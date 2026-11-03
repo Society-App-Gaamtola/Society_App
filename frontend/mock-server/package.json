@@ -1,0 +1,16 @@
+{
+  "name": "society-mock-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared fake backend for the mobile app and admin panel",
+  "main": "server.js",
+  "scripts": {
+    "mock": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "json-server": "^0.17.4",
+    "multer": "^2.0.2"
+  }
+}
