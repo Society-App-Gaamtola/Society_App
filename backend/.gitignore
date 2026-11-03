@@ -1,0 +1,6 @@
+node_modules/
+.env
+uploads/
+
+# Holds the real AES key and IV
+enc_dec.html
