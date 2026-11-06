@@ -43,25 +43,25 @@ const findOtpLoginUser = async (country_code, mobile_number) => {
     return common.isAccountInactive(user) ? { errorKey: "rest_account_inactive" } : { user };
 };
 
-// Checks the newest OTP and marks it used. Returns an error message key, or null when the OTP is correct
+// Checks the newest OTP and marks it verified. Returns an error message key, or null when the OTP is correct
 // With user_id, only an OTP requested by that user counts
 const consumeOtp = async (email, otp_purpose, otp, user_id = null) => {
     const [otpRows] = await db.query(
-        `SELECT id, otp_code, used_at, expires_at > NOW() AS is_valid FROM otp_codes
+        `SELECT id, otp_code, is_verified, expires_at > NOW() AS is_valid FROM otp_codes
          WHERE destination = ? AND purpose = ? ${user_id ? "AND user_id = ?" : ""}
          ORDER BY id DESC LIMIT 1`,
         user_id ? [email, otp_purpose, user_id] : [email, otp_purpose],
     );
     const otpRecord = otpRows[0];
 
-    if (!otpRecord || otpRecord.used_at) {
+    if (!otpRecord || otpRecord.is_verified) {
         return "rest_invalid_otp";
     }
 
     if (!otpRecord.is_valid) {
         return "rest_expired_otp";
     }
-
+    
     // Counted before comparing, so guesses sent at the same time can't get past the limit
     const [counted] = await query.updateQuery(
         "otp_codes",
@@ -77,8 +77,14 @@ const consumeOtp = async (email, otp_purpose, otp, user_id = null) => {
         return "rest_invalid_otp";
     }
 
-    await query.updateQuery("otp_codes", "used_at = NOW()", "id = ?", [otpRecord.id]);
-    return null;
+    // is_verified = 0 in the condition, so two requests sent together can't both use the same OTP
+    const [verified] = await query.updateQuery(
+        "otp_codes",
+        "is_verified = 1, used_at = NOW()",
+        "id = ? AND is_verified = 0",
+        [otpRecord.id],
+    );
+    return verified.affectedRows === 0 ? "rest_invalid_otp" : null;
 };
 
 // Saves only what was sent, so a missing address or photo keeps its old value

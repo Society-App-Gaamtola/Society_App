@@ -1,4 +1,4 @@
-import ScreenPlaceholder from '../components/ScreenPlaceholder';
+import { ScreenPlaceholder } from '../components';
 
 // Placeholder until the gallery screen is designed.
 export default function GalleryScreen() {

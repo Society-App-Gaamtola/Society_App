@@ -1,31 +1,29 @@
-import { useState, type ComponentProps } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Sharing from 'expo-sharing';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, fonts } from '../theme';
-import { useDonations } from '../donations/DonationsContext';
-import { useReports, type ReportFormat } from '../reports/ReportsContext';
-import { buildReportData, generateReportFile, reportMimeType, type ReportType } from '../reports/exportReport';
-import { formatDateTime } from '../utils/date';
-import { AppHeader, PermissionGate, PrimaryButton } from '../components';
-import DateRangeSheet, { formatRange, type DateRange } from '../components/DateRangeSheet';
-
-type McIcon = ComponentProps<typeof MaterialCommunityIcons>['name'];
+import { common, surface } from '../styles/common';
+import { colors, fonts, tones } from '../theme';
+import { REPORT_MIME_TYPES } from '../config';
+import { useDonations } from '../context/DonationsContext';
+import { useReports } from '../context/ReportsContext';
+import { Ionicons, MaterialCommunityIcons, type McIconName } from '../icons';
+import { buildReportData, generateReportFile } from '../services/reportExport';
+import type { DateRange, ReportFormat, ReportType } from '../types';
+import { formatDateTime, formatRange, toIsoDay } from '../utils/date';
+import { AppHeader, DateRangeButton, FieldLabel, OrDivider, PermissionGate, PrimaryButton } from '../components';
+import DateRangeSheet from '../components/sheets/DateRangeSheet';
 
 const DEFAULT_RANGE: DateRange = { start: '2026-10-01', end: '2026-10-31' };
-const MUTED_ICON = '#9A8F86';
-const PDF_RED = '#C62828';
-const EXCEL_GREEN = '#1E8E4E';
 
-const REPORT_TYPES: { type: ReportType; icon: McIcon }[] = [
+const REPORT_TYPES: { type: ReportType; icon: McIconName }[] = [
   { type: 'Donation Summary', icon: 'chart-pie' },
   { type: 'Transaction History', icon: 'format-list-bulleted' },
   { type: 'Member-wise Report', icon: 'account-group-outline' },
 ];
 
-const FORMATS: { format: ReportFormat; label: string; icon: McIcon; color: string }[] = [
-  { format: 'PDF', label: 'PDF (Recommended)', icon: 'file-pdf-box', color: PDF_RED },
-  { format: 'Excel', label: 'Excel (Editable)', icon: 'file-excel-box', color: EXCEL_GREEN },
+const FORMATS: { format: ReportFormat; label: string; icon: McIconName; color: string }[] = [
+  { format: 'PDF', label: 'PDF (Recommended)', icon: 'file-pdf-box', color: tones.danger.text },
+  { format: 'Excel', label: 'Excel (Editable)', icon: 'file-excel-box', color: tones.success.text },
 ];
 
 const INCLUDES = [
@@ -34,9 +32,6 @@ const INCLUDES = [
   'Payment method-wise summary',
   'Monthly trend and charts',
 ];
-
-const toIsoDay = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 const last30Days = (): DateRange => {
   const end = new Date();
@@ -81,7 +76,7 @@ function ExportReports() {
       });
       setSuccess(true);
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: reportMimeType(reportFormat), dialogTitle: type });
+        await Sharing.shareAsync(uri, { mimeType: REPORT_MIME_TYPES[reportFormat], dialogTitle: type });
       }
     } catch (e) {
       Alert.alert('Export failed', e instanceof Error ? e.message : 'Could not generate the report. Please try again.');
@@ -91,13 +86,13 @@ function ExportReports() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={common.screen}>
       <AppHeader leftType="back" rightIcons={['bell', 'avatar']} />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.heading}>Export Reports</Text>
-        <Text style={styles.subtext}>Generate and export donation reports.</Text>
+        <Text style={common.heading}>Export Reports</Text>
+        <Text style={common.subtext}>Generate and export donation reports.</Text>
 
-        <Label text="Report Type" />
+        <FieldLabel text="Report Type" style={styles.label} />
         <View style={styles.tiles}>
           {REPORT_TYPES.map((t) => {
             const active = t.type === type;
@@ -109,21 +104,17 @@ function ExportReports() {
                 accessibilityRole="radio"
                 accessibilityState={{ selected: active }}
               >
-                <MaterialCommunityIcons name={t.icon} size={24} color={active ? colors.primary : MUTED_ICON} />
+                <MaterialCommunityIcons name={t.icon} size={24} color={active ? colors.primary : colors.mutedIcon} />
                 <Text style={[styles.tileLabel, active && styles.tileLabelActive]}>{t.type}</Text>
               </Pressable>
             );
           })}
         </View>
 
-        <Label text="Date Range" />
-        <Pressable style={styles.range} onPress={() => setRangeOpen(true)} accessibilityRole="button">
-          <Ionicons name="calendar-outline" size={18} color={colors.primary} />
-          <Text style={styles.rangeText}>{formatRange(range)}</Text>
-          <Ionicons name="chevron-forward" size={18} color={MUTED_ICON} />
-        </Pressable>
+        <FieldLabel text="Date Range" style={styles.label} />
+        <DateRangeButton label={formatRange(range)} onPress={() => setRangeOpen(true)} />
 
-        <Label text="Export Format" />
+        <FieldLabel text="Export Format" style={styles.label} />
         <View style={styles.tiles}>
           {FORMATS.map((f) => {
             const active = f.format === format;
@@ -144,12 +135,12 @@ function ExportReports() {
 
         <View style={styles.includes}>
           <View style={styles.includesHeader}>
-            <Ionicons name="information-circle-outline" size={18} color="#E0700B" />
+            <Ionicons name="information-circle-outline" size={18} color={colors.warning} />
             <Text style={styles.includesTitle}>Report Includes</Text>
           </View>
           {INCLUDES.map((item) => (
             <View key={item} style={styles.includeRow}>
-              <Ionicons name="checkmark-circle" size={12} color={EXCEL_GREEN} />
+              <Ionicons name="checkmark-circle" size={12} color={tones.success.text} />
               <Text style={styles.includeText}>{item}</Text>
             </View>
           ))}
@@ -166,19 +157,15 @@ function ExportReports() {
 
         {success ? (
           <View style={styles.success}>
-            <Ionicons name="checkmark-circle" size={22} color={EXCEL_GREEN} />
-            <View style={styles.flex}>
+            <Ionicons name="checkmark-circle" size={22} color={tones.success.text} />
+            <View style={common.flex}>
               <Text style={styles.successTitle}>Report exported successfully!</Text>
               <Text style={styles.successText}>Your report has been generated and is ready to download.</Text>
             </View>
           </View>
         ) : null}
 
-        <View style={styles.orRow}>
-          <View style={styles.orLine} />
-          <Text style={styles.orText}>OR</Text>
-          <View style={styles.orLine} />
-        </View>
+        <OrDivider style={styles.or} />
 
         <Text style={styles.quickTitle}>Quick Download (Last 30 Days)</Text>
         <View style={styles.quickRow}>
@@ -226,55 +213,25 @@ function ExportReports() {
   );
 }
 
-function Label({ text }: { text: string }) {
-  return (
-    <Text style={styles.label}>
-      {text}
-      <Text style={styles.required}> *</Text>
-    </Text>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  flex: { flex: 1 },
   scroll: { padding: 16, paddingBottom: 32 },
-  heading: { fontFamily: fonts.bold, fontSize: 18, color: colors.textDark },
-  subtext: { fontFamily: fonts.regular, fontSize: 12, color: colors.textMuted, marginTop: 2 },
 
-  label: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.textDark, marginTop: 18, marginBottom: 8 },
-  required: { color: '#C62828' },
+  label: { marginTop: 18, marginBottom: 8 },
 
   tiles: { flexDirection: 'row', gap: 10 },
   tile: {
+    ...surface,
     flex: 1,
     height: 84,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     paddingHorizontal: 6,
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   formatTile: { height: 72 },
-  tileActive: { backgroundColor: '#FBEFEF', borderWidth: 1.5, borderColor: colors.primary },
+  tileActive: { backgroundColor: colors.softTint, borderWidth: 1.5, borderColor: colors.primary },
   tileLabel: { fontFamily: fonts.medium, fontSize: 11, color: colors.textDark, textAlign: 'center' },
   tileLabelActive: { fontFamily: fonts.semiBold, color: colors.primary },
-
-  range: {
-    height: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    backgroundColor: colors.card,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  rangeText: { flex: 1, fontFamily: fonts.medium, fontSize: 13, color: colors.textDark },
 
   includes: {
     marginTop: 18,
@@ -298,17 +255,15 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 12,
     padding: 12,
-    backgroundColor: '#E6F6EC',
+    backgroundColor: tones.success.bg,
     borderWidth: 1,
     borderColor: '#BFE5CC',
     borderRadius: 10,
   },
-  successTitle: { fontFamily: fonts.bold, fontSize: 12, color: EXCEL_GREEN },
+  successTitle: { fontFamily: fonts.bold, fontSize: 12, color: tones.success.text },
   successText: { fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted, marginTop: 1 },
 
-  orRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 18 },
-  orLine: { flex: 1, height: 1, backgroundColor: colors.border },
-  orText: { fontFamily: fonts.medium, fontSize: 12, color: colors.textMuted },
+  or: { marginVertical: 18 },
 
   quickTitle: { fontFamily: fonts.bold, fontSize: 13, color: colors.textDark, marginBottom: 10 },
   quickRow: { flexDirection: 'row', gap: 10 },

@@ -1,18 +1,17 @@
 import { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
+import { common } from '../styles/common';
 import { colors, fontFor, fonts, radius, spacing, type Language } from '../theme';
 import { languages, t } from '../i18n/strings';
 import { setAppLanguage } from '../i18n';
-import { Lotus } from '../components/Ornaments';
-import Loader from '../components/Loader';
+import { Ionicons } from '../icons';
+import { BrandBlock, Loader, Lotus } from '../components';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LanguageSelect'>;
 
-const BADGE_INACTIVE = '#EFEAE4';
 const MIN_LOADER_MS = 800;
 
 export default function LanguageSelectScreen({ navigation }: Props) {
@@ -32,12 +31,9 @@ export default function LanguageSelectScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={common.screen}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.brand}>
-          <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.brandTitle}>{'શ્રી ગામટોળા\nયુવક મિત્ર મંડળ'}</Text>
-        </View>
+        <BrandBlock logoSize={110} fontSize={24} lineHeight={36} />
 
         <Text style={styles.heading}>{t('selectLanguage', 'en')}</Text>
         <Text style={styles.subtext}>{t('selectLanguageHint', 'en')}</Text>
@@ -54,22 +50,12 @@ export default function LanguageSelectScreen({ navigation }: Props) {
                 accessibilityState={{ selected: active }}
               >
                 <View style={[styles.badge, active && styles.badgeActive]}>
-                  <Text
-                    style={[
-                      styles.badgeText,
-                      { fontFamily: fontFor(code, 'bold') },
-                      active && styles.badgeTextActive,
-                    ]}
-                  >
+                  <Text style={[styles.badgeText, { fontFamily: fontFor(code, 'bold') }, active && styles.badgeTextActive]}>
                     {badge}
                   </Text>
                 </View>
-                <Text style={[styles.label, { fontFamily: fontFor(code, code === 'en' ? 'bold' : 'regular') }]}>
-                  {native}
-                </Text>
-                <View style={[styles.radio, active && styles.radioActive]}>
-                  {active && <View style={styles.radioDot} />}
-                </View>
+                <Text style={[styles.label, { fontFamily: fontFor(code, code === 'en' ? 'bold' : 'regular') }]}>{native}</Text>
+                <View style={[styles.radio, active && styles.radioActive]}>{active && <View style={styles.radioDot} />}</View>
               </Pressable>
             );
           })}
@@ -92,23 +78,13 @@ export default function LanguageSelectScreen({ navigation }: Props) {
           <Lotus />
         </View>
       </ScrollView>
-      <Loader overlay visible={saving} message={t('loading', selected)} language={selected} />
+      <Loader visible={saving} message={t('loading', selected)} language={selected} />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   scroll: { flexGrow: 1, padding: spacing.lg },
-  brand: { alignItems: 'center', marginBottom: spacing.lg },
-  logo: { width: 110, height: 110, marginBottom: spacing.sm },
-  brandTitle: {
-    fontFamily: fonts.gujaratiHeading,
-    fontSize: 24,
-    lineHeight: 36,
-    color: colors.primary,
-    textAlign: 'center',
-  },
   heading: { fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 28, color: colors.textDark },
   subtext: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 20, color: colors.textMuted, marginTop: 2 },
   list: { gap: 12, marginTop: spacing.md, marginBottom: spacing.lg },
@@ -127,7 +103,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 6,
-    backgroundColor: BADGE_INACTIVE,
+    backgroundColor: '#EFEAE4',
     alignItems: 'center',
     justifyContent: 'center',
   },

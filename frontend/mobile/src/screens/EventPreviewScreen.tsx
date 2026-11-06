@@ -1,18 +1,20 @@
-import { useMemo, useState, type ComponentProps, type ReactNode } from 'react';
-import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { Ionicons } from '@expo/vector-icons';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Alert, Image, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/types';
+import { common, surface } from '../styles/common';
 import { colors, fonts } from '../theme';
-import { useAuth } from '../auth/AuthContext';
-import { useExecEvents, type NewExecEvent } from '../events/EventsContext';
+import { useAuth } from '../context/AuthContext';
+import { useExecEvents } from '../context/EventsContext';
+import { Ionicons, type IoniconName } from '../icons';
+import type { NewExecEvent } from '../types';
 import { dayCount, formatDateTime } from '../utils/date';
 import { AppHeader, OutlineButton, PermissionGate, PrimaryButton } from '../components';
+import DatePickerSheet from '../components/sheets/DatePickerSheet';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'EventPreview'>;
-type IconName = ComponentProps<typeof Ionicons>['name'];
 
 export default function EventPreviewScreen() {
   return (
@@ -91,13 +93,13 @@ function EventPreview() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={common.screen}>
       <AppHeader leftType="back" rightIcons={['refresh']} />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.titleRow}>
-          <View style={styles.flex}>
-            <Text style={styles.heading}>Event Preview</Text>
-            <Text style={styles.subtext}>Review event details before posting.</Text>
+          <View style={common.flex}>
+            <Text style={common.heading}>Event Preview</Text>
+            <Text style={common.subtext}>Review event details before posting.</Text>
           </View>
           <View style={styles.readyPill}>
             <Text style={styles.readyText}>● Ready to Post</Text>
@@ -122,20 +124,20 @@ function EventPreview() {
 
         <View style={styles.card}>
           <DetailRow icon={<Ionicons name="person-outline" size={16} color={colors.primary} />} label="Organizer" value={event.organizer} />
-          <View style={styles.divider} />
+          <View style={common.divider} />
           <DetailRow icon={<Ionicons name="call-outline" size={16} color={colors.primary} />} label="Contact" value={event.contact} />
         </View>
 
         <Text style={styles.subSection}>Additional Information</Text>
         <View style={styles.card}>
           <DetailRow label="Category" value={event.category} />
-          <View style={styles.divider} />
+          <View style={common.divider} />
           <DetailRow label="Created On" value={createdOn} />
         </View>
 
         <View style={styles.warning}>
-          <Ionicons name="alert-circle-outline" size={22} color="#E0700B" />
-          <View style={styles.flex}>
+          <Ionicons name="alert-circle-outline" size={22} color={colors.warning} />
+          <View style={common.flex}>
             <Text style={styles.warningTitle}>Publishing is subject to permission settings.</Text>
             <Text style={styles.warningText}>Event will be visible to members after posting and required approvals.</Text>
           </View>
@@ -149,39 +151,25 @@ function EventPreview() {
       </ScrollView>
 
       {iosPickerValue ? (
-        <Modal transparent animationType="slide" onRequestClose={() => setIosPickerValue(null)}>
-          <Pressable style={styles.backdrop} onPress={() => setIosPickerValue(null)} />
-          <View style={styles.sheet}>
-            <View style={styles.sheetHeader}>
-              <Pressable onPress={() => setIosPickerValue(null)} hitSlop={8}>
-                <Text style={styles.sheetCancel}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  const when = iosPickerValue;
-                  setIosPickerValue(null);
-                  onScheduled(when);
-                }}
-                hitSlop={8}
-              >
-                <Text style={styles.sheetDone}>Schedule</Text>
-              </Pressable>
-            </View>
-            <DateTimePicker
-              mode="datetime"
-              display="spinner"
-              value={iosPickerValue}
-              minimumDate={new Date()}
-              onChange={(_, d) => d && setIosPickerValue(d)}
-            />
-          </View>
-        </Modal>
+        <DatePickerSheet
+          mode="datetime"
+          value={iosPickerValue}
+          minimumDate={new Date()}
+          doneLabel="Schedule"
+          onChange={setIosPickerValue}
+          onCancel={() => setIosPickerValue(null)}
+          onDone={() => {
+            const when = iosPickerValue;
+            setIosPickerValue(null);
+            onScheduled(when);
+          }}
+        />
       ) : null}
     </View>
   );
 }
 
-function InfoRow({ icon, text }: { icon: IconName; text?: string }) {
+function InfoRow({ icon, text }: { icon: IoniconName; text?: string }) {
   if (!text) return null;
   return (
     <View style={styles.infoRow}>
@@ -202,13 +190,9 @@ function DetailRow({ icon, label, value }: { icon?: ReactNode; label: string; va
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  flex: { flex: 1 },
   scroll: { padding: 16, paddingBottom: 32 },
 
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  heading: { fontFamily: fonts.bold, fontSize: 18, color: colors.textDark },
-  subtext: { fontFamily: fonts.regular, fontSize: 12, color: colors.textMuted, marginTop: 2 },
   readyPill: {
     paddingVertical: 4,
     paddingHorizontal: 8,
@@ -228,15 +212,7 @@ const styles = StyleSheet.create({
   description: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 21, color: colors.textMuted },
   subSection: { fontFamily: fonts.bold, fontSize: 14, color: colors.textDark, marginTop: 18, marginBottom: 8 },
 
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 12,
-    marginTop: 14,
-  },
-  divider: { height: 1, backgroundColor: colors.border },
+  card: { ...surface, paddingHorizontal: 12, marginTop: 14 },
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
   detailLabel: { width: 90, fontFamily: fonts.regular, fontSize: 12, color: colors.textMuted },
   detailValue: { flex: 1, fontFamily: fonts.semiBold, fontSize: 13, color: colors.textDark, textAlign: 'right' },
@@ -258,16 +234,4 @@ const styles = StyleSheet.create({
   buttonRow: { flexDirection: 'row', gap: 10, marginTop: 18 },
   half: { flex: 1, width: 'auto' },
   schedule: { marginTop: 10 },
-
-  backdrop: { flex: 1, backgroundColor: 'rgba(43, 26, 18, 0.35)' },
-  sheet: { backgroundColor: colors.white, paddingBottom: 24 },
-  sheetHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  sheetCancel: { fontFamily: fonts.medium, fontSize: 14, color: colors.textMuted },
-  sheetDone: { fontFamily: fonts.semiBold, fontSize: 14, color: colors.primary },
 });

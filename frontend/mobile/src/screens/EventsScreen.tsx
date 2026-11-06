@@ -1,36 +1,26 @@
-import { useCallback, useMemo, useRef, useState, type ComponentRef } from 'react';
-import {
-  FlatList,
-  Image,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { memo, useCallback, useMemo, useRef, useState, type ComponentRef } from 'react';
+import { FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { EventsStackParamList } from '../navigation/types';
+import { common, surface } from '../styles/common';
 import { colors, fonts } from '../theme';
-import { events, type SocietyEvent } from '../data/mock';
-import { AppHeader, FilterChips, StatusBadge } from '../components';
+import { CATEGORY_FILTERS, type CategoryFilter } from '../config/filters';
+import { LIST_PERFORMANCE_PROPS } from '../config/list';
+import { events } from '../data/mock';
+import { useSimulatedRefresh } from '../hooks/useSimulatedRefresh';
+import { Ionicons } from '../icons';
+import type { SocietyEvent } from '../types';
+import { AppHeader, EmptyState, FilterChips, MetaRow, SearchBar, StatusBadge } from '../components';
 
-const FILTERS = ['All', 'Festival', 'Aarti', 'Cultural', 'Meeting'] as const;
-type Filter = (typeof FILTERS)[number];
-
-const PADDING = 16;
-const MUTED_ICON = '#9A8F86';
-const PLACEHOLDER = '#A89E94';
+const Separator = () => <View style={styles.separator} />;
 
 export default function EventsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<EventsStackParamList>>();
   const searchRef = useRef<ComponentRef<typeof TextInput>>(null);
-  const [filter, setFilter] = useState<Filter>('All');
+  const [filter, setFilter] = useState<CategoryFilter>('All');
   const [query, setQuery] = useState('');
-  const [searchFocused, setSearchFocused] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const { refreshing, onRefresh } = useSimulatedRefresh();
 
   const data = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -39,85 +29,61 @@ export default function EventsScreen() {
     );
   }, [filter, query]);
 
-  const onRefresh = useCallback(() => {
-    // TODO: reload events from the API.
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 800);
-  }, []);
+  const openEvent = useCallback((eventId: string) => navigation.navigate('EventDetails', { eventId }), [navigation]);
+  const renderItem = useCallback(
+    ({ item }: { item: SocietyEvent }) => <EventCard event={item} onOpen={openEvent} />,
+    [openEvent],
+  );
 
   const header = (
     <View>
-      <Text style={styles.heading}>Events & Cultural Programmes</Text>
-      <Text style={styles.subtext}>Stay updated with our upcoming events and cultural activities.</Text>
+      <Text style={common.heading}>Events & Cultural Programmes</Text>
+      <Text style={common.subtextRelaxed}>Stay updated with our upcoming events and cultural activities.</Text>
 
-      <View style={styles.searchRow}>
-        <View style={[styles.search, searchFocused && styles.searchFocused]}>
-          <Ionicons name="search-outline" size={18} color={MUTED_ICON} />
-          <TextInput
-            ref={searchRef}
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search events..."
-            placeholderTextColor={PLACEHOLDER}
-            style={styles.searchInput}
-            returnKeyType="search"
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-          />
-          {query ? (
-            <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityLabel="Clear search">
-              <Ionicons name="close-circle" size={18} color={MUTED_ICON} />
-            </Pressable>
-          ) : null}
-        </View>
-        <Pressable
-          style={styles.filterButton}
-          onPress={() => navigation.navigate('EventCalendar')}
-          accessibilityRole="button"
-          accessibilityLabel="Calendar view"
-        >
-          <Ionicons name="calendar-outline" size={20} color={colors.textDark} />
-        </Pressable>
-      </View>
+      <SearchBar
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Search events..."
+        inputRef={searchRef}
+        actionIcon="calendar-outline"
+        actionLabel="Calendar view"
+        onActionPress={() => navigation.navigate('EventCalendar')}
+      />
 
-      <FilterChips options={FILTERS} selected={filter} onSelect={setFilter} style={styles.chips} />
+      <FilterChips options={CATEGORY_FILTERS} selected={filter} onSelect={setFilter} style={styles.chips} />
     </View>
   );
 
   return (
-    <View style={styles.container}>
+    <View style={common.screen}>
       <AppHeader
         leftType="menu"
         rightIcons={['search', 'bell']}
         onRightPress={(icon) => icon === 'search' && searchRef.current?.focus()}
       />
       <FlatList
+        {...LIST_PERFORMANCE_PROPS}
         data={data}
         keyExtractor={(e) => e.id}
         contentContainerStyle={styles.list}
         ListHeaderComponent={header}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={Separator}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />
         }
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons name="calendar-outline" size={40} color={colors.lightGold} />
-            <Text style={styles.emptyText}>No events found</Text>
-          </View>
+          <EmptyState icon={<Ionicons name="calendar-outline" size={40} color={colors.lightGold} />} text="No events found" />
         }
-        renderItem={({ item }) => (
-          <EventCard event={item} onPress={() => navigation.navigate('EventDetails', { eventId: item.id })} />
-        )}
+        renderItem={renderItem}
       />
     </View>
   );
 }
 
-function EventCard({ event, onPress }: { event: SocietyEvent; onPress: () => void }) {
+const EventCard = memo(function EventCard({ event, onOpen }: { event: SocietyEvent; onOpen: (id: string) => void }) {
   return (
-    <Pressable style={styles.card} onPress={onPress} accessibilityRole="button">
+    <Pressable style={styles.card} onPress={() => onOpen(event.id)} accessibilityRole="button">
       <Image source={event.image} style={styles.image} />
       <View style={styles.info}>
         <View style={styles.titleRow}>
@@ -126,72 +92,21 @@ function EventCard({ event, onPress }: { event: SocietyEvent; onPress: () => voi
           </Text>
           <StatusBadge status={event.status} />
         </View>
-        <View style={styles.metaRow}>
-          <Ionicons name="calendar-outline" size={12} color={MUTED_ICON} />
-          <Text style={styles.meta} numberOfLines={1}>
-            {event.date}
-          </Text>
-        </View>
-        <View style={styles.metaRow}>
-          <Ionicons name="location-outline" size={12} color={MUTED_ICON} />
-          <Text style={styles.meta} numberOfLines={1} ellipsizeMode="tail">
-            {event.venue}
-          </Text>
-        </View>
+        <MetaRow icon="calendar-outline" text={event.date} />
+        <MetaRow icon="location-outline" text={event.venue} />
       </View>
-      <Ionicons name="chevron-forward" size={18} color={MUTED_ICON} />
+      <Ionicons name="chevron-forward" size={18} color={colors.mutedIcon} />
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  list: { padding: PADDING, paddingBottom: 32, flexGrow: 1 },
-  heading: { fontFamily: fonts.bold, fontSize: 18, color: colors.textDark },
-  subtext: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, color: colors.textMuted, marginTop: 2 },
-  searchRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  search: {
-    flex: 1,
-    height: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    backgroundColor: colors.card,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  searchFocused: { borderColor: colors.primary },
-  searchInput: { flex: 1, height: '100%', fontFamily: fonts.regular, fontSize: 13, color: colors.textDark, padding: 0 },
-  filterButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  list: { padding: 16, paddingBottom: 32, flexGrow: 1 },
   chips: { marginTop: 12, marginBottom: 14 },
   separator: { height: 12 },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 10,
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
+  card: { ...surface, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10 },
   image: { width: 90, height: 80, borderRadius: 10 },
   info: { flex: 1, gap: 4 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
   title: { flex: 1, fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.textDark },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  meta: { flex: 1, fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted },
-  empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 10 },
-  emptyText: { fontFamily: fonts.medium, fontSize: 14, color: colors.textMuted },
 });

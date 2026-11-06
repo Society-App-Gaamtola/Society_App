@@ -3,9 +3,9 @@ import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { MainTabParamList } from '../navigation/types';
 import { colors, fonts } from '../theme';
-import { MOCK_USERS, useAuth } from '../auth/AuthContext';
-import { OutlineButton } from '../components';
-import ScreenPlaceholder from '../components/ScreenPlaceholder';
+import { useAuth } from '../context/AuthContext';
+import { MOCK_USERS } from '../data/seeds';
+import { OutlineButton, ScreenPlaceholder } from '../components';
 
 // Placeholder until the profile screen is designed.
 export default function ProfileScreen() {
@@ -15,10 +15,12 @@ export default function ProfileScreen() {
   return (
     <ScreenPlaceholder title="Profile">
       <OutlineButton
-        title="Volunteer & Duties"
-        onPress={() => navigation.navigate('Home', { screen: 'Volunteer' })}
-        style={{ marginTop: 16 }}
+        title="Edit Profile"
+        onPress={() => navigation.navigate('Home', { screen: 'EditProfile' })}
+        style={styles.firstButton}
       />
+      <OutlineButton title="Change Password" onPress={() => navigation.navigate('Home', { screen: 'ChangePassword' })} />
+      <OutlineButton title="Volunteer & Duties" onPress={() => navigation.navigate('Home', { screen: 'Volunteer' })} />
       <OutlineButton
         title="Executive Membership Request"
         onPress={() => navigation.navigate('Home', { screen: 'ExecutiveRequest' })}
@@ -55,6 +57,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  firstButton: { marginTop: 16 },
   dev: {
     alignSelf: 'stretch',
     marginTop: 24,

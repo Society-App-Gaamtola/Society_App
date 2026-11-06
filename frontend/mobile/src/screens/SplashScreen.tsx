@@ -3,8 +3,13 @@ import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
+import { LOGO, SOCIETY_NAME_GU_TWO_LINES } from '../config';
+import { common } from '../styles/common';
 import { colors, fonts, spacing } from '../theme';
-import { CornerOrnament, GoldDivider, Lotus, TopOrnament } from '../components/Ornaments';
+import { useAuth } from '../context/AuthContext';
+import { resetAfterLogin } from '../navigation/navigationRef';
+import { sineLoop } from '../utils/animation';
+import { CornerOrnament, GoldDivider, Lotus, TopOrnament } from '../components/ui/Ornaments';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 
@@ -27,6 +32,7 @@ const riseStyle = (value: Animated.Value) => ({
 });
 
 export default function SplashScreen({ navigation }: Props) {
+  const { user } = useAuth();
   const ornaments = useRef(new Animated.Value(0)).current;
   const logo = useRef(new Animated.Value(0)).current;
   const glow = useRef(new Animated.Value(0)).current;
@@ -50,31 +56,22 @@ export default function SplashScreen({ navigation }: Props) {
       fade(lotus, 600, 900),
     ]).start();
 
-    const glowLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glow, { toValue: 1, duration: 1000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(glow, { toValue: 0, duration: 1000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ]),
-    );
-    const floatLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(lotusFloat, { toValue: 1, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(lotusFloat, { toValue: 0, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ]),
-    );
+    const glowLoop = sineLoop(glow, 1000);
+    const floatLoop = sineLoop(lotusFloat, 1200);
     glowLoop.start();
     floatLoop.start();
 
-    const timer = setTimeout(() => navigation.replace('Onboarding'), SPLASH_DURATION_MS);
+    // A saved login skips straight past onboarding and the login screens.
+    const timer = setTimeout(() => (user ? resetAfterLogin(user) : navigation.replace('Onboarding')), SPLASH_DURATION_MS);
     return () => {
       clearTimeout(timer);
       glowLoop.stop();
       floatLoop.stop();
     };
-  }, [navigation, ornaments, logo, glow, title, subtitle, divider, tagline, lotus, lotusFloat]);
+  }, [navigation, user, ornaments, logo, glow, title, subtitle, divider, tagline, lotus, lotusFloat]);
 
   return (
-    <View style={styles.container}>
+    <View style={common.screen}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: ornaments }]} pointerEvents="none">
         <CornerOrnament position="topLeft" />
         <CornerOrnament position="topRight" />
@@ -99,7 +96,7 @@ export default function SplashScreen({ navigation }: Props) {
               ]}
             />
             <Animated.Image
-              source={require('../../assets/logo.png')}
+              source={LOGO}
               style={[
                 styles.logo,
                 {
@@ -111,7 +108,7 @@ export default function SplashScreen({ navigation }: Props) {
             />
           </View>
 
-          <Animated.Text style={[styles.title, riseStyle(title)]}>{'શ્રી ગામટોળા\nયુવક મિત્ર મંડળ'}</Animated.Text>
+          <Animated.Text style={[styles.title, riseStyle(title)]}>{SOCIETY_NAME_GU_TWO_LINES}</Animated.Text>
           <Animated.Text style={[styles.subtitle, riseStyle(subtitle)]}>Society Cultural Activity App</Animated.Text>
           <Animated.View style={[styles.divider, riseStyle(divider)]}>
             <GoldDivider />
@@ -136,7 +133,6 @@ export default function SplashScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   safe: { flex: 1, alignItems: 'center' },
   topOrnament: { marginTop: spacing.sm },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg },

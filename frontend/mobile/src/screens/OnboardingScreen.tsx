@@ -14,8 +14,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
+import { common } from '../styles/common';
 import { colors, fonts, radius, spacing } from '../theme';
-import Loader from '../components/Loader';
+import { Loader } from '../components';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
 
@@ -24,21 +25,21 @@ type Slide = { key: string; image: ImageSourcePropType; title: string; descripti
 const slides: Slide[] = [
   {
     key: 'community',
-    image: require('../../assets/arti1.png'),
+    image: require('../../assets/onboarding-community.jpg'),
     title: 'Stay Connected with Our Community',
     description:
       'Explore cultural programmes, Aarti schedules, festivals and upcoming community events in one place.',
   },
   {
     key: 'festivals',
-    image: require('../../assets/Ganesh Chaturthi Puja at Night2.png'),
+    image: require('../../assets/onboarding-festivals.jpg'),
     title: 'Celebrate Every Festival Together',
     description:
       'Get event reminders, RSVP for Garba, Ganesh Chaturthi and more, and never miss a celebration.',
   },
   {
     key: 'donate',
-    image: require('../../assets/Diwali Courtyard Celebration3.png'),
+    image: require('../../assets/onboarding-donate.jpg'),
     title: 'Donate & Share Memories',
     description:
       'Contribute to society activities via UPI and share photos and videos with the community.',
@@ -46,7 +47,6 @@ const slides: Slide[] = [
 ];
 
 const HORIZONTAL_PADDING = spacing.lg;
-const INACTIVE_DOT = '#D9CBB8';
 const LOADER_MS = 700;
 
 export default function OnboardingScreen({ navigation }: Props) {
@@ -75,7 +75,7 @@ export default function OnboardingScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={common.screen}>
       <View style={styles.header}>
         <Pressable onPress={goToLanguageSelect} hitSlop={12}>
           <Text style={styles.skip}>Skip</Text>
@@ -103,7 +103,7 @@ export default function OnboardingScreen({ navigation }: Props) {
 
       <View style={styles.dots}>
         {slides.map((s, i) => (
-          <View key={s.key} style={[styles.dot, { backgroundColor: i === index ? colors.primary : INACTIVE_DOT }]} />
+          <View key={s.key} style={[styles.dot, { backgroundColor: i === index ? colors.primary : colors.dashedBorder }]} />
         ))}
       </View>
 
@@ -113,13 +113,12 @@ export default function OnboardingScreen({ navigation }: Props) {
       >
         <Text style={styles.buttonText}>{isLast ? 'Get Started →' : 'Next →'}</Text>
       </Pressable>
-      <Loader overlay visible={leaving} message="Loading..." language="en" />
+      <Loader visible={leaving} message="Loading..." language="en" />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row',
     justifyContent: 'flex-end',

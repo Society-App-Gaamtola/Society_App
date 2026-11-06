@@ -9,7 +9,30 @@ export const colors = {
   textMuted: '#7A6A5E',
   border: '#EADFCF',
   white: '#FFFFFF',
+  danger: '#C62828',
+  warning: '#E0700B',
+  mutedIcon: '#9A8F86',
+  placeholder: '#A89E94',
+  tint: '#F8E9E9',
+  softTint: '#FBEFEF',
+  dashedBorder: '#D9CBB8',
+  noteBackground: '#FDF3E4',
+  backdrop: 'rgba(43, 26, 18, 0.35)',
 } as const;
+
+/** Text and background pairs for badges and icon circles. */
+export const tones = {
+  success: { text: '#1E8E4E', bg: '#E6F6EC' },
+  danger: { text: '#C62828', bg: '#FDECEC' },
+  info: { text: '#1E63C6', bg: '#E8F0FC' },
+  warning: { text: '#E0700B', bg: '#FFF1E0' },
+  neutral: { text: '#6B6B6B', bg: '#F0EEEC' },
+  sky: { text: '#0A84B5', bg: '#E5F5FB' },
+} as const;
+
+export type Tone = { text: string; bg: string };
+
+export const PRIMARY_GRADIENT = ['#8E1426', '#6A0D1B'] as const;
 
 export const radius = {
   card: 12,
@@ -45,6 +68,3 @@ export const fontFor = (lang: Language, weight: 'regular' | 'bold' = 'regular') 
   if (lang === 'hi') return weight === 'bold' ? fonts.hindiBold : fonts.hindi;
   return weight === 'bold' ? fonts.semiBold : fonts.regular;
 };
-
-export const theme = { colors, radius, spacing, fonts };
-export default theme;

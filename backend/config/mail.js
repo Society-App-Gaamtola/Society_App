@@ -1,44 +1,75 @@
-const createOtpWmailTemplate = ({ userName = "User", otp, otpType = "signup" }) => {
+const createOtpWmailTemplate = ({ userName = "there", otp, otpType = "signup" }) => {
   const appName = process.env.APP_NAME || "Gaamtoda Mitra Mandal";
   const titles = { forgot_password: "Password Reset", login: "Login Verification", email_change: "Email Verification" };
   const title = titles[otpType] || "Signup Verification";
+  const intros = {
+    forgot_password: "Enter this code in the app to reset your password.",
+    login: "Enter this code in the app to log in to your account.",
+    email_change: "Enter this code in the app to confirm your new email address.",
+  };
+  const intro = intros[otpType] || "Enter this code in the app to verify your email and finish signing up.";
   const expireMinutes = 5;
- 
+
   return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light" />
   <title>${appName} OTP</title>
 </head>
-<body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6f8;padding:20px 10px;">
+<body style="margin:0;padding:0;background:#FFF8EE;font-family:Arial,Helvetica,sans-serif;color:#2B1A12;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${title} OTP, valid for ${expireMinutes} minutes.</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#FFF8EE" style="background:#FFF8EE;padding:24px 12px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:10px;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,0.06);">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#FFFFFF" style="max-width:520px;background:#FFFFFF;border:1px solid #EADFCF;border-radius:12px;border-collapse:separate;">
           <tr>
-            <td style="font-size:22px;font-weight:700;color:#0f172a;">${appName}</td>
-          </tr>
-          <tr>
-            <td style="padding-top:8px;font-size:18px;font-weight:600;color:#111827;">${title}</td>
-          </tr>
-          <tr>
-            <td style="padding-top:14px;font-size:14px;line-height:1.6;">
-              Hello ${userName},<br />
-              Use the OTP below to continue.
+            <td align="center" bgcolor="#7A1020" style="background:#7A1020;border-radius:11px 11px 0 0;border-bottom:3px solid #C9A24A;padding:22px 24px;font-size:20px;font-weight:700;color:#FFFFFF;">
+              ${appName}
             </td>
           </tr>
           <tr>
-            <td align="center" style="padding:22px 0;">
-              <div style="display:inline-block;padding:12px 22px;border-radius:8px;background:#e8f0fe;color:#0b57d0;font-size:28px;letter-spacing:6px;font-weight:700;">
-                ${otp}
+            <td style="padding:28px 28px 0;font-size:20px;font-weight:700;color:#2B1A12;">${title}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 28px 0;font-size:15px;line-height:1.6;color:#2B1A12;">
+              Hello ${userName},<br />
+              ${intro}
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:24px 28px;">
+              <table role="presentation" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center" bgcolor="#FFF8EE" style="background:#FFF8EE;border:1px solid #E8D4A2;border-radius:10px;padding:14px 20px 14px 28px;font-size:32px;line-height:1.2;font-weight:700;letter-spacing:8px;color:#7A1020;">
+                    ${otp}
+                  </td>
+                </tr>
+              </table>
+              <div style="padding-top:12px;font-size:13px;color:#7A6A5E;">
+                Expires in <strong style="color:#2B1A12;">${expireMinutes} minutes</strong>
               </div>
             </td>
           </tr>
           <tr>
-            <td style="font-size:13px;color:#4b5563;line-height:1.6;">
-              This OTP expires in ${expireMinutes} minutes. Do not share this code with anyone.
+            <td style="padding:0 28px 28px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="border-top:1px solid #EADFCF;padding-top:16px;font-size:13px;line-height:1.6;color:#7A6A5E;">
+                    <strong style="color:#2B1A12;">Never share this code</strong> with anyone, including ${appName} members or staff.
+                    If you didn't request it, you can safely ignore this email.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;">
+          <tr>
+            <td align="center" style="padding:16px 12px 0;font-size:12px;line-height:1.5;color:#7A6A5E;">
+              This is an automated email from ${appName}. Please do not reply.
             </td>
           </tr>
         </table>
@@ -49,6 +80,5 @@ const createOtpWmailTemplate = ({ userName = "User", otp, otpType = "signup" }) 
 </html>
 `.trim();
 };
- 
+
 export { createOtpWmailTemplate };
- 

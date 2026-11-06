@@ -1,14 +1,15 @@
-import type { ComponentProps } from 'react';
+import { useCallback } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, type CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { HomeStackParamList, MainTabParamList } from '../navigation/types';
+import { common, surface } from '../styles/common';
+import { useAuth } from '../context/AuthContext';
 import { colors, fonts } from '../theme';
-import { events, notices } from '../data/mock';
-import { AppHeader, StatusBadge } from '../components';
-import { EventListCard, FeaturedCarousel, SectionHeader } from '../components/HomeSections';
+import { events, featuredEvents, notices } from '../data/mock';
+import { Ionicons, MaterialCommunityIcons, type IoniconName } from '../icons';
+import { AppHeader, EventListCard, FeaturedCarousel, IconCircle, SectionHeader, StatusBadge } from '../components';
 
 type Nav = CompositeNavigationProp<
   NativeStackNavigationProp<HomeStackParamList, 'HomeMain'>,
@@ -16,22 +17,18 @@ type Nav = CompositeNavigationProp<
 >;
 
 const H_PADDING = 16;
-const PINK = '#F8E9E9';
 
-const featured = events.filter((e) => ['e1', 'e5', 'e3'].includes(e.id));
 const upcoming = events.filter((e) => e.status === 'Upcoming').slice(0, 3);
 const latestNotice = notices[0];
 
 export default function HomeScreen() {
   const navigation = useNavigation<Nav>();
-  const openEvent = (eventId: string) => navigation.navigate('EventDetails', { eventId });
+  const { user } = useAuth();
+  const firstName = user?.name.split(' ')[0];
+  const openEvent = useCallback((eventId: string) => navigation.navigate('EventDetails', { eventId }), [navigation]);
   const goToEvents = () => navigation.navigate('Events', { screen: 'EventsMain' });
 
-  const shortcuts: {
-    label: string;
-    icon: ComponentProps<typeof Ionicons>['name'];
-    onPress: () => void;
-  }[] = [
+  const shortcuts: { label: string; icon: IoniconName; onPress: () => void }[] = [
     { label: 'Events', icon: 'calendar-outline', onPress: goToEvents },
     { label: 'Notices', icon: 'megaphone-outline', onPress: () => navigation.navigate('NoticeBoard') },
     { label: 'Gallery', icon: 'images-outline', onPress: () => navigation.navigate('Gallery') },
@@ -40,20 +37,20 @@ export default function HomeScreen() {
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={common.screen}>
       <AppHeader leftType="menu" rightIcons={['bell', 'avatar']} />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.greeting}>Namaste, Ramesh 👋</Text>
+        <Text style={styles.greeting}>{`Namaste${firstName ? `, ${firstName}` : ''} 👋`}</Text>
         <Text style={styles.welcome}>Welcome to Shri Gamtola Yuvak Mitra Mandal</Text>
 
-        <FeaturedCarousel items={featured} onOpen={openEvent} horizontalPadding={H_PADDING} />
+        <FeaturedCarousel items={featuredEvents} onOpen={openEvent} horizontalPadding={H_PADDING} />
 
         <View style={styles.shortcuts}>
           {shortcuts.map((s) => (
             <Pressable key={s.label} style={styles.shortcut} onPress={s.onPress} accessibilityRole="button">
-              <View style={styles.shortcutIcon}>
+              <IconCircle size={48} radius={12}>
                 <Ionicons name={s.icon} size={22} color={colors.primary} />
-              </View>
+              </IconCircle>
               <Text style={styles.shortcutLabel}>{s.label}</Text>
             </Pressable>
           ))}
@@ -68,9 +65,9 @@ export default function HomeScreen() {
 
         <SectionHeader title="Latest Notices" onViewAll={() => navigation.navigate('NoticeBoard')} />
         <Pressable style={styles.noticeCard} onPress={() => navigation.navigate('NoticeBoard')}>
-          <View style={styles.noticeIcon}>
+          <IconCircle size={40}>
             <Ionicons name="megaphone-outline" size={20} color={colors.primary} />
-          </View>
+          </IconCircle>
           <View style={styles.noticeInfo}>
             <Text style={styles.noticeTitle}>{latestNotice.title}</Text>
             <Text style={styles.noticeDate}>{latestNotice.date}</Text>
@@ -97,42 +94,17 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   scroll: { paddingHorizontal: H_PADDING, paddingTop: 16, paddingBottom: 32 },
   greeting: { fontFamily: fonts.bold, fontSize: 20, color: colors.textDark },
   welcome: { fontFamily: fonts.regular, fontSize: 12, color: colors.textMuted, marginTop: 2 },
 
   shortcuts: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
   shortcut: { flex: 1, alignItems: 'center', gap: 6 },
-  shortcutIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: PINK,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   shortcutLabel: { fontFamily: fonts.medium, fontSize: 11, color: colors.textDark },
 
   list: { gap: 10 },
 
-  noticeCard: {
-    flexDirection: 'row',
-    gap: 10,
-    padding: 12,
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  noticeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: PINK,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  noticeCard: { ...surface, flexDirection: 'row', gap: 10, padding: 12 },
   noticeInfo: { flex: 1, gap: 2, paddingRight: 64 },
   noticeTitle: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textDark },
   noticeDate: { fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted },

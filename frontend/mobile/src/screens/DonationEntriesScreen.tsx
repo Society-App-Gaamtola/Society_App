@@ -1,53 +1,44 @@
-import { useCallback, useMemo, useState, type ComponentProps } from 'react';
-import {
-  Alert,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/types';
-import { colors, fonts } from '../theme';
-import { useDonations, type Donation, type PaymentMode } from '../donations/DonationsContext';
+import { common, surface } from '../styles/common';
+import { colors, fonts, tones, type Tone } from '../theme';
+import { LIST_PERFORMANCE_PROPS } from '../config/list';
+import { useDonations } from '../context/DonationsContext';
+import { Ionicons, MaterialCommunityIcons, type McIconName } from '../icons';
+import type { DateRange, Donation, DonationStatus, PaymentMode } from '../types';
+import { formatDateTime, formatRange, isInRange } from '../utils/date';
 import { formatINR } from '../utils/format';
-import { formatDateTime } from '../utils/date';
-import { AppHeader, FilterChips, PermissionGate } from '../components';
-import ActionSheet from '../components/ActionSheet';
-import DateRangeSheet, { formatRange, type DateRange as Range } from '../components/DateRangeSheet';
+import { ActionSheet, AppHeader, DateRangeButton, EmptyState, FilterChips, IconCircle, PermissionGate, Pill, SearchBar } from '../components';
+import DateRangeSheet from '../components/sheets/DateRangeSheet';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'DonationEntries'>;
 
 const FILTERS = ['All', 'Cash', 'UPI', 'Bank Transfer', 'Pending Verification'] as const;
 type Filter = (typeof FILTERS)[number];
 
-const DEFAULT_RANGE: Range = { start: '2026-10-10', end: '2026-10-14' };
-const MUTED_ICON = '#9A8F86';
-const PLACEHOLDER = '#A89E94';
+const DEFAULT_MONTH = '2026-10-10';
 
-const avatarColors = [
-  { bg: '#F8E9E9', text: '#7A1020' },
-  { bg: '#E8F0FC', text: '#1E63C6' },
-  { bg: '#E6F6EC', text: '#1E8E4E' },
+const avatarColors: Tone[] = [
+  { bg: colors.tint, text: colors.primary },
+  tones.info,
+  tones.success,
   { bg: '#FDEFE3', text: '#B45309' },
 ];
 
-const modeIcon: Record<PaymentMode, ComponentProps<typeof MaterialCommunityIcons>['name']> = {
+const modeIcon: Record<PaymentMode, McIconName> = {
   UPI: 'cellphone',
   Cash: 'cash',
   'Bank Transfer': 'bank-outline',
   Cheque: 'checkbook',
 };
 
-const statusTone: Record<Donation['status'], { text: string; bg: string }> = {
-  Verified: { text: '#1E8E4E', bg: '#E6F6EC' },
-  Pending: { text: '#E0700B', bg: '#FFF1E0' },
-  Draft: { text: '#6B6B6B', bg: '#F0EEEC' },
+const statusTone: Record<DonationStatus, Tone> = {
+  Verified: tones.success,
+  Pending: tones.warning,
+  Draft: tones.neutral,
 };
 
 const initials = (name: string) =>
@@ -64,7 +55,7 @@ const colorFor = (name: string) => {
   return avatarColors[hash % avatarColors.length];
 };
 
-const isoDay = (iso: string) => iso.slice(0, 10);
+const Separator = () => <View style={styles.separator} />;
 
 export default function DonationEntriesScreen() {
   return (
@@ -78,10 +69,9 @@ function DonationEntries() {
   const navigation = useNavigation<Nav>();
   const { donations, removeDonation, reload } = useDonations();
   const [query, setQuery] = useState('');
-  const [searchFocused, setSearchFocused] = useState(false);
   const [filter, setFilter] = useState<Filter>('All');
   // Start with all dates so newly added entries are always visible.
-  const [range, setRange] = useState<Range | null>(null);
+  const [range, setRange] = useState<DateRange | null>(null);
   const [rangeOpen, setRangeOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<Donation | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -95,7 +85,7 @@ function DonationEntries() {
         if (filter === 'Pending Verification') return d.status === 'Pending';
         return d.mode === filter;
       })
-      .filter((d) => !range || (isoDay(d.date) >= range.start && isoDay(d.date) <= range.end))
+      .filter((d) => !range || isInRange(d.date, range))
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [donations, query, filter, range]);
 
@@ -105,7 +95,7 @@ function DonationEntries() {
     setRefreshing(false);
   }, [reload]);
 
-  const rangeLabel = range ? formatRange(range) : 'All dates';
+  const renderItem = useCallback(({ item }: { item: Donation }) => <DonationCard donation={item} onMenu={setMenuFor} />, []);
 
   const viewDonation = (d: Donation) =>
     Alert.alert(
@@ -133,81 +123,55 @@ function DonationEntries() {
   const header = (
     <View>
       <View style={styles.titleRow}>
-        <View style={styles.flex}>
-          <Text style={styles.heading}>Donation Entries</Text>
-          <Text style={styles.subtext}>View and manage donation transactions.</Text>
+        <View style={common.flex}>
+          <Text style={common.heading}>Donation Entries</Text>
+          <Text style={common.subtext}>View and manage donation transactions.</Text>
         </View>
         <Pressable style={styles.addButton} onPress={() => navigation.navigate('AddDonation')} accessibilityRole="button">
           <Text style={styles.addButtonText}>+ Add Entry</Text>
         </Pressable>
       </View>
 
-      <View style={styles.searchRow}>
-        <View style={[styles.search, searchFocused && styles.searchFocused]}>
-          <Ionicons name="search-outline" size={18} color={MUTED_ICON} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search by donor name, member ID..."
-            placeholderTextColor={PLACEHOLDER}
-            style={styles.searchInput}
-            returnKeyType="search"
-            autoCapitalize="none"
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-          />
-          {query ? (
-            <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityLabel="Clear search">
-              <Ionicons name="close-circle" size={18} color={MUTED_ICON} />
-            </Pressable>
-          ) : null}
-        </View>
-        <Pressable
-          style={styles.filterButton}
-          onPress={() => Alert.alert('Filters', 'More filters coming soon.')}
-          accessibilityRole="button"
-          accessibilityLabel="Filters"
-        >
-          <Ionicons name="options-outline" size={20} color={colors.textDark} />
-        </Pressable>
-      </View>
+      <SearchBar
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Search by donor name, member ID..."
+        autoCapitalize="none"
+        actionIcon="options-outline"
+        actionLabel="Filters"
+        onActionPress={() => Alert.alert('Filters', 'More filters coming soon.')}
+      />
 
-      <Pressable style={styles.range} onPress={() => setRangeOpen(true)} accessibilityRole="button">
-        <Ionicons name="calendar-outline" size={18} color={colors.primary} />
-        <Text style={styles.rangeText}>{rangeLabel}</Text>
-        <Ionicons name="chevron-forward" size={18} color={MUTED_ICON} />
-      </Pressable>
+      <DateRangeButton label={range ? formatRange(range) : 'All dates'} onPress={() => setRangeOpen(true)} style={styles.range} />
 
       <FilterChips options={FILTERS} selected={filter} onSelect={setFilter} style={styles.chips} />
     </View>
   );
 
   return (
-    <View style={styles.container}>
+    <View style={common.screen}>
       <AppHeader leftType="menu" rightIcons={['bell', 'avatar']} />
       <FlatList
+        {...LIST_PERFORMANCE_PROPS}
         data={data}
         keyExtractor={(d) => d.id}
         contentContainerStyle={styles.list}
         ListHeaderComponent={header}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={Separator}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />
         }
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <MaterialCommunityIcons name="hand-coin-outline" size={40} color={colors.lightGold} />
-            <Text style={styles.emptyText}>No donations found</Text>
-          </View>
+          <EmptyState icon={<MaterialCommunityIcons name="hand-coin-outline" size={40} color={colors.lightGold} />} text="No donations found" />
         }
-        renderItem={({ item }) => <DonationCard donation={item} onMenu={() => setMenuFor(item)} />}
+        renderItem={renderItem}
       />
 
       <DateRangeSheet
         visible={rangeOpen}
         initial={range}
-        defaultMonth={DEFAULT_RANGE.start}
+        defaultMonth={DEFAULT_MONTH}
         onClose={() => setRangeOpen(false)}
         onApply={(r) => {
           setRange(r);
@@ -237,50 +201,44 @@ function DonationEntries() {
   );
 }
 
-function DonationCard({ donation, onMenu }: { donation: Donation; onMenu: () => void }) {
+const DonationCard = memo(function DonationCard({ donation, onMenu }: { donation: Donation; onMenu: (d: Donation) => void }) {
   const tone = colorFor(donation.donorName);
   return (
     <View style={styles.card}>
-      <View style={[styles.avatar, { backgroundColor: tone.bg }]}>
+      <IconCircle size={40} color={tone.bg}>
         <Text style={[styles.avatarText, { color: tone.text }]}>{initials(donation.donorName)}</Text>
-      </View>
+      </IconCircle>
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>
           {donation.donorName}
         </Text>
         <Text style={styles.meta}>Member ID: {donation.memberId}</Text>
         <View style={styles.metaRow}>
-          <Ionicons name="calendar-outline" size={12} color={MUTED_ICON} />
+          <Ionicons name="calendar-outline" size={12} color={colors.mutedIcon} />
           <Text style={styles.meta}>{formatDateTime(new Date(donation.date))}</Text>
         </View>
         <View style={styles.metaRow}>
-          <MaterialCommunityIcons name={modeIcon[donation.mode]} size={13} color={MUTED_ICON} />
+          <MaterialCommunityIcons name={modeIcon[donation.mode]} size={13} color={colors.mutedIcon} />
           <Text style={styles.meta}>{donation.mode}</Text>
         </View>
       </View>
       <View style={styles.right}>
         <View style={styles.amountRow}>
           <Text style={styles.amount}>{formatINR(donation.amount)}</Text>
-          <Pressable onPress={onMenu} hitSlop={10} accessibilityLabel="More options">
-            <Ionicons name="ellipsis-horizontal" size={18} color={MUTED_ICON} />
+          <Pressable onPress={() => onMenu(donation)} hitSlop={10} accessibilityLabel="More options">
+            <Ionicons name="ellipsis-horizontal" size={18} color={colors.mutedIcon} />
           </Pressable>
         </View>
-        <View style={[styles.badge, { backgroundColor: statusTone[donation.status].bg }]}>
-          <Text style={[styles.badgeText, { color: statusTone[donation.status].text }]}>{donation.status}</Text>
-        </View>
+        <Pill label={donation.status} tone={statusTone[donation.status]} />
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  flex: { flex: 1 },
   list: { padding: 16, paddingBottom: 32, flexGrow: 1 },
 
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  heading: { fontFamily: fonts.bold, fontSize: 18, color: colors.textDark },
-  subtext: { fontFamily: fonts.regular, fontSize: 12, color: colors.textMuted, marginTop: 2 },
   addButton: {
     height: 34,
     paddingHorizontal: 12,
@@ -290,57 +248,11 @@ const styles = StyleSheet.create({
   },
   addButtonText: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.white },
 
-  searchRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  search: {
-    flex: 1,
-    height: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    backgroundColor: colors.card,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  searchFocused: { borderColor: colors.primary },
-  searchInput: { flex: 1, height: '100%', fontFamily: fonts.regular, fontSize: 13, color: colors.textDark, padding: 0 },
-  filterButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  range: {
-    height: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    marginTop: 10,
-    backgroundColor: colors.card,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  rangeText: { flex: 1, fontFamily: fonts.medium, fontSize: 13, color: colors.textDark },
+  range: { marginTop: 10 },
   chips: { marginTop: 12, marginBottom: 14 },
 
   separator: { height: 10 },
-  card: {
-    flexDirection: 'row',
-    gap: 10,
-    padding: 12,
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  card: { ...surface, flexDirection: 'row', gap: 10, padding: 12 },
   avatarText: { fontFamily: fonts.bold, fontSize: 14 },
   info: { flex: 1, gap: 2 },
   name: { fontFamily: fonts.semiBold, fontSize: 14, color: colors.textDark },
@@ -349,10 +261,4 @@ const styles = StyleSheet.create({
   right: { alignItems: 'flex-end', justifyContent: 'space-between' },
   amountRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   amount: { fontFamily: fonts.bold, fontSize: 15, color: colors.textDark },
-  badge: { paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6 },
-  badgeText: { fontFamily: fonts.semiBold, fontSize: 10, lineHeight: 14 },
-
-  empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 10 },
-  emptyText: { fontFamily: fonts.medium, fontSize: 14, color: colors.textMuted },
-
 });
