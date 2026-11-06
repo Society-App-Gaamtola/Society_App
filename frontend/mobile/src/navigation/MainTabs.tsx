@@ -1,65 +1,57 @@
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useMemo } from 'react';
+import { createBottomTabNavigator, type BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { SideDrawerProvider } from '../components/layout/SideDrawer';
+import { useAuth } from '../context/AuthContext';
+import { Ionicons, MaterialCommunityIcons, type IoniconName } from '../icons';
 import { colors, fonts } from '../theme';
-import type { EventsStackParamList, HomeStackParamList, MainTabParamList } from './types';
-import HomeScreen from '../screens/HomeScreen';
-import ExecutiveDashboardScreen from '../screens/ExecutiveDashboardScreen';
-import { useAuth } from '../auth/AuthContext';
-import EventsScreen from '../screens/EventsScreen';
-import GalleryScreen from '../screens/GalleryScreen';
-import DonateScreen from '../screens/DonateScreen';
-import ProfileScreen from '../screens/ProfileScreen';
-import NoticeBoardScreen from '../screens/NoticeBoardScreen';
-import NoticeDetailsScreen from '../screens/NoticeDetailsScreen';
-import EventCalendarScreen from '../screens/EventCalendarScreen';
-import VolunteerScreen from '../screens/VolunteerScreen';
-import ExecutiveRequestScreen from '../screens/ExecutiveRequestScreen';
-import SocietyExpensesScreen from '../screens/SocietyExpensesScreen';
-import SettingsScreen from '../screens/SettingsScreen';
-import CreateEventScreen from '../screens/CreateEventScreen';
-import MyEventsScreen from '../screens/MyEventsScreen';
-import EventPreviewScreen from '../screens/EventPreviewScreen';
-import DonationEntriesScreen from '../screens/DonationEntriesScreen';
-import AddDonationScreen from '../screens/AddDonationScreen';
-import FinancialReportsScreen from '../screens/FinancialReportsScreen';
-import ExportReportsScreen from '../screens/ExportReportsScreen';
-import { SideDrawerProvider } from '../components/SideDrawer';
-import EventDetailsScreen from '../screens/EventDetailsScreen';
+import type { EventsStackParamList, HomeStackParamList, MainTabParamList, SharedStackParams } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
 const EventsStack = createNativeStackNavigator<EventsStackParamList>();
 
-const INACTIVE = '#9A8F86';
 const stackOptions = { headerShown: false, contentStyle: { backgroundColor: colors.background } };
+
+/** Screens pushed inside both the Home and Events tabs. Each one loads the first time it opens. */
+const SHARED_SCREENS: { name: keyof SharedStackParams; getComponent: () => React.ComponentType<any> }[] = [
+  { name: 'NoticeBoard', getComponent: () => require('../screens/NoticeBoardScreen').default },
+  { name: 'EventCalendar', getComponent: () => require('../screens/EventCalendarScreen').default },
+  { name: 'Volunteer', getComponent: () => require('../screens/VolunteerScreen').default },
+  { name: 'ExecutiveRequest', getComponent: () => require('../screens/ExecutiveRequestScreen').default },
+  { name: 'SocietyExpenses', getComponent: () => require('../screens/SocietyExpensesScreen').default },
+  { name: 'Settings', getComponent: () => require('../screens/SettingsScreen').default },
+  { name: 'EditProfile', getComponent: () => require('../screens/EditProfileScreen').default },
+  { name: 'ChangePassword', getComponent: () => require('../screens/ChangePasswordScreen').default },
+  { name: 'CreateEvent', getComponent: () => require('../screens/CreateEventScreen').default },
+  { name: 'MyEvents', getComponent: () => require('../screens/MyEventsScreen').default },
+  { name: 'EventPreview', getComponent: () => require('../screens/EventPreviewScreen').default },
+  { name: 'DonationEntries', getComponent: () => require('../screens/DonationEntriesScreen').default },
+  { name: 'AddDonation', getComponent: () => require('../screens/AddDonationScreen').default },
+  { name: 'FinancialReports', getComponent: () => require('../screens/FinancialReportsScreen').default },
+  { name: 'ExportReports', getComponent: () => require('../screens/ExportReportsScreen').default },
+  { name: 'NoticeDetails', getComponent: () => require('../screens/NoticeDetailsScreen').default },
+  { name: 'EventDetails', getComponent: () => require('../screens/EventDetailsScreen').default },
+];
 
 /** Executives get their dashboard on the Home tab; members get the regular home. */
 function HomeMain() {
   const { user } = useAuth();
-  return user?.role === 'executive' ? <ExecutiveDashboardScreen /> : <HomeScreen />;
+  const Screen =
+    user?.role === 'executive'
+      ? require('../screens/ExecutiveDashboardScreen').default
+      : require('../screens/HomeScreen').default;
+  return <Screen />;
 }
 
 function HomeStackScreen() {
   return (
     <HomeStack.Navigator screenOptions={stackOptions}>
       <HomeStack.Screen name="HomeMain" component={HomeMain} />
-      <HomeStack.Screen name="NoticeBoard" component={NoticeBoardScreen} />
-      <HomeStack.Screen name="EventCalendar" component={EventCalendarScreen} />
-      <HomeStack.Screen name="Volunteer" component={VolunteerScreen} />
-      <HomeStack.Screen name="ExecutiveRequest" component={ExecutiveRequestScreen} />
-      <HomeStack.Screen name="SocietyExpenses" component={SocietyExpensesScreen} />
-      <HomeStack.Screen name="Settings" component={SettingsScreen} />
-      <HomeStack.Screen name="CreateEvent" component={CreateEventScreen} />
-      <HomeStack.Screen name="MyEvents" component={MyEventsScreen} />
-      <HomeStack.Screen name="EventPreview" component={EventPreviewScreen} />
-      <HomeStack.Screen name="DonationEntries" component={DonationEntriesScreen} />
-      <HomeStack.Screen name="AddDonation" component={AddDonationScreen} />
-      <HomeStack.Screen name="FinancialReports" component={FinancialReportsScreen} />
-      <HomeStack.Screen name="ExportReports" component={ExportReportsScreen} />
-      <HomeStack.Screen name="NoticeDetails" component={NoticeDetailsScreen} />
-      <HomeStack.Screen name="EventDetails" component={EventDetailsScreen} />
+      {SHARED_SCREENS.map((screen) => (
+        <HomeStack.Screen key={screen.name} name={screen.name} getComponent={screen.getComponent} />
+      ))}
     </HomeStack.Navigator>
   );
 }
@@ -67,75 +59,56 @@ function HomeStackScreen() {
 function EventsStackScreen() {
   return (
     <EventsStack.Navigator screenOptions={stackOptions}>
-      <EventsStack.Screen name="EventsMain" component={EventsScreen} />
-      <EventsStack.Screen name="NoticeBoard" component={NoticeBoardScreen} />
-      <EventsStack.Screen name="EventCalendar" component={EventCalendarScreen} />
-      <EventsStack.Screen name="Volunteer" component={VolunteerScreen} />
-      <EventsStack.Screen name="ExecutiveRequest" component={ExecutiveRequestScreen} />
-      <EventsStack.Screen name="SocietyExpenses" component={SocietyExpensesScreen} />
-      <EventsStack.Screen name="Settings" component={SettingsScreen} />
-      <EventsStack.Screen name="CreateEvent" component={CreateEventScreen} />
-      <EventsStack.Screen name="MyEvents" component={MyEventsScreen} />
-      <EventsStack.Screen name="EventPreview" component={EventPreviewScreen} />
-      <EventsStack.Screen name="DonationEntries" component={DonationEntriesScreen} />
-      <EventsStack.Screen name="AddDonation" component={AddDonationScreen} />
-      <EventsStack.Screen name="FinancialReports" component={FinancialReportsScreen} />
-      <EventsStack.Screen name="ExportReports" component={ExportReportsScreen} />
-      <EventsStack.Screen name="NoticeDetails" component={NoticeDetailsScreen} />
-      <EventsStack.Screen name="EventDetails" component={EventDetailsScreen} />
+      <EventsStack.Screen name="EventsMain" getComponent={() => require('../screens/EventsScreen').default} />
+      {SHARED_SCREENS.map((screen) => (
+        <EventsStack.Screen key={screen.name} name={screen.name} getComponent={screen.getComponent} />
+      ))}
     </EventsStack.Navigator>
   );
 }
 
+const tabIcon = (name: IoniconName): BottomTabNavigationOptions => ({
+  tabBarIcon: ({ color, size }) => <Ionicons name={name} size={size} color={color} />,
+});
+
+const HOME_OPTIONS = tabIcon('home-outline');
+const EVENTS_OPTIONS = tabIcon('calendar-outline');
+const GALLERY_OPTIONS = tabIcon('image-outline');
+const PROFILE_OPTIONS = tabIcon('person-outline');
+const DONATE_OPTIONS: BottomTabNavigationOptions = {
+  tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="hand-coin-outline" size={size} color={color} />,
+};
+
 export default function MainTabs() {
-  const insets = useSafeAreaInsets();
+  const { bottom } = useSafeAreaInsets();
+  const screenOptions = useMemo<BottomTabNavigationOptions>(
+    () => ({
+      headerShown: false,
+      tabBarActiveTintColor: colors.primary,
+      tabBarInactiveTintColor: colors.mutedIcon,
+      tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11 },
+      tabBarStyle: {
+        backgroundColor: colors.white,
+        borderTopColor: colors.border,
+        borderTopWidth: 1,
+        height: 64 + bottom,
+        paddingTop: 6,
+        paddingBottom: 8 + bottom,
+      },
+      sceneStyle: { backgroundColor: colors.background },
+    }),
+    [bottom],
+  );
+
   return (
     <SideDrawerProvider>
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: INACTIVE,
-        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11 },
-        tabBarStyle: {
-          backgroundColor: colors.white,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          height: 64 + insets.bottom,
-          paddingTop: 6,
-          paddingBottom: 8 + insets.bottom,
-        },
-        sceneStyle: { backgroundColor: colors.background },
-      }}
-    >
-      <Tab.Screen
-        name="Home"
-        component={HomeStackScreen}
-        options={{ tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} /> }}
-      />
-      <Tab.Screen
-        name="Events"
-        component={EventsStackScreen}
-        options={{ tabBarIcon: ({ color, size }) => <Ionicons name="calendar-outline" size={size} color={color} /> }}
-      />
-      <Tab.Screen
-        name="Gallery"
-        component={GalleryScreen}
-        options={{ tabBarIcon: ({ color, size }) => <Ionicons name="image-outline" size={size} color={color} /> }}
-      />
-      <Tab.Screen
-        name="Donate"
-        component={DonateScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="hand-coin-outline" size={size} color={color} />,
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} /> }}
-      />
-    </Tab.Navigator>
+      <Tab.Navigator screenOptions={screenOptions}>
+        <Tab.Screen name="Home" component={HomeStackScreen} options={HOME_OPTIONS} />
+        <Tab.Screen name="Events" component={EventsStackScreen} options={EVENTS_OPTIONS} />
+        <Tab.Screen name="Gallery" getComponent={() => require('../screens/GalleryScreen').default} options={GALLERY_OPTIONS} />
+        <Tab.Screen name="Donate" getComponent={() => require('../screens/DonateScreen').default} options={DONATE_OPTIONS} />
+        <Tab.Screen name="Profile" getComponent={() => require('../screens/ProfileScreen').default} options={PROFILE_OPTIONS} />
+      </Tab.Navigator>
     </SideDrawerProvider>
   );
 }

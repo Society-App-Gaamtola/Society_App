@@ -1,22 +1,27 @@
-import { useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Calendar, type DateData } from 'react-native-calendars';
 import * as Notifications from 'expo-notifications';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/types';
-import { colors, fonts } from '../theme';
-import { calendarEvents, events, type CalendarEntry, type EventCategory } from '../data/mock';
-import { AppHeader } from '../components';
+import { common, surface } from '../styles/common';
+import { colors, fonts, tones, type Tone } from '../theme';
+import { calendarEvents, events } from '../data/mock';
+import { Ionicons, MaterialCommunityIcons } from '../icons';
+import type { CalendarEntry, EventCategory } from '../types';
+import { MONTHS, MONTH_NAMES } from '../utils/date';
+import { AppHeader, MetaRow, Pill, SectionHeader } from '../components';
 
 const INITIAL_MONTH = '2026-10-01';
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-const MUTED_ICON = '#9A8F86';
+
+const CALENDAR_THEME = {
+  calendarBackground: colors.card,
+  textSectionTitleColor: colors.textMuted,
+  textDayHeaderFontFamily: fonts.regular,
+  textDayHeaderFontSize: 11,
+  arrowColor: colors.primary,
+};
 
 const legend: { label: EventCategory; color: string }[] = [
   { label: 'Aarti', color: '#F59E0B' },
@@ -25,23 +30,40 @@ const legend: { label: EventCategory; color: string }[] = [
   { label: 'Meeting', color: '#16A34A' },
 ];
 
-const categoryBadge: Record<EventCategory, { text: string; bg: string }> = {
-  Festival: { text: '#E0700B', bg: '#FFF1E0' },
+const categoryBadge: Record<EventCategory, Tone> = {
+  Festival: tones.warning,
   Cultural: { text: '#7C3AED', bg: '#F1EAFE' },
-  Meeting: { text: '#1E63C6', bg: '#E8F0FC' },
+  Meeting: tones.info,
   Aarti: { text: '#B45309', bg: '#FEF3C7' },
 };
 
 const eventDates = new Set(calendarEvents.map((e) => e.date));
 
+const renderArrow = (direction: 'left' | 'right') => (
+  <Ionicons name={direction === 'left' ? 'chevron-back' : 'chevron-forward'} size={20} color={colors.primary} />
+);
+
+const renderMonthTitle = (date?: unknown) => {
+  // XDate exposes getMonth/getFullYear like Date.
+  const d = date as Date | undefined;
+  return d ? (
+    <Text style={styles.monthTitle}>
+      {MONTH_NAMES[d.getMonth()]} {d.getFullYear()}
+    </Text>
+  ) : null;
+};
+
+// Read from context so selecting a day redraws only the day cells that use it.
+const SelectedDateContext = createContext<string | null>(null);
+
 type DayProps = {
   date?: DateData;
   state?: string;
   onPress?: (date: DateData) => void;
-  selectedDate: string | null;
 };
 
-function Day({ date, state, onPress, selectedDate }: DayProps) {
+function Day({ date, state, onPress }: DayProps) {
+  const selectedDate = useContext(SelectedDateContext);
   if (!date) return <View style={styles.day} />;
   const hasEvent = eventDates.has(date.dateString);
   const otherMonth = state === 'disabled';
@@ -54,20 +76,8 @@ function Day({ date, state, onPress, selectedDate }: DayProps) {
       accessibilityRole="button"
       accessibilityLabel={`${date.day} ${MONTH_NAMES[date.month - 1]}${hasEvent ? ', has events' : ''}`}
     >
-      <View
-        style={[
-          styles.dayCircle,
-          hasEvent && !otherMonth && styles.dayEvent,
-          selected && styles.daySelected,
-        ]}
-      >
-        <Text
-          style={[
-            styles.dayText,
-            otherMonth && styles.dayTextOther,
-            hasEvent && !otherMonth && styles.dayTextEvent,
-          ]}
-        >
+      <View style={[styles.dayCircle, hasEvent && !otherMonth && styles.dayEvent, selected && styles.daySelected]}>
+        <Text style={[styles.dayText, otherMonth && styles.dayTextOther, hasEvent && !otherMonth && styles.dayTextEvent]}>
           {date.day}
         </Text>
       </View>
@@ -84,9 +94,9 @@ export default function EventCalendarScreen() {
     [selectedDate],
   );
 
-  const onDayPress = (date: DateData) => {
+  const onDayPress = useCallback((date: DateData) => {
     setSelectedDate((current) => (current === date.dateString ? null : date.dateString));
-  };
+  }, []);
 
   const enableNotifications = async () => {
     try {
@@ -104,43 +114,25 @@ export default function EventCalendarScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={common.screen}>
       <AppHeader leftType="menu" rightIcons={['bell', 'avatar']} />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.heading}>Event Calendar</Text>
-        <Text style={styles.subtext}>View all upcoming events and cultural activities of our society.</Text>
+        <Text style={common.heading}>Event Calendar</Text>
+        <Text style={common.subtextRelaxed}>View all upcoming events and cultural activities of our society.</Text>
 
         <View style={styles.calendarCard}>
-          <Calendar
-            current={INITIAL_MONTH}
-            onDayPress={onDayPress}
-            firstDay={0}
-            enableSwipeMonths
-            renderArrow={(direction) => (
-              <Ionicons
-                name={direction === 'left' ? 'chevron-back' : 'chevron-forward'}
-                size={20}
-                color={colors.primary}
-              />
-            )}
-            renderHeader={(date) => {
-              // XDate exposes getMonth/getFullYear like Date.
-              const d = date as unknown as Date | undefined;
-              return d ? (
-                <Text style={styles.monthTitle}>
-                  {MONTH_NAMES[d.getMonth()]} {d.getFullYear()}
-                </Text>
-              ) : null;
-            }}
-            dayComponent={(props) => <Day {...props} selectedDate={selectedDate} />}
-            theme={{
-              calendarBackground: colors.card,
-              textSectionTitleColor: colors.textMuted,
-              textDayHeaderFontFamily: fonts.regular,
-              textDayHeaderFontSize: 11,
-              arrowColor: colors.primary,
-            }}
-          />
+          <SelectedDateContext.Provider value={selectedDate}>
+            <Calendar
+              current={INITIAL_MONTH}
+              onDayPress={onDayPress}
+              firstDay={0}
+              enableSwipeMonths
+              renderArrow={renderArrow}
+              renderHeader={renderMonthTitle}
+              dayComponent={Day}
+              theme={CALENDAR_THEME}
+            />
+          </SelectedDateContext.Provider>
         </View>
 
         <View style={styles.legend}>
@@ -152,12 +144,7 @@ export default function EventCalendarScreen() {
           ))}
         </View>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Upcoming Events</Text>
-          <Pressable onPress={() => setSelectedDate(null)} hitSlop={8}>
-            <Text style={styles.viewAll}>View All →</Text>
-          </Pressable>
-        </View>
+        <SectionHeader title="Upcoming Events" onViewAll={() => setSelectedDate(null)} style={styles.sectionHeader} />
 
         <View style={styles.list}>
           {list.length ? (
@@ -190,7 +177,6 @@ export default function EventCalendarScreen() {
 
 function EventRow({ entry, onPress }: { entry: CalendarEntry; onPress: () => void }) {
   const [, month, day] = entry.date.split('-');
-  const badge = categoryBadge[entry.category];
   const image = events.find((e) => e.id === entry.eventId)?.image;
 
   return (
@@ -204,40 +190,18 @@ function EventRow({ entry, onPress }: { entry: CalendarEntry; onPress: () => voi
         <Text style={styles.rowTitle} numberOfLines={1}>
           {entry.title}
         </Text>
-        <View style={styles.metaRow}>
-          <Ionicons name="time-outline" size={12} color={MUTED_ICON} />
-          <Text style={styles.meta} numberOfLines={1}>
-            {entry.time}
-          </Text>
-        </View>
-        <View style={styles.metaRow}>
-          <Ionicons name="location-outline" size={12} color={MUTED_ICON} />
-          <Text style={styles.meta} numberOfLines={1}>
-            {entry.venue}
-          </Text>
-        </View>
+        <MetaRow icon="time-outline" text={entry.time} />
+        <MetaRow icon="location-outline" text={entry.venue} />
       </View>
-      <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-        <Text style={[styles.badgeText, { color: badge.text }]}>{entry.category}</Text>
-      </View>
+      <Pill label={entry.category} tone={categoryBadge[entry.category]} style={styles.badge} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: 16, paddingBottom: 32 },
-  heading: { fontFamily: fonts.bold, fontSize: 18, color: colors.textDark },
-  subtext: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, color: colors.textMuted, marginTop: 2 },
 
-  calendarCard: {
-    marginTop: 14,
-    backgroundColor: colors.card,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 12,
-  },
+  calendarCard: { ...surface, marginTop: 14, borderRadius: 14, padding: 12 },
   monthTitle: { fontFamily: fonts.bold, fontSize: 15, color: colors.textDark },
   day: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   dayCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
@@ -252,44 +216,24 @@ const styles = StyleSheet.create({
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { fontFamily: fonts.regular, fontSize: 11, color: colors.textDark },
 
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 20,
-    marginBottom: 12,
-  },
-  sectionTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.textDark },
-  viewAll: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.primary },
+  sectionHeader: { marginTop: 20 },
 
   list: { gap: 10 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 10,
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
+  row: { ...surface, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10 },
   dateBlock: { width: 40, alignItems: 'center' },
   dateDay: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 22, color: colors.primary },
   dateMonth: { fontFamily: fonts.medium, fontSize: 11, color: colors.primary },
   rowImage: { width: 56, height: 56, borderRadius: 8 },
   rowInfo: { flex: 1, gap: 3 },
   rowTitle: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textDark },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  meta: { flex: 1, fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted },
-  badge: { alignSelf: 'flex-start', paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6 },
-  badgeText: { fontFamily: fonts.semiBold, fontSize: 10, lineHeight: 14 },
+  badge: { alignSelf: 'flex-start' },
   empty: { fontFamily: fonts.regular, fontSize: 13, color: colors.textMuted, textAlign: 'center', paddingVertical: 24 },
 
   notify: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#FDF3E4',
+    backgroundColor: colors.noteBackground,
     borderRadius: 12,
     padding: 12,
     marginTop: 20,

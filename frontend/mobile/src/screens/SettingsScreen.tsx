@@ -1,4 +1,4 @@
-import ScreenPlaceholder from '../components/ScreenPlaceholder';
+import { ScreenPlaceholder } from '../components';
 
 // Placeholder until the settings screen is designed.
 export default function SettingsScreen() {

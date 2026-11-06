@@ -1,15 +1,9 @@
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { colors } from '../theme';
-import type { RootStackParamList } from './types';
 import SplashScreen from '../screens/SplashScreen';
-import OnboardingScreen from '../screens/OnboardingScreen';
-import LanguageSelectScreen from '../screens/LanguageSelectScreen';
-import LoginScreen from '../screens/LoginScreen';
-import RegisterScreen from '../screens/RegisterScreen';
-import OtpScreen from '../screens/OtpScreen';
-import ProfileSetupScreen from '../screens/ProfileSetupScreen';
-import MainTabs from './MainTabs';
+import { navigationRef } from './navigationRef';
+import type { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -25,9 +19,10 @@ const navTheme = {
   },
 };
 
+// Screens load the first time they open (getComponent), which keeps app start fast on low-end phones.
 export default function RootNavigator() {
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer ref={navigationRef} theme={navTheme}>
       <Stack.Navigator
         initialRouteName="Splash"
         screenOptions={{
@@ -37,13 +32,13 @@ export default function RootNavigator() {
         }}
       >
         <Stack.Screen name="Splash" component={SplashScreen} />
-        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        <Stack.Screen name="LanguageSelect" component={LanguageSelectScreen} />
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen name="Otp" component={OtpScreen} />
-        <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
-        <Stack.Screen name="Main" component={MainTabs} />
+        <Stack.Screen name="Onboarding" getComponent={() => require('../screens/OnboardingScreen').default} />
+        <Stack.Screen name="LanguageSelect" getComponent={() => require('../screens/LanguageSelectScreen').default} />
+        <Stack.Screen name="Login" getComponent={() => require('../screens/LoginScreen').default} />
+        <Stack.Screen name="Register" getComponent={() => require('../screens/RegisterScreen').default} />
+        <Stack.Screen name="Otp" getComponent={() => require('../screens/OtpScreen').default} />
+        <Stack.Screen name="ProfileSetup" getComponent={() => require('../screens/ProfileSetupScreen').default} />
+        <Stack.Screen name="Main" getComponent={() => require('./MainTabs').default} />
       </Stack.Navigator>
     </NavigationContainer>
   );

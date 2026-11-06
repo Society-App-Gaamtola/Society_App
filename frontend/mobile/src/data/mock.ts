@@ -1,35 +1,4 @@
-import type { ComponentProps } from 'react';
-import type { ImageSourcePropType } from 'react-native';
-import type { Ionicons } from '@expo/vector-icons';
-import type { BadgeStatus } from '../components/StatusBadge';
-
-export type EventCategory = 'Festival' | 'Aarti' | 'Cultural' | 'Meeting';
-
-export type SocietyEvent = {
-  id: string;
-  title: string;
-  date: string;
-  days?: string;
-  time?: string;
-  venue: string;
-  category: EventCategory;
-  status: BadgeStatus;
-  image: ImageSourcePropType;
-  organizer: string;
-  contact: string;
-  latitude: number;
-  longitude: number;
-  description: string;
-};
-
-export type Notice = {
-  id: string;
-  title: string;
-  date: string;
-  description: string;
-  tag: BadgeStatus;
-  icon: ComponentProps<typeof Ionicons>['name'];
-};
+import type { CalendarEntry, Duty, ExpenseCategory, Notice, SocietyEvent, Transaction } from '../types';
 
 const ORGANIZER = 'Executive Committee';
 const CONTACT = '+91 98765 43210';
@@ -128,6 +97,9 @@ export const events: SocietyEvent[] = [
   },
 ];
 
+/** Shown in the home screen carousels. */
+export const featuredEvents = events.filter((e) => ['e1', 'e5', 'e3'].includes(e.id));
+
 export const notices: Notice[] = [
   {
     id: 'n1',
@@ -179,16 +151,6 @@ export const notices: Notice[] = [
   },
 ];
 
-export type CalendarEntry = {
-  /** ISO date, used as the calendar key. */
-  date: string;
-  title: string;
-  time: string;
-  venue: string;
-  category: EventCategory;
-  eventId: string;
-};
-
 export const calendarEvents: CalendarEntry[] = [
   {
     date: '2026-10-07',
@@ -223,16 +185,6 @@ export const calendarEvents: CalendarEntry[] = [
     eventId: 'e6',
   },
 ];
-
-export type Duty = {
-  id: string;
-  title: string;
-  icon: ComponentProps<typeof Ionicons>['name'];
-  date: string;
-  venue: string;
-  category: EventCategory;
-  status: 'Assigned' | 'Open' | 'Confirmed';
-};
 
 export const duties: Duty[] = [
   {
@@ -291,29 +243,12 @@ export const financeSummary = {
   availableBalance: 82500,
 };
 
-export type ExpenseCategory = {
-  id: string;
-  title: string;
-  icon: ComponentProps<typeof Ionicons>['name'];
-  spent: number;
-  budget: number;
-};
-
 export const expenseBreakdown: ExpenseCategory[] = [
   { id: 'x1', title: 'Festival', icon: 'sparkles-outline', spent: 22000, budget: 40000 },
   { id: 'x2', title: 'Decorations', icon: 'flower-outline', spent: 8500, budget: 15000 },
   { id: 'x3', title: 'Prasad', icon: 'restaurant-outline', spent: 6000, budget: 10000 },
   { id: 'x4', title: 'Sound & Lights', icon: 'volume-high-outline', spent: 5000, budget: 12000 },
 ];
-
-export type Transaction = {
-  id: string;
-  date: string;
-  title: string;
-  note: string;
-  amount: number;
-  status: 'Completed';
-};
 
 export const transactions: Transaction[] = [
   { id: 't1', date: '05 Oct 2026', title: 'Festival', note: 'Decoration items', amount: 8500, status: 'Completed' },

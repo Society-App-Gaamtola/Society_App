@@ -1,28 +1,26 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, fonts } from '../theme';
-import { MIN_EXECUTIVE_DONATION, STORAGE_KEYS } from '../config';
+import { common } from '../styles/common';
+import { colors, fonts, PRIMARY_GRADIENT, tones, type Tone } from '../theme';
+import { MAX_UPLOAD_BYTES, MIN_EXECUTIVE_DONATION, STORAGE_KEYS } from '../config';
+import { Ionicons, MaterialCommunityIcons } from '../icons';
 import { formatINR } from '../utils/format';
-import { AppHeader, Checkbox, InputField, PrimaryButton } from '../components';
+import { AppHeader, Checkbox, FormField, InputField, KeyboardAvoid, Pill, PrimaryButton } from '../components';
 
 type RequestStatus = 'Not submitted' | 'Pending review' | 'Approved' | 'Rejected';
 type PickedFile = { name: string; uri: string; size?: number; mimeType?: string };
 
-const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
-const REQUIRED = '#C62828';
 
-const statusStyle: Record<RequestStatus, { text: string; bg: string }> = {
-  'Not submitted': { text: '#C62828', bg: '#FDECEC' },
-  'Pending review': { text: '#E0700B', bg: '#FFF1E0' },
-  Approved: { text: '#1E8E4E', bg: '#E6F6EC' },
-  Rejected: { text: '#C62828', bg: '#FDECEC' },
+const statusStyle: Record<RequestStatus, Tone> = {
+  'Not submitted': tones.danger,
+  'Pending review': tones.warning,
+  Approved: tones.success,
+  Rejected: tones.danger,
 };
-
 
 export default function ExecutiveRequestScreen() {
   const [name, setName] = useState('');
@@ -54,7 +52,7 @@ export default function ExecutiveRequestScreen() {
     const result = await DocumentPicker.getDocumentAsync({ type: ACCEPTED_TYPES, copyToCacheDirectory: true });
     if (result.canceled) return;
     const asset = result.assets[0];
-    if (asset.size && asset.size > MAX_FILE_BYTES) {
+    if (asset.size && asset.size > MAX_UPLOAD_BYTES) {
       setFileError('File must be smaller than 5MB.');
       return;
     }
@@ -76,23 +74,21 @@ export default function ExecutiveRequestScreen() {
     Alert.alert('Request Submitted', 'Your executive membership request has been sent for admin review.');
   };
 
-  const badge = statusStyle[status];
-
   return (
-    <View style={styles.container}>
+    <View style={common.screen}>
       <AppHeader leftType="menu" rightIcons={['bell', 'avatar']} />
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoid>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Text style={styles.heading}>Executive Membership Request</Text>
-          <Text style={styles.subtext}>
+          <Text style={common.heading}>Executive Membership Request</Text>
+          <Text style={common.subtextRelaxed}>
             Apply for executive membership and be a part of your society's leadership team.
           </Text>
 
-          <LinearGradient colors={['#8E1426', '#6A0D1B']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
+          <LinearGradient colors={PRIMARY_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
             <View style={styles.bannerIcon}>
               <MaterialCommunityIcons name="crown-outline" size={24} color={colors.white} />
             </View>
-            <View style={styles.flex}>
+            <View style={common.flex}>
               <Text style={styles.bannerTitle}>Become an Executive Member</Text>
               <Text style={styles.bannerText}>
                 Executive membership access is granted only after a minimum donation of{' '}
@@ -104,16 +100,16 @@ export default function ExecutiveRequestScreen() {
 
           <Text style={styles.formTitle}>Application Form</Text>
 
-          <Field label="Member Name">
+          <FormField label="Member Name">
             <InputField placeholder="Enter your full name" value={name} onChangeText={setName} autoCapitalize="words" />
-          </Field>
+          </FormField>
 
-          <Field label="Member ID">
+          <FormField label="Member ID">
             <InputField placeholder="Enter your member ID (if any)" value={memberId} onChangeText={setMemberId} />
-          </Field>
+          </FormField>
 
           <View style={styles.row}>
-            <Field label="Contact Number" style={styles.flex}>
+            <FormField label="Contact Number" style={common.flex}>
               <InputField
                 placeholder="+91 98765 43210"
                 value={contact}
@@ -121,18 +117,18 @@ export default function ExecutiveRequestScreen() {
                 keyboardType="phone-pad"
                 maxLength={16}
               />
-            </Field>
-            <Field label="Donation Reference" style={styles.flex}>
+            </FormField>
+            <FormField label="Donation Reference" style={common.flex}>
               <InputField
                 placeholder="Transaction ID / UPI Ref No."
                 value={reference}
                 onChangeText={setReference}
                 autoCapitalize="characters"
               />
-            </Field>
+            </FormField>
           </View>
 
-          <Field label="Reason for Executive Membership">
+          <FormField label="Reason for Executive Membership">
             <InputField
               placeholder="Write a brief reason for your application..."
               value={reason}
@@ -141,9 +137,9 @@ export default function ExecutiveRequestScreen() {
               containerStyle={styles.reason}
               style={styles.reasonInput}
             />
-          </Field>
+          </FormField>
 
-          <Field label="Upload Payment Proof">
+          <FormField label="Upload Payment Proof" error={fileError}>
             {file ? (
               <View style={styles.fileRow}>
                 <Ionicons name="document-attach-outline" size={20} color={colors.primary} />
@@ -161,8 +157,7 @@ export default function ExecutiveRequestScreen() {
                 <Text style={styles.uploadHint}>PDF, JPG, PNG (Max 5MB)</Text>
               </Pressable>
             )}
-            {fileError ? <Text style={styles.error}>{fileError}</Text> : null}
-          </Field>
+          </FormField>
 
           <Checkbox
             checked={declared}
@@ -187,33 +182,16 @@ export default function ExecutiveRequestScreen() {
           <View style={styles.status}>
             <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
             <Text style={styles.statusLabel}>Application status</Text>
-            <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
-              <Text style={[styles.statusText, { color: badge.text }]}>{status}</Text>
-            </View>
+            <Pill label={status} tone={statusStyle[status]} />
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
-  );
-}
-
-function Field({ label, children, style }: { label: string; children: ReactNode; style?: object }) {
-  return (
-    <View style={[styles.field, style]}>
-      <Text style={styles.label}>
-        {label} <Text style={styles.required}>*</Text>
-      </Text>
-      {children}
+      </KeyboardAvoid>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  flex: { flex: 1 },
   scroll: { padding: 16, paddingBottom: 32 },
-  heading: { fontFamily: fonts.bold, fontSize: 18, color: colors.textDark },
-  subtext: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, color: colors.textMuted, marginTop: 2 },
 
   banner: { flexDirection: 'row', gap: 12, borderRadius: 12, padding: 14, marginTop: 14 },
   bannerIcon: {
@@ -228,9 +206,6 @@ const styles = StyleSheet.create({
   bannerText: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 17, color: 'rgba(255,255,255,0.9)', marginTop: 4 },
 
   formTitle: { fontFamily: fonts.bold, fontSize: 15, color: colors.textDark, marginTop: 20, marginBottom: 12 },
-  field: { marginBottom: 14 },
-  label: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.textDark, marginBottom: 6 },
-  required: { color: REQUIRED },
   row: { flexDirection: 'row', gap: 10 },
   reason: { minHeight: 90 },
   reasonInput: { minHeight: 66 },
@@ -240,7 +215,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: '#D9CBB8',
+    borderColor: colors.dashedBorder,
     backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
@@ -260,7 +235,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   fileName: { flex: 1, fontFamily: fonts.medium, fontSize: 13, color: colors.textDark },
-  error: { fontFamily: fonts.regular, fontSize: 11, color: REQUIRED, marginTop: 4 },
 
   declare: { alignItems: 'flex-start', marginTop: 4 },
   declareText: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, color: colors.textDark },
@@ -279,6 +253,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   statusLabel: { flex: 1, fontFamily: fonts.medium, fontSize: 12, color: colors.textDark },
-  statusBadge: { paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6 },
-  statusText: { fontFamily: fonts.semiBold, fontSize: 10, lineHeight: 14 },
 });

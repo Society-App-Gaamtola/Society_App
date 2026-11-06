@@ -1,9 +1,10 @@
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import type { HomeStackParamList } from '../navigation/types';
+import { common } from '../styles/common';
 import { colors, fonts, radius, spacing } from '../theme';
 import { events } from '../data/mock';
+import { Ionicons } from '../icons';
 import { AppHeader, StatusBadge } from '../components';
 
 // Basic layout until the event details screen is designed.
@@ -12,7 +13,7 @@ export default function EventDetailsScreen() {
   const event = events.find((e) => e.id === params.eventId);
 
   return (
-    <View style={styles.container}>
+    <View style={common.screen}>
       <AppHeader leftType="back" rightIcons={['more']} />
       {event ? (
         <ScrollView contentContainerStyle={styles.content}>
@@ -45,7 +46,6 @@ export default function EventDetailsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.md, gap: 10 },
   image: { width: '100%', height: 200, borderRadius: radius.image },
   title: { fontFamily: fonts.bold, fontSize: 20, color: colors.primary },
