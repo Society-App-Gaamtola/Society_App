@@ -115,16 +115,6 @@ export type MyDonation = {
   reference?: string;
 };
 
-export type GalleryPhoto = {
-  id: string;
-  image: ImageSourcePropType;
-  caption: string;
-  category: EventCategory;
-  /** Display date, e.g. "12 Oct 2026". */
-  date: string;
-  /** Uploaded by this user and waiting for the Super Admin to approve it. */
-  pending?: boolean;
-};
 
 export type DirectoryMember = {
   id: string;

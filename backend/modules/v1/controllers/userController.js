@@ -21,6 +21,14 @@ const userController = {
         return userModule.getNoticeDetails(request, res);
     },
 
+    async getMedia(request, res) {
+        return userModule.getMedia(request, res);
+    },
+
+    async saveMedia(request, res) {
+        return userModule.saveMedia(request, res);
+    },
+
     async getEventCategories(request, res) {
         return userModule.getEventCategories(request, res);
     },

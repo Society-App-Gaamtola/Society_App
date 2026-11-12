@@ -1,4 +1,4 @@
-import { File } from 'expo-file-system';
+import { mediaFolder, uploadMedia } from '../services/media';
 import { getDeviceFields } from '../services/device';
 import { getAppLanguage } from '../i18n';
 import { request } from './client';
@@ -27,21 +27,11 @@ type ResendData = { resend_after_seconds: number };
 type MobileNumber = { country_code: string; mobile_number: string };
 type SignupDetails = MobileNumber & { email: string; password: string };
 
-// Expo's fetch can't send React Native's usual { uri, name, type } file: it throws before sending.
-// It reads the file through bytes() instead; the type is passed on because the backend checks it.
-const toUploadPart = ({ uri, name, type }: ImageFile) => ({
-  name,
-  type,
-  bytes: async () => new Uint8Array(await new File(uri).arrayBuffer()),
-});
-
-const toForm = (fields: Record<string, string | undefined>, image?: ImageFile | null) => {
-  const form = new FormData();
-  for (const [key, value] of Object.entries(fields)) {
-    if (value !== undefined) form.append(key, value);
-  }
-  if (image) form.append('profile_image', toUploadPart(image) as unknown as Blob);
-  return form;
+// A new photo goes straight to Cloudinary (society_app/<env>/profiles/user_<id>); the backend only stores its link
+const withPhoto = async <T extends object>(fields: T, image?: ImageFile | null, userId?: string) => {
+  if (!image) return fields;
+  const photo = await uploadMedia({ uri: image.uri, kind: 'image', mimeType: image.type }, mediaFolder('profile', userId));
+  return { ...fields, profile_image_url: photo.url };
 };
 
 /** Sign-up step 1: mails the OTP. Nothing is saved until verifyOtp succeeds. */
@@ -66,18 +56,22 @@ export const verifyLoginOtp = async (otp: string, mobile: MobileNumber) =>
   });
 
 /** Sign-up final step. */
-export const completeProfile = (fields: { username: string; address: string }, image?: ImageFile | null) =>
+export const completeProfile = async (fields: { username: string; address: string }, image?: ImageFile | null, userId?: string) =>
   request<{ userData: ApiUser }>('PUT', '/auth/complete-profile', {
-    form: toForm({ ...fields, accept_terms: '1' }, image),
+    body: await withPhoto({ ...fields, accept_terms: true }, image, userId),
   });
 
 /** The logged-in user's current details from the server. */
 export const getProfile = () => request<{ userData: ApiUser }>('GET', '/auth/profile');
 
 /** Only the fields passed are changed. A new email is saved after verifyEmailChange. */
-export const editProfile = (fields: { username?: string; address?: string; email?: string }, image?: ImageFile | null) =>
+export const editProfile = async (
+  fields: { username?: string; address?: string; email?: string },
+  image?: ImageFile | null,
+  userId?: string,
+) =>
   request<{ userData: ApiUser; new_email?: string; resend_after_seconds?: number }>('PUT', '/auth/edit-profile', {
-    form: toForm(fields, image),
+    body: await withPhoto(fields, image, userId),
   });
 
 export const verifyEmailChange = (email: string, otp: string) =>

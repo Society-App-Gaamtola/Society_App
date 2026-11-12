@@ -23,7 +23,7 @@ import {
 type Props = NativeStackScreenProps<RootStackParamList, 'ProfileSetup'>;
 
 export default function ProfileSetupScreen({ navigation, route }: Props) {
-  const { updateUser, signOut } = useAuth();
+  const { user, updateUser, signOut } = useAuth();
   const [photo, setPhoto] = useState<ImageFile | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [name, setName] = useState(route.params?.name ?? '');
@@ -48,7 +48,7 @@ export default function ProfileSetupScreen({ navigation, route }: Props) {
     if (!canSubmit || submitting) return;
     setSubmitting(true);
     try {
-      const { data, message } = await authApi.completeProfile({ username: name.trim(), address: address.trim() }, photo);
+      const { data, message } = await authApi.completeProfile({ username: name.trim(), address: address.trim() }, photo, user?.id);
       await updateUser(data.userData);
       Alert.alert('Account Created', message, [
         { text: 'OK', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Main' }] }) },

@@ -81,17 +81,28 @@ const consumeOtp = async (email, otp_purpose, otp, user_id = null) => {
     return verified.affectedRows === 0 ? "rest_invalid_otp" : null;
 };
 
+// The new profile photo: the Cloudinary link the app uploaded (must be in this user's folder,
+// society_app/<env>/profiles/user_<id>/), or the uploads/ file name sent by older app versions.
+// undefined = no new photo, null = link in the wrong folder
+const newProfilePhoto = (request, user_id) => {
+    const url = request.body.profile_image_url;
+    if (url === undefined) {
+        return request.file?.filename;
+    }
+    return common.isInMediaFolder(url, "profile", user_id) ? url : null;
+};
+
 // Saves only what was sent, so a missing address or photo keeps its old value
-// A new photo replaces the old one: its file is deleted once the new one is saved
-const saveProfile = async (user_id, address, file) => {
+// A new photo replaces the old one. An old uploads/ file is deleted; Cloudinary files are left as they are
+const saveProfile = async (user_id, address, photo) => {
     const profileData = {};
     if (address !== undefined) {
         profileData.address_line1 = address;
     }
 
     let oldPhoto = null;
-    if (file) {
-        profileData.photo_url = file.filename;
+    if (photo) {
+        profileData.photo_url = photo;
         const [rows] = await db.query("SELECT photo_url FROM user_profiles WHERE user_id = ?", [user_id]);
         oldPhoto = rows[0]?.photo_url;
     }
@@ -102,7 +113,7 @@ const saveProfile = async (user_id, address, file) => {
 
     await db.query("INSERT INTO user_profiles SET ? ON DUPLICATE KEY UPDATE ?", [{ user_id, ...profileData }, profileData]);
 
-    if (oldPhoto) {
+    if (oldPhoto && oldPhoto !== photo && !/^https?:\/\//.test(oldPhoto)) {
         await common.deleteUpload(oldPhoto);
     }
 };
@@ -300,7 +311,12 @@ const authModule = {
             const user_id = request.loginUser.id;
             const { username, address } = request.body;
 
-            await saveProfile(user_id, address, request.file);
+            const photo = newProfilePhoto(request, user_id);
+            if (photo === null) {
+                return middleware.sendError(res, "rest_invalid_media_folder");
+            }
+
+            await saveProfile(user_id, address, photo);
 
             // accept_terms is enforced by completeProfileSchema; IGNORE keeps the first acceptance of this version
             await db.query("INSERT IGNORE INTO declaration_acceptances SET ?", [{
@@ -350,6 +366,11 @@ const authModule = {
                 return middleware.sendError(res, "rest_user_not_found");
             }
 
+            const photo = newProfilePhoto(request, user_id);
+            if (photo === null) {
+                return middleware.sendError(res, "rest_invalid_media_folder");
+            }
+
             // Sending the current email again is not a change, so it needs no OTP and raises no error
             const isEmailChanging = !!email && email !== user.email.toLowerCase();
             let resend_after_seconds;
@@ -363,7 +384,7 @@ const authModule = {
                 ({ resend_after_seconds } = await this.issueOtp({ user_id, email, otp_purpose: OTP_PURPOSE.EMAIL_CHANGE }));
             }
 
-            await saveProfile(user_id, address, request.file);
+            await saveProfile(user_id, address, photo);
             if (username) {
                 await query.updateQuery("users", { full_name: username }, "id = ?", [user_id]);
             }

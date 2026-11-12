@@ -3,7 +3,7 @@ import userController from "../controllers/userController.js";
 import middleware from "../../../middleware/middleware.js";
 import schemas from "../validation_rules/userValidation.js";
 
-const { eventListSchema, noticeListSchema } = schemas;
+const { eventListSchema, noticeListSchema, saveMediaSchema, mediaListSchema } = schemas;
 
 const userRoutes = express.Router();
 
@@ -23,5 +23,9 @@ userRoutes.get("/event-categories", userController.getEventCategories);
 userRoutes.get("/notices", middleware.validateJoi(noticeListSchema, true), userController.getNotices);
 
 userRoutes.get("/notices/:id", userController.getNoticeDetails);
+
+// Gallery. The app uploads files to Cloudinary itself and sends their links: ?page=&limit=&category_id=
+userRoutes.get("/media", middleware.validateJoi(mediaListSchema, true), userController.getMedia);
+userRoutes.post("/media", middleware.validateJoi(saveMediaSchema), userController.saveMedia);
 
 export default userRoutes;

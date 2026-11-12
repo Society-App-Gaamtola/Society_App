@@ -1,5 +1,6 @@
 import Joi from "joi";
 import constant from "../../../config/constant.js";
+import { mediaUrl } from "./userValidation.js";
 
 const countryCode = Joi.string().trim().pattern(/^\+\d{1,4}$/).default(constant.DEFAULT_COUNTRY_CODE);
 const mobileNumber = Joi.string().trim().pattern(/^\d{7,15}$/);
@@ -66,10 +67,12 @@ const verifyOtpSchema = Joi.object({
 });
 
 // Signup step 1 → 2 – Profile & Address (multipart, profile_image file is optional)
+// profile_image_url: the photo the app uploaded to Cloudinary (older app versions send a profile_image file)
 const completeProfileSchema = Joi.object({
   username: username.required(),
   address: address.required(),
   accept_terms: Joi.boolean().truthy(1, "1").valid(true).required(),
+  profile_image_url: mediaUrl,
 });
 
 // Every field is optional (multipart, profile_image file too). The mobile number can't be changed
@@ -77,6 +80,7 @@ const editProfileSchema = Joi.object({
   username,
   address,
   email,
+  profile_image_url: mediaUrl,
   country_code: Joi.forbidden().messages({ "any.unknown": "country_code cannot be changed" }),
   mobile_number: Joi.forbidden().messages({ "any.unknown": "mobile_number cannot be changed" }),
 });
