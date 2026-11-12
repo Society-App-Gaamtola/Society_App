@@ -13,7 +13,24 @@ export const SOCIETY_NAME_GU_TWO_LINES = 'શ્રી ગામટોળા\n�
 
 export const LOGO = require('../../assets/logo.png');
 
+/** Steps shown on the Change Email and OTP screens. */
+export const EMAIL_CHANGE_STEPS = ['New Email', 'Verify OTP', 'Updated'];
+
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+
+export const APP_VERSION = '1.0.0';
+
+/**
+ * The society's UPI ID for donations. Left empty until the admin gives the real one:
+ * paying to a made-up ID could send money to a stranger, so the Donate screen won't open UPI without it.
+ */
+export const SOCIETY_UPI_ID: string = '';
+
+/** Amounts offered as one-tap choices on the Donate screen. */
+export const DONATION_PRESETS = [501, 1001, 2501, 5001, 11000];
+
+/** Most items the backend sends in one page (MAX_PAGE_SIZE in backend/config/constant.js). */
+export const MAX_PAGE_SIZE = 50;
 
 export const STORAGE_KEYS = {
   language: 'app_language',
@@ -22,6 +39,7 @@ export const STORAGE_KEYS = {
   executiveEvents: 'executive_events',
   donations: 'donations',
   reports: 'reports',
+  myDonations: 'my_donations',
 } as const;
 
 export const REPORT_MIME_TYPES: Record<ReportFormat, string> = {

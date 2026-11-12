@@ -4,3 +4,7 @@ uploads/
 
 # Holds the real AES key and IV
 enc_dec.html
+
+# Any other env file (e.g. .env.production) holds real secrets; only the example is committed
+.env.*
+!.env.example

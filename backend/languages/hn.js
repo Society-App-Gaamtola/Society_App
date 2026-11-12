@@ -44,6 +44,10 @@ const hi = {
 	rest_invalid_otp: "अमान्य OTP",
 	rest_expired_otp: "OTP की समय-सीमा समाप्त हो गई है। कृपया नया OTP माँगें",
 	rest_otp_attempts_exceeded: "बहुत अधिक गलत प्रयास। कृपया नया OTP माँगें",
+
+	// Events / notices
+	rest_event_not_found: "कार्यक्रम नहीं मिला",
+	rest_notice_not_found: "सूचना नहीं मिली",
 };
 
 export default hi;

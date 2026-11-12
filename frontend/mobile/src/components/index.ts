@@ -25,6 +25,7 @@ export { default as InputField } from './form/InputField';
 export { default as OtpInput } from './form/OtpInput';
 export { default as PickerField } from './form/PickerField';
 export { default as SearchBar } from './form/SearchBar';
+export { default as SegmentedTabs } from './form/SegmentedTabs';
 export { default as StepIndicator, REGISTER_STEPS } from './form/StepIndicator';
 export { default as TextAreaField } from './form/TextAreaField';
 export { default as UploadBox } from './form/UploadBox';

@@ -3,6 +3,12 @@ import { getAppLanguage } from '../i18n';
 
 const TIMEOUT_MS = 20000;
 
+const API_ORIGIN = API_URL.replace(/\/api\/.*$/, '');
+
+/** Image links from the backend. Without BASE_URL set it builds them with localhost, which a phone can't open. */
+export const mediaUrl = (url: string | null) =>
+  url?.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/, API_ORIGIN) ?? null;
+
 // `code` values in the backend's response (backend/config/status_codes.js).
 export const ApiCode = {
   invalidToken: -1,
@@ -49,7 +55,7 @@ type RequestOptions = { body?: object; form?: FormData };
 
 /** Calls the backend. Resolves for `code` 1 and 5, throws ApiError for everything else. */
 export async function request<T = undefined>(
-  method: 'POST' | 'PUT' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   path: string,
   { body, form }: RequestOptions = {},
 ): Promise<ApiResponse<T>> {

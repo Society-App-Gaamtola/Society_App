@@ -1,5 +1,5 @@
 import type { ImageSourcePropType } from 'react-native';
-import type { IoniconName } from '../icons';
+import type { IoniconName, McIconName } from '../icons';
 
 // --- Auth
 
@@ -21,19 +21,24 @@ export type AuthUser = {
   photoUrl?: string | null;
   /** False until the Profile & Address step is done. */
   profileComplete?: boolean;
+  /** True once the email was confirmed with an OTP. */
+  emailVerified?: boolean;
+  /** ISO date the account was created. */
+  memberSince?: string | null;
 };
 
 // --- Shared
 
 export type BadgeStatus =
   | 'Upcoming'
+  | 'Ongoing'
+  | 'Completed'
   | 'Important'
   | 'General'
   | 'Featured'
   | 'Event'
   | 'Meeting'
   | 'Other'
-  | 'Assigned'
   | 'Open'
   | 'Confirmed';
 
@@ -44,21 +49,25 @@ export type DateRange = { start: string; end: string };
 
 export type EventCategory = 'Festival' | 'Aarti' | 'Cultural' | 'Meeting';
 
+/** An event from the API, ready to display (`toSocietyEvent` in api/user.ts). */
 export type SocietyEvent = {
   id: string;
   title: string;
+  /** Display date, e.g. "13 Nov 2026, 7:00 PM" or "08 Nov 2026 - 10 Nov 2026". */
   date: string;
   days?: string;
   time?: string;
   venue: string;
-  category: EventCategory;
+  /** First and last day, yyyy-mm-dd (the same for one-day events). */
+  startDay: string;
+  endDay: string;
+  /** Category name in the app's language. */
+  category: string;
+  categoryColor: string;
   status: BadgeStatus;
   image: ImageSourcePropType;
-  organizer: string;
-  contact: string;
-  latitude: number;
-  longitude: number;
   description: string;
+  mapLink: string | null;
 };
 
 export type Notice = {
@@ -70,24 +79,60 @@ export type Notice = {
   icon: IoniconName;
 };
 
-export type CalendarEntry = {
-  /** ISO date, used as the calendar key. */
-  date: string;
+// --- Notifications and member donations (sample data until their APIs exist)
+
+export type NotificationKind = 'event' | 'notice' | 'payment';
+
+export type AppNotification = {
+  id: string;
+  kind: NotificationKind;
   title: string;
+  /** Short text for the list. */
+  body: string;
+  /** Full message on the details screen. */
+  message: string;
+  /** Display time, e.g. "Today, 8:45 AM". */
   time: string;
-  venue: string;
-  category: EventCategory;
-  eventId: string;
+  icon: IoniconName;
+  unread: boolean;
+  /** Date, time and venue rows for event alerts. */
+  event?: { date: string; time: string; venue: string };
 };
 
-export type Duty = {
+export type DonationMethod = 'UPI App' | 'QR Code' | 'Card' | 'Net Banking' | 'Cash';
+
+export type MyDonation = {
   id: string;
   title: string;
-  icon: IoniconName;
+  /** ISO date-time. */
   date: string;
-  venue: string;
+  amount: number;
+  /** Pending until the treasurer matches it with the bank statement or cash book. */
+  status: 'Successful' | 'Pending';
+  icon: McIconName;
+  method: DonationMethod;
+  /** UPI transaction ID (UTR) or receipt number. */
+  reference?: string;
+};
+
+export type GalleryPhoto = {
+  id: string;
+  image: ImageSourcePropType;
+  caption: string;
   category: EventCategory;
-  status: 'Assigned' | 'Open' | 'Confirmed';
+  /** Display date, e.g. "12 Oct 2026". */
+  date: string;
+  /** Uploaded by this user and waiting for the Super Admin to approve it. */
+  pending?: boolean;
+};
+
+export type DirectoryMember = {
+  id: string;
+  name: string;
+  memberId: string;
+  role: 'Executive' | 'Member';
+  /** Shown to executives only (privacy setting in the PPT). */
+  mobile: string;
 };
 
 // --- Executive events

@@ -5,13 +5,14 @@ import Pill from './Pill';
 
 const palette: Record<BadgeStatus, Tone> = {
   Upcoming: tones.success,
+  Ongoing: tones.warning,
+  Completed: tones.neutral,
   Important: tones.danger,
   General: tones.info,
   Featured: tones.info,
   Event: tones.sky,
   Meeting: tones.neutral,
   Other: tones.neutral,
-  Assigned: tones.success,
   Open: tones.info,
   Confirmed: tones.success,
 };

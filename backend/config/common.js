@@ -6,7 +6,6 @@ import nodemailer from "nodemailer";
 import db from "../config/db.js";
 import query from "../config/dbHelper.js";
 import constant from "../config/constant.js";
-import { UPLOAD_DIR } from "../config/multer.js";
 
 // Role code comes from roles, address and photo from user_profiles
 const USER_SELECT = `SELECT u.*, r.code AS role, p.address_line1 AS address, p.photo_url AS profile_image
@@ -14,9 +13,7 @@ const USER_SELECT = `SELECT u.*, r.code AS role, p.address_line1 AS address, p.p
     JOIN roles r ON r.id = u.role_id
     LEFT JOIN user_profiles p ON p.user_id = u.id`;
 
-const TOKEN_EXPIRY_DAYS = 365;
-
-const SIGNUP_STEPS = { otp_pending: 0, profile_pending: 1, completed: 2 };
+const { TOKEN_EXPIRY_DAYS, SIGNUP_STEPS, UPLOAD_DIR, DEVICE_STATUS } = constant;
 
 const common = {
     // conditions: { column: value } – several columns are matched together, e.g. { country_code, mobile }
@@ -149,12 +146,12 @@ const common = {
             const [deviceExists] = await db.query(checkSql, [user_id, device_uid]);
             if (deviceExists.length > 0) {
                 // Logging in again must not lift a block placed on this device
-                const status = deviceExists[0].status === "blocked" ? "blocked" : "active";
+                const status = deviceExists[0].status === DEVICE_STATUS.BLOCKED ? DEVICE_STATUS.BLOCKED : DEVICE_STATUS.ACTIVE;
                 await query.updateQuery("user_devices", { ...devicePayload, status }, "id = ?", [deviceExists[0].id]);
                 return token;
             }
 
-            await query.insertQuery("user_devices", { ...devicePayload, user_id, device_uid, status: "active" });
+            await query.insertQuery("user_devices", { ...devicePayload, user_id, device_uid, status: DEVICE_STATUS.ACTIVE });
             return token;
         } catch (error) {
             console.error("Error generating token: ", error);

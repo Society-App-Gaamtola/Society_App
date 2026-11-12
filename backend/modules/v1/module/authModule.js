@@ -8,19 +8,13 @@ import db from "../../../config/db.js";
 import query from "../../../config/dbHelper.js";
 import { createOtpWmailTemplate } from "../../../config/mail.js";
 
-const OTP_EXPIRY_MINUTES = 5;
-const OTP_RESEND_SECONDS = 60; // matches the resend timer on the OTP screen
-const BCRYPT_ROUNDS = 10;
-const MAX_OTP_ATTEMPTS = 5;
-const EMAIL_CHANGE_OTP_PURPOSE = "email_change";
-// Takes a device off the account. Logging in again sets it back to active
-const LOGGED_OUT_DEVICE = { refresh_token_hash: null, fcm_token: null, status: "logged_out", is_active: 0 };
+const { OTP_EXPIRY_MINUTES, OTP_RESEND_SECONDS, BCRYPT_ROUNDS, MAX_OTP_ATTEMPTS, OTP_PURPOSE, LOGGED_OUT_DEVICE } = constant;
 
-// Outside production the OTP is always 123456 so the flow can be tested without a real mailbox
+// Outside production the OTP is always DEV_OTP so the flow can be tested without a real mailbox
 const generateOtp = () => {
     return process.env.NODE_ENV === "production"
         ? String(crypto.randomInt(100000, 1000000))
-        : "123456";
+        : constant.DEV_OTP;
 };
 
 // Returns an error message key if the mobile or email is already registered, otherwise null
@@ -182,7 +176,7 @@ const authModule = {
                 return middleware.sendError(res, conflictKey);
             }
 
-            const { resend_after_seconds } = await this.issueOtp({ email, otp_purpose: "signup" });
+            const { resend_after_seconds } = await this.issueOtp({ email, otp_purpose: OTP_PURPOSE.SIGNUP });
 
             return middleware.sendSuccess(res, "rest_signup_otp_sent", {
                 email,
@@ -225,7 +219,7 @@ const authModule = {
             const { email, country_code, mobile_number, otp_purpose } = request;
 
             let otpTarget;
-            if (otp_purpose === "signup") {
+            if (otp_purpose === OTP_PURPOSE.SIGNUP) {
                 const isEmailUnique = await common.checkunique("users", { email });
                 if (!isEmailUnique) {
                     return middleware.sendError(res, "rest_email_already_exists");
@@ -255,7 +249,7 @@ const authModule = {
             const { email, country_code, mobile_number, password, language, otp, otp_purpose } = request;
 
             let user;
-            if (otp_purpose === "signup") {
+            if (otp_purpose === OTP_PURPOSE.SIGNUP) {
                 // Checked before the OTP so a taken mobile number doesn't use up the OTP
                 const conflictKey = await findSignupConflict(request);
                 if (conflictKey) {
@@ -331,6 +325,19 @@ const authModule = {
         }
     },
 
+    // The logged-in user's current details, so the app can refresh what it saved at login
+    async getProfile(request, res) {
+        try {
+            const user = await common.getUserDetails({ id: request.loginUser.id });
+            if (!user) {
+                return middleware.sendError(res, "rest_user_not_found");
+            }
+            return middleware.sendSuccess(res, "rest_keywords_success", { userData: common.sanitizeUser(user) });
+        } catch (error) {
+            return middleware.sendServerError(res, "getProfile", error);
+        }
+    },
+
     // Username, address and photo are saved straight away. A new email is saved only after /verify-email-change
     // The mobile number can't be changed (editProfileSchema refuses it)
     async editProfile(request, res) {
@@ -353,7 +360,7 @@ const authModule = {
                 }
 
                 // Before saving anything, so a failed mail leaves the profile untouched
-                ({ resend_after_seconds } = await this.issueOtp({ user_id, email, otp_purpose: EMAIL_CHANGE_OTP_PURPOSE }));
+                ({ resend_after_seconds } = await this.issueOtp({ user_id, email, otp_purpose: OTP_PURPOSE.EMAIL_CHANGE }));
             }
 
             await saveProfile(user_id, address, request.file);
@@ -382,7 +389,7 @@ const authModule = {
                 return middleware.sendError(res, "rest_email_already_exists");
             }
 
-            const otpError = await consumeOtp(email, EMAIL_CHANGE_OTP_PURPOSE, otp, user_id);
+            const otpError = await consumeOtp(email, OTP_PURPOSE.EMAIL_CHANGE, otp, user_id);
             if (otpError) {
                 return middleware.sendError(res, otpError);
             }

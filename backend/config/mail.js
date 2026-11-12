@@ -1,4 +1,6 @@
-const createOtpWmailTemplate = ({ userName = "there", otp, otpType = "signup" }) => {
+import constant from "./constant.js";
+
+const createOtpWmailTemplate = ({ userName = "there", otp, otpType = constant.OTP_PURPOSE.SIGNUP }) => {
   const appName = process.env.APP_NAME || "Gaamtoda Mitra Mandal";
   const titles = { forgot_password: "Password Reset", login: "Login Verification", email_change: "Email Verification" };
   const title = titles[otpType] || "Signup Verification";
@@ -8,7 +10,7 @@ const createOtpWmailTemplate = ({ userName = "there", otp, otpType = "signup" })
     email_change: "Enter this code in the app to confirm your new email address.",
   };
   const intro = intros[otpType] || "Enter this code in the app to verify your email and finish signing up.";
-  const expireMinutes = 5;
+  const expireMinutes = constant.OTP_EXPIRY_MINUTES;
 
   return `
 <!DOCTYPE html>

@@ -1,35 +1,60 @@
-import { memo, useCallback, useMemo, useRef, useState, type ComponentRef } from 'react';
-import { FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+import { memo, useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
+import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { EventsStackParamList } from '../navigation/types';
 import { common, surface } from '../styles/common';
 import { colors, fonts } from '../theme';
-import { CATEGORY_FILTERS, type CategoryFilter } from '../config/filters';
 import { LIST_PERFORMANCE_PROPS } from '../config/list';
-import { events } from '../data/mock';
-import { useSimulatedRefresh } from '../hooks/useSimulatedRefresh';
+import { getEventCategories, getEvents, toSocietyEvent, type ApiCategory } from '../api/user';
+import { usePagedList } from '../hooks/usePagedList';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { Ionicons } from '../icons';
-import type { SocietyEvent } from '../types';
-import { AppHeader, EmptyState, FilterChips, MetaRow, SearchBar, StatusBadge } from '../components';
+import type { DateRange, SocietyEvent } from '../types';
+import { formatRange, toIsoDay } from '../utils/date';
+import { AppHeader, DateRangeButton, EmptyState, FilterChips, MetaRow, SearchBar, StatusBadge } from '../components';
+import DateRangeSheet from '../components/sheets/DateRangeSheet';
+
+const ALL = 'All';
 
 const Separator = () => <View style={styles.separator} />;
 
 export default function EventsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<EventsStackParamList>>();
   const searchRef = useRef<ComponentRef<typeof TextInput>>(null);
-  const [filter, setFilter] = useState<CategoryFilter>('All');
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [category, setCategory] = useState(ALL);
   const [query, setQuery] = useState('');
-  const { refreshing, onRefresh } = useSimulatedRefresh();
+  const [range, setRange] = useState<DateRange | null>(null);
+  const [rangeOpen, setRangeOpen] = useState(false);
+  const search = useDebouncedValue(query.trim());
 
-  const data = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return events.filter(
-      (e) => (filter === 'All' || e.category === filter) && (!q || e.title.toLowerCase().includes(q)),
-    );
-  }, [filter, query]);
+  // Without categories the chips show only "All"; the list itself still works.
+  useEffect(() => {
+    getEventCategories()
+      .then(({ data }) => setCategories(data.categories))
+      .catch(() => {});
+  }, []);
 
-  const openEvent = useCallback((eventId: string) => navigation.navigate('EventDetails', { eventId }), [navigation]);
+  const categoryId = categories.find((c) => c.name === category)?.id;
+  const fetchPage = useCallback(
+    async (page: number) => {
+      const { data } = await getEvents(page, {
+        search,
+        category_id: categoryId,
+        from_date: range?.start,
+        to_date: range?.end,
+      });
+      return { items: data.events.map(toSocietyEvent), pagination: data.pagination };
+    },
+    [search, categoryId, range],
+  );
+  const { items, loading, loadingMore, refreshing, error, loadMore, refresh } = usePagedList(fetchPage);
+
+  const openEvent = useCallback(
+    (event: SocietyEvent) => navigation.navigate('EventDetails', { eventId: event.id, event }),
+    [navigation],
+  );
   const renderItem = useCallback(
     ({ item }: { item: SocietyEvent }) => <EventCard event={item} onOpen={openEvent} />,
     [openEvent],
@@ -50,7 +75,14 @@ export default function EventsScreen() {
         onActionPress={() => navigation.navigate('EventCalendar')}
       />
 
-      <FilterChips options={CATEGORY_FILTERS} selected={filter} onSelect={setFilter} style={styles.chips} />
+      <DateRangeButton label={range ? formatRange(range) : 'All dates'} onPress={() => setRangeOpen(true)} style={styles.range} />
+
+      <FilterChips
+        options={[ALL, ...categories.map((c) => c.name)]}
+        selected={category}
+        onSelect={setCategory}
+        style={styles.chips}
+      />
     </View>
   );
 
@@ -63,27 +95,54 @@ export default function EventsScreen() {
       />
       <FlatList
         {...LIST_PERFORMANCE_PROPS}
-        data={data}
+        data={items}
         keyExtractor={(e) => e.id}
         contentContainerStyle={styles.list}
         ListHeaderComponent={header}
         ItemSeparatorComponent={Separator}
         keyboardShouldPersistTaps="handled"
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[colors.primary]} tintColor={colors.primary} />
         }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
         ListEmptyComponent={
-          <EmptyState icon={<Ionicons name="calendar-outline" size={40} color={colors.lightGold} />} text="No events found" />
+          loading ? (
+            <ActivityIndicator color={colors.primary} style={styles.loading} />
+          ) : (
+            <EmptyState
+              icon={<Ionicons name={error ? 'cloud-offline-outline' : 'calendar-outline'} size={40} color={colors.lightGold} />}
+              text={error ? "Couldn't load events. Pull down to try again." : 'No events found'}
+            />
+          )
+        }
+        ListFooterComponent={
+          loadingMore ? (
+            <ActivityIndicator color={colors.primary} style={styles.footer} />
+          ) : error && items.length > 0 ? (
+            <Text style={styles.footerError}>Couldn't load more events. Scroll down to try again.</Text>
+          ) : undefined
         }
         renderItem={renderItem}
+      />
+
+      <DateRangeSheet
+        visible={rangeOpen}
+        initial={range}
+        defaultMonth={toIsoDay(new Date())}
+        onClose={() => setRangeOpen(false)}
+        onApply={(r) => {
+          setRange(r);
+          setRangeOpen(false);
+        }}
       />
     </View>
   );
 }
 
-const EventCard = memo(function EventCard({ event, onOpen }: { event: SocietyEvent; onOpen: (id: string) => void }) {
+const EventCard = memo(function EventCard({ event, onOpen }: { event: SocietyEvent; onOpen: (event: SocietyEvent) => void }) {
   return (
-    <Pressable style={styles.card} onPress={() => onOpen(event.id)} accessibilityRole="button">
+    <Pressable style={styles.card} onPress={() => onOpen(event)} accessibilityRole="button">
       <Image source={event.image} style={styles.image} />
       <View style={styles.info}>
         <View style={styles.titleRow}>
@@ -102,7 +161,11 @@ const EventCard = memo(function EventCard({ event, onOpen }: { event: SocietyEve
 
 const styles = StyleSheet.create({
   list: { padding: 16, paddingBottom: 32, flexGrow: 1 },
+  range: { marginTop: 10 },
   chips: { marginTop: 12, marginBottom: 14 },
+  loading: { marginTop: 40 },
+  footer: { marginVertical: 16 },
+  footerError: { fontFamily: fonts.regular, fontSize: 12, color: colors.textMuted, textAlign: 'center', marginVertical: 16 },
   separator: { height: 12 },
   card: { ...surface, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10 },
   image: { width: 90, height: 80, borderRadius: 10 },

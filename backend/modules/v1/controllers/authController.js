@@ -21,6 +21,10 @@ const authController = {
         return authModule.completeProfile(request, res);
     },
 
+    async getProfile(request, res) {
+        return authModule.getProfile(request, res);
+    },
+
     async editProfile(request, res) {
         return authModule.editProfile(request, res);
     },

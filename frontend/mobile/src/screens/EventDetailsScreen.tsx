@@ -1,16 +1,30 @@
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import type { HomeStackParamList } from '../navigation/types';
 import { common } from '../styles/common';
 import { colors, fonts, radius, spacing } from '../theme';
-import { events } from '../data/mock';
+import { getEvent, toSocietyEvent } from '../api/user';
 import { Ionicons } from '../icons';
+import type { SocietyEvent } from '../types';
 import { AppHeader, StatusBadge } from '../components';
 
 // Basic layout until the event details screen is designed.
 export default function EventDetailsScreen() {
   const { params } = useRoute<RouteProp<HomeStackParamList, 'EventDetails'>>();
-  const event = events.find((e) => e.id === params.eventId);
+  // A list that opened this screen passes the event, so it shows at once; the API copy replaces it.
+  const [event, setEvent] = useState<SocietyEvent | null>(params.event ?? null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getEvent(params.eventId)
+      .then(({ data }) => active && setEvent(toSocietyEvent(data.event)))
+      .catch((e) => active && setError(e instanceof Error ? e.message : 'Could not load the event.'));
+    return () => {
+      active = false;
+    };
+  }, [params.eventId]);
 
   return (
     <View style={common.screen}>
@@ -25,8 +39,7 @@ export default function EventDetailsScreen() {
               ['calendar-outline', event.days ? `${event.date} (${event.days})` : event.date],
               ['time-outline', event.time],
               ['location-outline', event.venue],
-              ['people-outline', event.organizer],
-              ['call-outline', event.contact],
+              ['pricetag-outline', event.category],
             ] as const
           )
             .filter(([, text]) => !!text)
@@ -38,8 +51,10 @@ export default function EventDetailsScreen() {
             ))}
           <Text style={styles.desc}>{event.description}</Text>
         </ScrollView>
+      ) : error ? (
+        <Text style={styles.missing}>{error}</Text>
       ) : (
-        <Text style={styles.missing}>Event not found.</Text>
+        <ActivityIndicator color={colors.primary} style={styles.loading} />
       )}
     </View>
   );
@@ -53,4 +68,5 @@ const styles = StyleSheet.create({
   meta: { flex: 1, fontFamily: fonts.regular, fontSize: 13, color: colors.textDark },
   desc: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 21, color: colors.textMuted, marginTop: 6 },
   missing: { fontFamily: fonts.regular, fontSize: 14, color: colors.textMuted, textAlign: 'center', marginTop: 40 },
+  loading: { marginTop: 40 },
 });

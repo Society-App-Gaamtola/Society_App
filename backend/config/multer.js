@@ -1,9 +1,9 @@
 import fs from "fs";
 import path from "path";
 import multer from "multer";
+import constant from "./constant.js";
 
-const UPLOAD_DIR = "uploads";
-const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png"];
+const { UPLOAD_DIR, ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE_BYTES } = constant;
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
@@ -18,7 +18,7 @@ const storage = multer.diskStorage({
 // Local disk upload for profile images (event media will go to Cloudinary)
 const upload = multer({
     storage,
-    limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB (JPG / PNG, as shown on the profile screen)
+    limits: { fileSize: MAX_IMAGE_SIZE_BYTES },
     fileFilter: (req, file, cb) => {
         if (ALLOWED_IMAGE_TYPES.includes(file.mimetype)) {
             return cb(null, true);
@@ -27,5 +27,4 @@ const upload = multer({
     },
 });
 
-export { UPLOAD_DIR };
 export default upload;

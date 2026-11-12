@@ -17,6 +17,7 @@ export type ApiUser = {
   is_verified: 0 | 1;
   /** 1 = profile still to complete, 2 = completed. */
   steps: number;
+  created_at?: string;
 };
 
 export type AuthData = { userData: ApiUser; token: string };
@@ -69,6 +70,9 @@ export const completeProfile = (fields: { username: string; address: string }, i
   request<{ userData: ApiUser }>('PUT', '/auth/complete-profile', {
     form: toForm({ ...fields, accept_terms: '1' }, image),
   });
+
+/** The logged-in user's current details from the server. */
+export const getProfile = () => request<{ userData: ApiUser }>('GET', '/auth/profile');
 
 /** Only the fields passed are changed. A new email is saved after verifyEmailChange. */
 export const editProfile = (fields: { username?: string; address?: string; email?: string }, image?: ImageFile | null) =>

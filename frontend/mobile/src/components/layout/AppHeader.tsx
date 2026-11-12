@@ -2,6 +2,8 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../navigation/types';
 import { LOGO, SOCIETY_NAME_GU_TWO_LINES } from '../../config';
 import { colors, fonts } from '../../theme';
 import { Ionicons } from '../../icons';
@@ -26,11 +28,18 @@ const iconNames = {
 
 export default function AppHeader({ leftType = 'menu', rightIcons = [], onRightPress }: Props) {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const isFocused = useIsFocused();
   const drawer = useSideDrawer();
 
   const handleLeft = leftType === 'back' ? () => navigation.canGoBack() && navigation.goBack() : drawer?.open;
+
+  // The bell and the avatar work the same on every screen; other icons are up to the screen.
+  const handleRight = (icon: HeaderRightIcon) => {
+    if (icon === 'bell') navigation.navigate('Main', { screen: 'Home', params: { screen: 'Notifications' } });
+    else if (icon === 'avatar') navigation.navigate('Main', { screen: 'Profile', params: { screen: 'ProfileMain' } });
+    else onRightPress?.(icon);
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -60,7 +69,7 @@ export default function AppHeader({ leftType = 'menu', rightIcons = [], onRightP
           {rightIcons.map((icon) => (
             <Pressable
               key={icon}
-              onPress={() => onRightPress?.(icon)}
+              onPress={() => handleRight(icon)}
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={icon}
