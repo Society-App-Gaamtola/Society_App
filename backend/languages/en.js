@@ -44,6 +44,10 @@ const en = {
 	rest_invalid_otp: "Invalid OTP",
 	rest_expired_otp: "OTP has expired. Please request a new one",
 	rest_otp_attempts_exceeded: "Too many wrong attempts. Please request a new OTP",
+
+	// Events / notices
+	rest_event_not_found: "Event not found",
+	rest_notice_not_found: "Notice not found",
 };
 
 export default en;

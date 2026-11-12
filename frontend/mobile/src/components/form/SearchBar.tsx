@@ -10,10 +10,10 @@ type Props = {
   placeholder: string;
   autoCapitalize?: TextInputProps['autoCapitalize'];
   inputRef?: Ref<ComponentRef<typeof TextInput>>;
-  /** Square button beside the search box. */
-  actionIcon: IoniconName;
-  actionLabel: string;
-  onActionPress: () => void;
+  /** Optional square button beside the search box. */
+  actionIcon?: IoniconName;
+  actionLabel?: string;
+  onActionPress?: () => void;
 };
 
 export default function SearchBar({
@@ -50,9 +50,11 @@ export default function SearchBar({
           </Pressable>
         ) : null}
       </View>
-      <Pressable style={styles.action} onPress={onActionPress} accessibilityRole="button" accessibilityLabel={actionLabel}>
-        <Ionicons name={actionIcon} size={20} color={colors.textDark} />
-      </Pressable>
+      {actionIcon ? (
+        <Pressable style={styles.action} onPress={onActionPress} accessibilityRole="button" accessibilityLabel={actionLabel}>
+          <Ionicons name={actionIcon} size={20} color={colors.textDark} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }

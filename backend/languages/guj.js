@@ -44,6 +44,10 @@ const gu = {
 	rest_invalid_otp: "અમાન્ય OTP",
 	rest_expired_otp: "OTPની સમયમર્યાદા પૂરી થઈ ગઈ છે. કૃપા કરીને નવો OTP માંગો",
 	rest_otp_attempts_exceeded: "ઘણા બધા ખોટા પ્રયાસો. કૃપા કરીને નવો OTP માંગો",
+
+	// Events / notices
+	rest_event_not_found: "કાર્યક્રમ મળ્યો નથી",
+	rest_notice_not_found: "સૂચના મળી નથી",
 };
 
 export default gu;

@@ -3,6 +3,7 @@ import authController from "../controllers/authController.js";
 import middleware from "../../../middleware/middleware.js";
 import schemas from "../validation_rules/authValidation.js";
 import upload from "../../../config/multer.js";
+import constant from "../../../config/constant.js";
 
 const {
   signupSchema,
@@ -17,7 +18,7 @@ const {
 
 const authRoutes = express.Router();
 
-// Public (listed in bypassRoutes)
+// Public (listed in constant.BYPASS_ROUTES)
 authRoutes.post("/signup", middleware.validateJoi(signupSchema), authController.signUp);
 
 authRoutes.post("/login", middleware.validateJoi(loginSchema), authController.login);
@@ -31,13 +32,15 @@ authRoutes.delete("/logout", authController.logout);
 // Logged-in app users (Executive / Member)
 authRoutes.put(
   "/complete-profile",
-  middleware.allowedRoles("executive", "member"),
+  middleware.allowedRoles(constant.ROLES.EXECUTIVE, constant.ROLES.MEMBER),
   upload.single("profile_image"),
   middleware.validateJoi(completeProfileSchema),
   authController.completeProfile,
 );
 
 // Any logged-in user, on their own account
+authRoutes.get("/profile", authController.getProfile);
+
 // allowEmpty: a request with only a profile_image has no body fields
 authRoutes.put(
   "/edit-profile",

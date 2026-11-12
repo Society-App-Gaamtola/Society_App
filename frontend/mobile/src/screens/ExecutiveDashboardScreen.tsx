@@ -1,6 +1,6 @@
-import { useCallback } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useNavigation, type CompositeNavigationProp } from '@react-navigation/native';
+import { useCallback, useRef, useState } from 'react';
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useNavigation, type CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { HomeStackParamList, MainTabParamList } from '../navigation/types';
@@ -8,9 +8,9 @@ import { common, surface } from '../styles/common';
 import { colors, fonts } from '../theme';
 import { hasPermission, useAuth } from '../context/AuthContext';
 import { useExecEvents } from '../context/EventsContext';
-import { events, featuredEvents } from '../data/mock';
+import { getHome, toSocietyEvent } from '../api/user';
 import { Ionicons, MaterialCommunityIcons, type McIconName } from '../icons';
-import type { ExecEventStatus, Permission } from '../types';
+import type { ExecEventStatus, Permission, SocietyEvent } from '../types';
 import { timeAgo } from '../utils/date';
 import { AppHeader, EventListCard, FeaturedCarousel, IconCircle, SectionHeader } from '../components';
 
@@ -29,8 +29,6 @@ type Action = {
 
 const PADDING = 16;
 
-const upcomingEvent = events[0];
-
 const activityLabel: Record<ExecEventStatus, string> = {
   Draft: 'Event draft saved',
   Posted: 'Event posted',
@@ -44,15 +42,50 @@ export default function ExecutiveDashboardScreen() {
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
   const { myEvents } = useExecEvents();
-  const openEvent = useCallback((eventId: string) => navigation.navigate('EventDetails', { eventId }), [navigation]);
+  const [hero, setHero] = useState<SocietyEvent[]>([]);
+  const [upcomingEvent, setUpcomingEvent] = useState<SocietyEvent | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  // Read inside openEvent, so the carousel's memoised slides don't re-render on every reload
+  const heroRef = useRef<SocietyEvent[]>([]);
+
+  // Same data as the member home page: hero slider and the next upcoming event
+  const load = useCallback(async () => {
+    try {
+      const { data } = await getHome();
+      const slides = data.hero_events.map(toSocietyEvent);
+      heroRef.current = slides;
+      setHero(slides);
+      setUpcomingEvent(data.upcoming_events[0] ? toSocietyEvent(data.upcoming_events[0]) : null);
+    } catch {
+      // What was loaded before stays on screen; the API client already handles expired logins.
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
+
+  const openEvent = useCallback(
+    (eventId: string) =>
+      navigation.navigate('EventDetails', { eventId, event: heroRef.current.find((e) => e.id === eventId) }),
+    [navigation],
+  );
 
   const actions: Action[] = [
     { label: 'Create Event', icon: 'calendar-plus', permission: 'events', onPress: () => navigation.navigate('CreateEvent') },
     { label: 'Post Notice', icon: 'file-document-outline', permission: 'notices', onPress: comingSoon('Post Notice') },
     { label: 'My Events', icon: 'calendar-check-outline', permission: 'events', onPress: () => navigation.navigate('MyEvents') },
     { label: 'Event Planning', icon: 'clipboard-list-outline', permission: 'events', onPress: comingSoon('Event Planning') },
-    { label: 'Upload Media', icon: 'image-plus', permission: 'media', onPress: comingSoon('Upload Media') },
-    { label: 'Member Directory', icon: 'account-group-outline', onPress: comingSoon('Member Directory') },
+    { label: 'Upload Media', icon: 'image-plus', permission: 'media', onPress: () => navigation.navigate('Gallery') },
+    { label: 'Member Directory', icon: 'account-group-outline', onPress: () => navigation.navigate('MemberDirectory') },
   ];
 
   const recent = myEvents.slice(0, 3);
@@ -60,7 +93,13 @@ export default function ExecutiveDashboardScreen() {
   return (
     <View style={common.screen}>
       <AppHeader leftType="menu" rightIcons={['bell', 'avatar']} />
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />
+        }
+      >
         <View style={styles.greetingRow}>
           <View style={common.flex}>
             <Text style={styles.greeting}>Hello, {user?.name} 👋</Text>
@@ -71,7 +110,7 @@ export default function ExecutiveDashboardScreen() {
           </View>
         </View>
 
-        <FeaturedCarousel items={featuredEvents} onOpen={openEvent} horizontalPadding={PADDING} />
+        {hero.length > 0 ? <FeaturedCarousel items={hero} onOpen={openEvent} horizontalPadding={PADDING} /> : null}
 
         <View style={styles.grid}>
           {actions.map((action) => {
@@ -116,7 +155,14 @@ export default function ExecutiveDashboardScreen() {
         </View>
 
         <SectionHeader title="Upcoming Event" onViewAll={() => navigation.navigate('Events', { screen: 'EventsMain' })} />
-        <EventListCard event={upcomingEvent} onPress={() => openEvent(upcomingEvent.id)} />
+        {upcomingEvent ? (
+          <EventListCard
+            event={upcomingEvent}
+            onPress={() => navigation.navigate('EventDetails', { eventId: upcomingEvent.id, event: upcomingEvent })}
+          />
+        ) : (
+          <Text style={styles.empty}>No upcoming events right now.</Text>
+        )}
 
         <SectionHeader title="Recent Activity" onViewAll={() => navigation.navigate('MyEvents')} />
         <View style={styles.activityCard}>

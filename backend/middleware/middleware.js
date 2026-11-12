@@ -3,6 +3,7 @@ import CryptoJS from "crypto-js";
 import jwt from "jsonwebtoken";
 import Codes from "../config/status_codes.js";
 import common from "../config/common.js";
+import constant from "../config/constant.js";
 import db from "../config/db.js";
 import en from "../languages/en.js";
 import hi from "../languages/hn.js";
@@ -15,18 +16,9 @@ local
     .add("hi", hi)
     .add("gu", gu);
 
-const SUPPORTED_LANGUAGES = ["en", "hi", "gu"];
-
 const key = CryptoJS.enc.Utf8.parse(process.env.KEY || "");
 const iv = CryptoJS.enc.Utf8.parse(process.env.IV || "");
 
-const bypassRoutes = [
-    "/api/v1/auth/signup",
-    "/api/v1/auth/login",
-    "/api/v1/auth/send-otp",
-    "/api/v1/auth/verify-otp",
-    "/api/v1/auth/logout",
-];
 
 const resolveMessage = (responseMessage) => {
     if (!responseMessage) {
@@ -49,8 +41,9 @@ const resolveMessage = (responseMessage) => {
 };
 
 const extractHeaderLanguage = (req, res, next) => {
-    const headerLang = (req.headers['accept-language'] || 'en').split(',')[0].split('-')[0].toLowerCase();
-    req.lang = SUPPORTED_LANGUAGES.includes(headerLang) ? headerLang : 'en';
+    const { LANGUAGES, DEFAULT_LANGUAGE } = constant;
+    const headerLang = (req.headers['accept-language'] || DEFAULT_LANGUAGE).split(',')[0].split('-')[0].toLowerCase();
+    req.lang = LANGUAGES.includes(headerLang) ? headerLang : DEFAULT_LANGUAGE;
     res.locals.language = req.lang;
     req.getTranslation = (keyword, components = {}) => {
         local.setLocale(req.lang);
@@ -90,9 +83,12 @@ const sendServerError = (res, where, error) => {
     return sendApiResponse(res, Codes.INTERNAL_ERROR, Codes.RESPONSE_ERROR, "rest_keywords_error", null);
 };
 
+// GET requests are checked from the query string. The checked values go on req.body either way,
+// because Express 5 doesn't allow replacing req.query
 const validateJoi = (schema, allowEmpty = false) => {
     return (req, res, next) => {
-        if (!allowEmpty && (!req.body || Object.keys(req.body).length === 0)) {
+        const input = req.method === "GET" ? req.query : req.body;
+        if (!allowEmpty && (!input || Object.keys(input).length === 0)) {
             return sendApiResponse(
                 res,
                 Codes.SUCCESS,
@@ -102,7 +98,7 @@ const validateJoi = (schema, allowEmpty = false) => {
             );
         }
 
-        const { error, value } = schema.validate(req.body || {}, {
+        const { error, value } = schema.validate(input || {}, {
             abortEarly: false,
             stripUnknown: true,
         });
@@ -161,7 +157,7 @@ const getBearerToken = (req) => {
 
 async function tokenMiddleware(req, res, next) {
     const requestPath = (req.originalUrl || req.url || "").split("?")[0];
-    if (bypassRoutes.some((route) => requestPath.startsWith(route))) {
+    if (constant.BYPASS_ROUTES.some((route) => requestPath.startsWith(route))) {
         return next();
     }
 

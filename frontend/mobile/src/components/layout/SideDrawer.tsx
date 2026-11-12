@@ -87,12 +87,17 @@ function DrawerPanel({ progress, onClose }: { progress: Animated.Value; onClose:
   const { user, signOut } = useAuth();
   const panelWidth = Math.min(width * 0.8, 320);
 
+  const isExecutive = user?.role === 'executive';
   const links: DrawerLink[] = [
-    { label: 'Home', icon: 'home-outline', target: 'HomeMain' },
+    { label: isExecutive ? 'Executive Dashboard' : 'Home', icon: 'home-outline', target: 'HomeMain' },
+    { label: 'Notifications', icon: 'notifications-outline', target: 'Notifications' },
     { label: 'Event Calendar', icon: 'calendar-outline', target: 'EventCalendar' },
-    { label: 'Volunteer & Duties', icon: 'people-outline', target: 'Volunteer' },
     { label: 'Notice Board', icon: 'megaphone-outline', target: 'NoticeBoard' },
-    { label: 'Executive Request', icon: 'ribbon-outline', target: 'ExecutiveRequest' },
+    { label: 'My Donations', icon: 'heart-outline', target: 'MyDonations' },
+    { label: 'Member Directory', icon: 'people-outline', target: 'MemberDirectory' },
+    { label: 'My Events', icon: 'calendar-number-outline', target: 'MyEvents', hidden: !hasPermission(user, 'events') },
+    // Executives already have the role
+    { label: 'Executive Request', icon: 'ribbon-outline', target: 'ExecutiveRequest', hidden: isExecutive },
     { label: 'Donation Entries', icon: 'cash-outline', target: 'DonationEntries', hidden: !hasPermission(user, 'donations') },
     { label: 'Financial Reports', icon: 'bar-chart-outline', target: 'FinancialReports', hidden: !hasPermission(user, 'reports') },
     { label: 'Society Expenses', icon: 'wallet-outline', target: 'SocietyExpenses', hidden: !canViewExpenses(user) },

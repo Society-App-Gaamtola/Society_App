@@ -11,6 +11,8 @@ import { showApiError } from '../hooks/useFormErrors';
 import { Ionicons } from '../icons';
 import { clearSignupDraft, getSignupDraft } from '../services/signupDraft';
 import { formatCountdown } from '../utils/date';
+import { showToast } from '../utils/toast';
+import { EMAIL_CHANGE_STEPS } from '../config';
 import { AuthScreenLayout, BackButton, OtpInput, OutlineButton, PrimaryButton, REGISTER_STEPS, StepIndicator } from '../components';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Otp'>;
@@ -33,6 +35,7 @@ export default function OtpScreen({ navigation, route }: Props) {
 
   const complete = code.length === OTP_LENGTH;
   const isLogin = mode === 'login';
+  const isEmailChange = mode === 'email_change';
 
   const requestNewCode = async () => {
     if (mode === 'register') return authApi.sendOtp({ otp_purpose: 'signup', email: email ?? '' });
@@ -56,7 +59,8 @@ export default function OtpScreen({ navigation, route }: Props) {
     if (mode === 'email_change') {
       const { data, message } = await authApi.verifyEmailChange(email ?? '', code);
       await updateUser(data.userData);
-      Alert.alert('Email Updated', message);
+      // The Change Email screen underneath shows the success step.
+      showToast(message);
       navigation.goBack();
       return;
     }
@@ -97,8 +101,11 @@ export default function OtpScreen({ navigation, route }: Props) {
     <AuthScreenLayout showScrollIndicator>
       <BackButton />
       {mode === 'register' ? <StepIndicator steps={REGISTER_STEPS} current={2} /> : null}
+      {isEmailChange ? <StepIndicator steps={EMAIL_CHANGE_STEPS} current={2} /> : null}
 
-      <Text style={styles.heading}>{isLogin ? 'Enter Verification Code' : 'Verify Your Email'}</Text>
+      <Text style={styles.heading}>
+        {isLogin ? 'Enter Verification Code' : isEmailChange ? 'Verify New Email' : 'Verify Your Email'}
+      </Text>
       <Text style={styles.subtext}>
         Enter the 6-digit verification code sent to{' '}
         {isLogin ? (
@@ -139,7 +146,11 @@ export default function OtpScreen({ navigation, route }: Props) {
 
       <View style={styles.info}>
         <Ionicons name="shield-checkmark-outline" size={22} color={colors.primary} />
-        <Text style={styles.infoText}>Your email will be used for verification and account security.</Text>
+        <Text style={styles.infoText}>
+          {isEmailChange
+            ? 'Your current email stays active until this code is verified.'
+            : 'Your email will be used for verification and account security.'}
+        </Text>
       </View>
     </AuthScreenLayout>
   );

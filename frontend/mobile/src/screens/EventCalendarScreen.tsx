@@ -1,19 +1,18 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Calendar, type DateData } from 'react-native-calendars';
 import * as Notifications from 'expo-notifications';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/types';
 import { common, surface } from '../styles/common';
-import { colors, fonts, tones, type Tone } from '../theme';
-import { calendarEvents, events } from '../data/mock';
+import { colors, fonts } from '../theme';
+import { MAX_PAGE_SIZE } from '../config';
+import { getEventCategories, getEvents, toSocietyEvent, type ApiCategory } from '../api/user';
 import { Ionicons, MaterialCommunityIcons } from '../icons';
-import type { CalendarEntry, EventCategory } from '../types';
-import { MONTHS, MONTH_NAMES } from '../utils/date';
+import type { SocietyEvent } from '../types';
+import { formatDate, fromIsoDay, MONTHS, MONTH_NAMES, toIsoDay } from '../utils/date';
 import { AppHeader, MetaRow, Pill, SectionHeader } from '../components';
-
-const INITIAL_MONTH = '2026-10-01';
 
 const CALENDAR_THEME = {
   calendarBackground: colors.card,
@@ -23,21 +22,28 @@ const CALENDAR_THEME = {
   arrowColor: colors.primary,
 };
 
-const legend: { label: EventCategory; color: string }[] = [
-  { label: 'Aarti', color: '#F59E0B' },
-  { label: 'Festival', color: '#D32F2F' },
-  { label: 'Cultural', color: '#7C3AED' },
-  { label: 'Meeting', color: '#16A34A' },
-];
-
-const categoryBadge: Record<EventCategory, Tone> = {
-  Festival: tones.warning,
-  Cultural: { text: '#7C3AED', bg: '#F1EAFE' },
-  Meeting: tones.info,
-  Aarti: { text: '#B45309', bg: '#FEF3C7' },
+/** First and last day (yyyy-mm-dd) of the month that `day` is in. */
+const monthRange = (day: string) => {
+  const d = fromIsoDay(day);
+  return {
+    start: toIsoDay(new Date(d.getFullYear(), d.getMonth(), 1)),
+    end: toIsoDay(new Date(d.getFullYear(), d.getMonth() + 1, 0)),
+  };
 };
 
-const eventDates = new Set(calendarEvents.map((e) => e.date));
+/** Every day an event runs on, so multi-day events mark each of their days. */
+const eventDays = (events: SocietyEvent[]) => {
+  const days = new Set<string>();
+  for (const e of events) {
+    for (let d = fromIsoDay(e.startDay); toIsoDay(d) <= e.endDay; d.setDate(d.getDate() + 1)) {
+      days.add(toIsoDay(d));
+    }
+  }
+  return days;
+};
+
+/** Category colour from the database, as a badge: the colour on a light tint of itself. */
+const categoryTone = (color: string) => ({ text: color, bg: `${color}1F` });
 
 const renderArrow = (direction: 'left' | 'right') => (
   <Ionicons name={direction === 'left' ? 'chevron-back' : 'chevron-forward'} size={20} color={colors.primary} />
@@ -53,8 +59,11 @@ const renderMonthTitle = (date?: unknown) => {
   ) : null;
 };
 
-// Read from context so selecting a day redraws only the day cells that use it.
-const SelectedDateContext = createContext<string | null>(null);
+// Read from context so selecting a day or loading a month redraws only the day cells.
+const DayContext = createContext<{ selectedDate: string | null; eventDates: Set<string> }>({
+  selectedDate: null,
+  eventDates: new Set(),
+});
 
 type DayProps = {
   date?: DateData;
@@ -63,7 +72,7 @@ type DayProps = {
 };
 
 function Day({ date, state, onPress }: DayProps) {
-  const selectedDate = useContext(SelectedDateContext);
+  const { selectedDate, eventDates } = useContext(DayContext);
   if (!date) return <View style={styles.day} />;
   const hasEvent = eventDates.has(date.dateString);
   const otherMonth = state === 'disabled';
@@ -87,16 +96,57 @@ function Day({ date, state, onPress }: DayProps) {
 
 export default function EventCalendarScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
+  const [today] = useState(() => toIsoDay(new Date()));
+  const [month, setMonth] = useState(() => monthRange(today));
+  const [events, setEvents] = useState<SocietyEvent[]>([]);
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
+  useEffect(() => {
+    getEventCategories()
+      .then(({ data }) => setCategories(data.categories))
+      .catch(() => {});
+  }, []);
+
+  // Every event that runs on any day of the shown month
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    getEvents(1, { from_date: month.start, to_date: month.end, limit: MAX_PAGE_SIZE })
+      .then(({ data }) => {
+        if (!active) return;
+        setEvents(data.events.map(toSocietyEvent));
+        setError(null);
+      })
+      .catch((e) => active && setError(e instanceof Error ? e.message : 'Could not load events.'))
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [month]);
+
+  const dayContext = useMemo(() => ({ selectedDate, eventDates: eventDays(events) }), [selectedDate, events]);
+
   const list = useMemo(
-    () => (selectedDate ? calendarEvents.filter((e) => e.date === selectedDate) : calendarEvents),
-    [selectedDate],
+    () => (selectedDate ? events.filter((e) => e.startDay <= selectedDate && selectedDate <= e.endDay) : events),
+    [selectedDate, events],
   );
 
   const onDayPress = useCallback((date: DateData) => {
     setSelectedDate((current) => (current === date.dateString ? null : date.dateString));
   }, []);
+
+  const onMonthChange = useCallback((date: DateData) => {
+    setSelectedDate(null);
+    setMonth(monthRange(date.dateString));
+  }, []);
+
+  const shownMonth = fromIsoDay(month.start);
+  const listTitle = selectedDate
+    ? `Events on ${formatDate(fromIsoDay(selectedDate))}`
+    : `Events in ${MONTH_NAMES[shownMonth.getMonth()]} ${shownMonth.getFullYear()}`;
 
   const enableNotifications = async () => {
     try {
@@ -121,10 +171,11 @@ export default function EventCalendarScreen() {
         <Text style={common.subtextRelaxed}>View all upcoming events and cultural activities of our society.</Text>
 
         <View style={styles.calendarCard}>
-          <SelectedDateContext.Provider value={selectedDate}>
+          <DayContext.Provider value={dayContext}>
             <Calendar
-              current={INITIAL_MONTH}
+              current={today}
               onDayPress={onDayPress}
+              onMonthChange={onMonthChange}
               firstDay={0}
               enableSwipeMonths
               renderArrow={renderArrow}
@@ -132,31 +183,35 @@ export default function EventCalendarScreen() {
               dayComponent={Day}
               theme={CALENDAR_THEME}
             />
-          </SelectedDateContext.Provider>
+          </DayContext.Provider>
         </View>
 
         <View style={styles.legend}>
-          {legend.map((l) => (
-            <View key={l.label} style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: l.color }]} />
-              <Text style={styles.legendText}>{l.label}</Text>
+          {categories.map((c) => (
+            <View key={c.id} style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: c.color }]} />
+              <Text style={styles.legendText}>{c.name}</Text>
             </View>
           ))}
         </View>
 
-        <SectionHeader title="Upcoming Events" onViewAll={() => setSelectedDate(null)} style={styles.sectionHeader} />
+        <SectionHeader title={listTitle} onViewAll={() => setSelectedDate(null)} style={styles.sectionHeader} />
 
         <View style={styles.list}>
-          {list.length ? (
-            list.map((entry) => (
+          {loading ? (
+            <ActivityIndicator color={colors.primary} style={styles.loading} />
+          ) : error ? (
+            <Text style={styles.empty}>{error}</Text>
+          ) : list.length ? (
+            list.map((event) => (
               <EventRow
-                key={entry.date + entry.title}
-                entry={entry}
-                onPress={() => navigation.navigate('EventDetails', { eventId: entry.eventId })}
+                key={event.id}
+                event={event}
+                onPress={() => navigation.navigate('EventDetails', { eventId: event.id, event })}
               />
             ))
           ) : (
-            <Text style={styles.empty}>No events on this date.</Text>
+            <Text style={styles.empty}>{selectedDate ? 'No events on this date.' : 'No events this month.'}</Text>
           )}
         </View>
 
@@ -175,9 +230,8 @@ export default function EventCalendarScreen() {
   );
 }
 
-function EventRow({ entry, onPress }: { entry: CalendarEntry; onPress: () => void }) {
-  const [, month, day] = entry.date.split('-');
-  const image = events.find((e) => e.id === entry.eventId)?.image;
+function EventRow({ event, onPress }: { event: SocietyEvent; onPress: () => void }) {
+  const [, month, day] = event.startDay.split('-');
 
   return (
     <Pressable style={styles.row} onPress={onPress} accessibilityRole="button">
@@ -185,15 +239,15 @@ function EventRow({ entry, onPress }: { entry: CalendarEntry; onPress: () => voi
         <Text style={styles.dateDay}>{day}</Text>
         <Text style={styles.dateMonth}>{MONTHS[Number(month) - 1]}</Text>
       </View>
-      {image ? <Image source={image} style={styles.rowImage} /> : null}
+      <Image source={event.image} style={styles.rowImage} />
       <View style={styles.rowInfo}>
         <Text style={styles.rowTitle} numberOfLines={1}>
-          {entry.title}
+          {event.title}
         </Text>
-        <MetaRow icon="time-outline" text={entry.time} />
-        <MetaRow icon="location-outline" text={entry.venue} />
+        {event.time ? <MetaRow icon="time-outline" text={event.time} /> : null}
+        <MetaRow icon="location-outline" text={event.venue} />
       </View>
-      <Pill label={entry.category} tone={categoryBadge[entry.category]} style={styles.badge} />
+      <Pill label={event.category} tone={categoryTone(event.categoryColor)} style={styles.badge} />
     </Pressable>
   );
 }
@@ -228,6 +282,7 @@ const styles = StyleSheet.create({
   rowTitle: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textDark },
   badge: { alignSelf: 'flex-start' },
   empty: { fontFamily: fonts.regular, fontSize: 13, color: colors.textMuted, textAlign: 'center', paddingVertical: 24 },
+  loading: { paddingVertical: 24 },
 
   notify: {
     flexDirection: 'row',

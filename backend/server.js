@@ -6,13 +6,15 @@ import pool from "./config/db.js";
 import Codes from "./config/status_codes.js";
 import middleware from "./middleware/middleware.js";
 import authRoutes from "./modules/v1/routes/authRoute.js";
+import userRoutes from "./modules/v1/routes/userRoute.js";
 import startCronJobs from "./config/cron.js";
+import constant from "./config/constant.js";
 
-const PORT = process.env.PORT || 5020;
+const PORT = constant.PORT;
 const app = express();
 
 app.use(cors({
-  origin: "http://localhost:3000", // admin panel
+  origin: constant.ADMIN_PANEL_URL,
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
@@ -32,6 +34,7 @@ app.use(middleware.tokenMiddleware);
 
 // API Routes
 app.use("/api/v1/auth/", authRoutes);
+app.use("/api/v1/user/", userRoutes);
 
 // Bad JSON / rejected uploads / unexpected errors → JSON response instead of Express's HTML page
 app.use((err, req, res, next) => {
@@ -67,7 +70,7 @@ async function startServer() {
       process.exit(1);
     }
 
-    // startCronJobs();
+    startCronJobs();
     app.listen(PORT, () => {
       console.log(`✓ Server is running on port ${PORT}`);
     });

@@ -1,240 +1,89 @@
-import type { CalendarEntry, Duty, ExpenseCategory, Notice, SocietyEvent, Transaction } from '../types';
+// Sample data for screens that have no API yet: finance, notifications, donations, gallery and members.
+import type { AppNotification, DirectoryMember, ExpenseCategory, GalleryPhoto, MyDonation, Transaction } from '../types';
 
-const ORGANIZER = 'Executive Committee';
-const CONTACT = '+91 98765 43210';
-
-export const events: SocietyEvent[] = [
-  {
-    id: 'e1',
-    title: 'Navratri Garba Mahotsav',
-    date: '10 Oct 2026 - 14 Oct 2026',
-    days: '5 Days',
-    time: '7:00 PM - 10:00 PM',
-    venue: 'Society Premises, Vadodara',
-    category: 'Festival',
-    status: 'Upcoming',
-    image: require('../../assets/event1.jpg'),
-    organizer: ORGANIZER,
-    contact: CONTACT,
-    latitude: 22.3072,
-    longitude: 73.1812,
-    description:
-      'Join us for five nights of traditional Garba and Dandiya with live music, aarti every evening and prizes for the best-dressed participants. All members and their families are welcome.',
-  },
-  {
-    id: 'e2',
-    title: 'Janmashtami Celebration',
-    date: '26 Aug 2026, 8:00 PM',
-    venue: 'Temple Premises, Vadodara',
-    category: 'Festival',
-    status: 'Upcoming',
-    image: require('../../assets/event2.jpg'),
-    organizer: ORGANIZER,
-    contact: CONTACT,
-    latitude: 22.3105,
-    longitude: 73.1868,
-    description:
-      'Celebrate the birth of Lord Krishna with bhajans, Matki Phod, cradle ceremony at midnight and prasad distribution.',
-  },
-  {
-    id: 'e3',
-    title: 'Ganesh Chaturthi',
-    date: '10 Sep 2026, 8:00 AM',
-    venue: 'Temple Premises, Vadodara',
-    category: 'Festival',
-    status: 'Upcoming',
-    image: require('../../assets/event3.jpg'),
-    organizer: ORGANIZER,
-    contact: CONTACT,
-    latitude: 22.3105,
-    longitude: 73.1868,
-    description:
-      'Ganpati sthapana with morning puja, daily aarti and cultural programmes through the festival, ending with a grand visarjan procession.',
-  },
-  {
-    id: 'e4',
-    title: 'Aarti & Bhajan Sandhya',
-    date: '12 Oct 2026, 7:30 PM',
-    venue: 'Society Community Hall, Vadodara',
-    category: 'Aarti',
-    status: 'Upcoming',
-    image: require('../../assets/event4.jpg'),
-    organizer: ORGANIZER,
-    contact: CONTACT,
-    latitude: 22.3049,
-    longitude: 73.1795,
-    description: 'An evening of devotional bhajans by local artists followed by maha aarti and prasad.',
-  },
-  {
-    id: 'e5',
-    title: 'Cultural Programme',
-    date: '20 Oct 2026, 6:00 PM',
-    venue: 'Society Premises, Vadodara',
-    category: 'Cultural',
-    status: 'Featured',
-    image: require('../../assets/event5.jpg'),
-    organizer: ORGANIZER,
-    contact: CONTACT,
-    latitude: 22.3072,
-    longitude: 73.1812,
-    description:
-      'Folk dance, drama and music performances by children and youth of the society. Register with the committee to participate.',
-  },
-  {
-    id: 'e6',
-    title: 'Annual General Meeting',
-    date: '25 Oct 2026, 10:00 AM',
-    venue: 'Community Hall, Vadodara',
-    category: 'Meeting',
-    status: 'Meeting',
-    image: require('../../assets/event6.jpg'),
-    organizer: ORGANIZER,
-    contact: CONTACT,
-    latitude: 22.3049,
-    longitude: 73.1795,
-    description:
-      'Annual review of society accounts and activities, election of committee members and planning for next year. All members are requested to attend.',
-  },
+export const galleryPhotos: GalleryPhoto[] = [
+  { id: 'g1', image: require('../../assets/event3.jpg'), caption: 'Diwali Rangoli Competition', category: 'Festival', date: '09 Nov 2026' },
+  { id: 'g2', image: require('../../assets/event1.jpg'), caption: 'Navratri Maha Aarti', category: 'Aarti', date: '12 Oct 2026' },
+  { id: 'g3', image: require('../../assets/event2.jpg'), caption: 'Ganesh Sthapana', category: 'Festival', date: '07 Sep 2026' },
+  { id: 'g4', image: require('../../assets/onboarding-festivals.jpg'), caption: 'Garba Night', category: 'Cultural', date: '14 Oct 2026' },
+  { id: 'g5', image: require('../../assets/onboarding-community.jpg'), caption: 'Annual General Meeting', category: 'Meeting', date: '22 Oct 2026' },
+  { id: 'g6', image: require('../../assets/event4.jpg'), caption: 'Sharad Purnima Aarti', category: 'Aarti', date: '15 Oct 2026' },
 ];
 
-/** Shown in the home screen carousels. */
-export const featuredEvents = events.filter((e) => ['e1', 'e5', 'e3'].includes(e.id));
+export const directoryMembers: DirectoryMember[] = [
+  { id: 'dm1', name: 'Dhaval Patel', memberId: 'GYMM-0042', role: 'Executive', mobile: '+91 98765 43210' },
+  { id: 'dm2', name: 'Sejal Kothari', memberId: 'GYMM-0023', role: 'Executive', mobile: '+91 98250 11223' },
+  { id: 'dm3', name: 'Ramesh Patel', memberId: 'GYMM-1024', role: 'Member', mobile: '+91 98765 43211' },
+  { id: 'dm4', name: 'Ketan Thakkar', memberId: 'GYMM-0045', role: 'Member', mobile: '+91 99099 45678' },
+  { id: 'dm5', name: 'Pooja Gandhi', memberId: 'GYMM-0032', role: 'Member', mobile: '+91 97234 56789' },
+  { id: 'dm6', name: 'Nita Patel', memberId: 'GYMM-0249', role: 'Member', mobile: '+91 98980 12345' },
+  { id: 'dm7', name: 'Hitesh Shah', memberId: 'GYMM-0118', role: 'Member', mobile: '+91 90990 87654' },
+  { id: 'dm8', name: 'Kavita Desai', memberId: 'GYMM-0076', role: 'Member', mobile: '+91 94260 33445' },
+];
 
-export const notices: Notice[] = [
+const NAVRATRI = { date: '12 Oct 2026 (Monday)', time: '7:00 PM - 10:00 PM', venue: 'Society Premises, Vadodara' };
+
+export const notifications: AppNotification[] = [
   {
-    id: 'n1',
-    title: 'Navratri Garba Practice Schedule',
-    date: '10 Oct 2026',
-    description: 'Practice sessions from 12 Oct to 14 Oct. All members are requested to attend.',
-    tag: 'Important',
-    icon: 'megaphone-outline',
+    id: 'nt1',
+    kind: 'event',
+    title: 'Navratri event reminder',
+    body: "Garba Mahotsav is happening tomorrow at 7:00 PM. Don't miss the celebration!",
+    message:
+      'Dear Member,\n\nNavratri Garba Mahotsav is happening tomorrow at our society premises. Please be there and join the celebration with your family and friends.',
+    time: 'Today, 8:45 AM',
+    icon: 'calendar-outline',
+    unread: true,
+    event: NAVRATRI,
   },
   {
-    id: 'n2',
-    title: 'Society Meeting Notice',
-    date: '08 Oct 2026',
-    description: 'General body meeting will be held on 15 Oct 2026 at 11:00 AM in the community hall.',
-    tag: 'General',
+    id: 'nt2',
+    kind: 'notice',
+    title: 'New notice published',
+    body: 'Society meeting notice has been published for all members.',
+    message: 'Dear Member,\n\nA new notice about the society meeting has been published. Please read it on the Notice Board.',
+    time: 'Yesterday, 6:20 PM',
     icon: 'document-text-outline',
+    unread: true,
   },
   {
-    id: 'n3',
-    title: 'Donation Appeal',
-    date: '05 Oct 2026',
-    description: 'We request all members to contribute generously for the upcoming cultural programmes.',
-    tag: 'Important',
-    icon: 'alert-circle-outline',
+    id: 'nt3',
+    kind: 'payment',
+    title: 'Donation payment successful',
+    body: 'Your donation of ₹5,001 has been received. Thank you for your support!',
+    message: 'Dear Member,\n\nYour donation of ₹5,001 for Navratri Mahotsav has been received. You can download the receipt from My Donations.',
+    time: '18 Oct 2026, 4:32 PM',
+    icon: 'cash-outline',
+    unread: true,
   },
   {
-    id: 'n4',
-    title: 'Janmashtami Celebration Details',
-    date: '01 Oct 2026',
-    description: 'Event details, schedule and participation information are now available.',
-    tag: 'Event',
-    icon: 'flower-outline',
-  },
-  {
-    id: 'n5',
-    title: 'Water Supply Disruption',
-    date: '28 Sep 2026',
-    description: 'Due to maintenance work, water supply will be disrupted on 29 Sep 2026 from 9 AM to 2 PM.',
-    tag: 'General',
+    id: 'nt5',
+    kind: 'notice',
+    title: 'Water supply update',
+    body: 'Water supply will be unavailable today from 10 AM to 2 PM for maintenance.',
+    message: 'Dear Member,\n\nWater supply will be unavailable today from 10 AM to 2 PM because of tank maintenance. Please store water in advance.',
+    time: '16 Oct 2026, 7:40 PM',
     icon: 'water-outline',
+    unread: false,
   },
   {
-    id: 'n6',
-    title: 'New Member Registration Open',
-    date: '26 Sep 2026',
-    description: 'Registration for new members is now open. Please visit the member section for details.',
-    tag: 'Other',
-    icon: 'person-add-outline',
+    id: 'nt6',
+    kind: 'event',
+    title: 'Event time changed',
+    body: 'Cultural programme time has been updated to 6:30 PM (earlier 6:00 PM).',
+    message: 'Dear Member,\n\nThe Cultural Programme will now start at 6:30 PM instead of 6:00 PM. The venue is unchanged.',
+    time: '14 Oct 2026, 5:25 PM',
+    icon: 'time-outline',
+    unread: false,
+    event: { date: '20 Oct 2026 (Tuesday)', time: '6:30 PM - 9:00 PM', venue: 'Society Premises, Vadodara' },
   },
 ];
 
-export const calendarEvents: CalendarEntry[] = [
-  {
-    date: '2026-10-07',
-    title: 'Navratri Garba Mahotsav',
-    time: '7:00 PM - 10:00 PM',
-    venue: 'Society Premises, Vadodara',
-    category: 'Festival',
-    eventId: 'e1',
-  },
-  {
-    date: '2026-10-10',
-    title: 'Sharad Purnima Aarti',
-    time: '7:30 PM - 9:00 PM',
-    venue: 'Temple Premises, Vadodara',
-    category: 'Aarti',
-    eventId: 'e4',
-  },
-  {
-    date: '2026-10-15',
-    title: 'Aarti & Bhajan Sandhya',
-    time: '6:30 PM - 8:00 PM',
-    venue: 'Temple Premises, Vadodara',
-    category: 'Cultural',
-    eventId: 'e5',
-  },
-  {
-    date: '2026-10-22',
-    title: 'Annual General Meeting',
-    time: '10:00 AM - 12:00 PM',
-    venue: 'Community Hall, Vadodara',
-    category: 'Meeting',
-    eventId: 'e6',
-  },
-];
-
-export const duties: Duty[] = [
-  {
-    id: 'd1',
-    title: 'Welcome Desk',
-    icon: 'people-outline',
-    date: '8 Oct 2026, 6:00 PM - 8:00 PM',
-    venue: 'Society Premises, Vadodara',
-    category: 'Festival',
-    status: 'Assigned',
-  },
-  {
-    id: 'd2',
-    title: 'Stage Arrangement',
-    icon: 'grid-outline',
-    date: '9 Oct 2026, 5:00 PM - 7:00 PM',
-    venue: 'Temple Premises, Vadodara',
-    category: 'Cultural',
-    status: 'Assigned',
-  },
-  {
-    id: 'd3',
-    title: 'Prasad Distribution',
-    icon: 'restaurant-outline',
-    date: '9 Oct 2026, 6:00 PM - 9:30 PM',
-    venue: 'Temple Premises, Vadodara',
-    category: 'Aarti',
-    status: 'Assigned',
-  },
-  {
-    id: 'd4',
-    title: 'Sound & Lights',
-    icon: 'volume-high-outline',
-    date: '9 Oct 2026, 6:00 PM - 8:00 PM',
-    venue: 'Temple Premises, Vadodara',
-    category: 'Festival',
-    status: 'Open',
-  },
-];
-
-export const myAssignments: Duty[] = [
-  {
-    id: 'a1',
-    title: 'Welcome Desk',
-    icon: 'people-outline',
-    date: '7 Oct 2026, 6:00 PM - 8:00 PM',
-    venue: 'Society Premises, Vadodara',
-    category: 'Festival',
-    status: 'Confirmed',
-  },
+export const myDonations: MyDonation[] = [
+  { id: 'md1', title: 'Navratri Mahotsav', date: '2026-10-12T16:32:00', amount: 5001, status: 'Successful', icon: 'temple-hindu', method: 'UPI App', reference: '628714503921' },
+  { id: 'md2', title: 'Society General Fund', date: '2026-08-05T11:20:00', amount: 5000, status: 'Successful', icon: 'account-group', method: 'QR Code', reference: '621903377410' },
+  { id: 'md3', title: 'Ganesh Chaturthi', date: '2026-01-22T18:15:00', amount: 5000, status: 'Successful', icon: 'hand-heart', method: 'Cash', reference: 'RCPT-0112' },
+  { id: 'md4', title: 'Diwali Celebration', date: '2025-11-01T10:05:00', amount: 2500, status: 'Successful', icon: 'lamp', method: 'Card', reference: 'pay_P8xK2LmQ' },
 ];
 
 export const financeSummary = {
