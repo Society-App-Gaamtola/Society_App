@@ -48,6 +48,12 @@ const gu = {
 	// Events / notices
 	rest_event_not_found: "કાર્યક્રમ મળ્યો નથી",
 	rest_notice_not_found: "સૂચના મળી નથી",
+
+	// Media
+	rest_invalid_media_folder: "આ ફાઇલ સાચી જગ્યાએ અપલોડ થઈ નથી. કૃપા કરીને ફરી અપલોડ કરો",
+	rest_media_saved: "ગેલેરીમાં ઉમેરાયું",
+	rest_media_pending: "અપલોડ થયું. મંજૂરી પછી તે ગેલેરીમાં દેખાશે",
+	rest_category_not_found: "કૃપા કરીને માન્ય શ્રેણી પસંદ કરો",
 };
 
 export default gu;

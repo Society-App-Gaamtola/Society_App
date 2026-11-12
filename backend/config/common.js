@@ -62,6 +62,30 @@ const common = {
         return rows[0] || null;
     },
 
+    // Media is a Cloudinary link, or a file name in uploads/ saved before Cloudinary was added
+    mediaUrl(file) {
+        if (!file) return null;
+        return /^https?:\/\//.test(file) ? file : constant.IMAGE_BASE_URL + file;
+    },
+
+    // True when a Cloudinary link points into its folder (constant.MEDIA_FOLDERS) for this server's environment, e.g.
+    // https://res.cloudinary.com/<cloud>/image/upload/v123/society_app/production/profiles/user_54/<file>.jpg
+    // Only the text of the link is checked: no request to Cloudinary
+    isInMediaFolder(url, purpose, user_id, resourceType = "image") {
+        const env = process.env.NODE_ENV === "production" ? "production" : "development";
+        const folder = constant.MEDIA_FOLDERS[purpose]
+            .replace("{user}", String(user_id))
+            .replace("{yyyy}", "\\d{4}")
+            .replace("{mm}", "(0[1-9]|1[0-2])");
+        const pattern = new RegExp(
+            `^${constant.MEDIA_URL_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}${resourceType}/upload/` +
+            "(?:[^/]+/)*?v\\d+/" + // optional transformations (e.g. a video thumbnail's so_1/), then the version
+            `${constant.MEDIA_ROOT_FOLDER}/${env}/${folder}/[^/]+\\.[a-z0-9]+$`,
+            "i",
+        );
+        return typeof url === "string" && pattern.test(url);
+    },
+
     isAccountInactive(user) {
         return user.is_active == 0 || user.status === "suspended";
     },
@@ -81,7 +105,7 @@ const common = {
             email: user.email,
             country_code: user.country_code,
             mobile_number: user.mobile,
-            profile_image: user.profile_image ? constant.IMAGE_BASE_URL + user.profile_image : null,
+            profile_image: common.mediaUrl(user.profile_image),
             address: user.address ?? null,
             language: user.preferred_language,
             is_verified: user.email_verified_at ? 1 : 0,

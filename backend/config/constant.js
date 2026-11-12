@@ -76,6 +76,23 @@ export default {
     EVENT_STATUS: { POSTED: "posted" }, // only posted events are shown to users
     NOTICE_STATUS: { PUBLISHED: "published" },
     NOTICE_TAGS: ["important", "general", "event"],
+    // ---------- Media ----------
+    // The app uploads photos and videos straight to Cloudinary and sends the link; the server only stores it.
+    // Only links from the society's Cloudinary account are accepted
+    MEDIA_URL_PREFIX: "https://res.cloudinary.com/ggrljuty/",
+    MEDIA_URL_MAX_LENGTH: 512,
+    // Every file must sit in its folder: society_app/<production|development>/<folder>/<file>.
+    // {user} = the uploader's id, {yyyy}/{mm} = upload year and month. The app builds the same paths
+    MEDIA_ROOT_FOLDER: "society_app",
+    MEDIA_FOLDERS: {
+        profile: "profiles/user_{user}",
+        gallery: "gallery/{yyyy}/{mm}",
+    },
+    MEDIA_STATUS: { PENDING: "pending", APPROVED: "approved", REJECTED: "rejected" },
+    // Photos from these roles are published straight away; members' photos wait for approval
+    MEDIA_AUTO_APPROVE_ROLES: ["super_admin", "executive"],
+    CAPTION_MAX_LENGTH: 256,
+
     // ---------- Cron jobs (node-cron syntax) ----------
     // Every day at midnight
     OTP_CLEANUP_SCHEDULE: "0 0 * * *",

@@ -48,6 +48,12 @@ const hi = {
 	// Events / notices
 	rest_event_not_found: "कार्यक्रम नहीं मिला",
 	rest_notice_not_found: "सूचना नहीं मिली",
+
+	// Media
+	rest_invalid_media_folder: "यह फ़ाइल सही जगह पर अपलोड नहीं हुई। कृपया फिर से अपलोड करें",
+	rest_media_saved: "गैलरी में जोड़ा गया",
+	rest_media_pending: "अपलोड हो गया। स्वीकृति के बाद यह गैलरी में दिखेगा",
+	rest_category_not_found: "कृपया एक मान्य श्रेणी चुनें",
 };
 
 export default hi;

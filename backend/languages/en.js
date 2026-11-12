@@ -48,6 +48,12 @@ const en = {
 	// Events / notices
 	rest_event_not_found: "Event not found",
 	rest_notice_not_found: "Notice not found",
+
+	// Media
+	rest_invalid_media_folder: "This file was not uploaded to the right place. Please upload it again",
+	rest_media_saved: "Added to the gallery",
+	rest_media_pending: "Uploaded. It will appear in the gallery after approval",
+	rest_category_not_found: "Please choose a valid category",
 };
 
 export default en;

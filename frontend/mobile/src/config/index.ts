@@ -18,6 +18,28 @@ export const EMAIL_CHANGE_STEPS = ['New Email', 'Verify OTP', 'Updated'];
 
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
+/**
+ * Cloudinary account the app uploads to (unsigned upload preset, so no secret is needed in the app).
+ * The backend only accepts links that start with https://res.cloudinary.com/<cloudName>/ (MEDIA_URL_PREFIX).
+ */
+export const CLOUDINARY = {
+  cloudName: 'ggrljuty',
+  uploadPreset: 'society_app_unsigned',
+  rootFolder: 'society_app',
+  /** Uploads made while the app talks to a local backend go to a separate folder, so tests never mix with real files. */
+  envFolder: API_URL.startsWith('https://') ? 'production' : 'development',
+} as const;
+
+/** Photos and videos (Cloudinary Free plan limits per file). */
+export const MEDIA = {
+  maxBytes: { image: 10 * 1024 * 1024, video: 100 * 1024 * 1024 },
+  /** Photos are shrunk to this many pixels on the longest side before upload. */
+  maxImageSide: 2048,
+  imageQuality: 0.8,
+  /** How many gallery files can be picked at once. */
+  maxPick: 10,
+} as const;
+
 export const APP_VERSION = '1.0.0';
 
 /**

@@ -90,6 +90,7 @@ export default function EditProfileScreen() {
       const { data, message } = await authApi.editProfile(
         { username: nameChanged ? newName : undefined, address: addressChanged ? newAddress : undefined },
         photo,
+        user?.id,
       );
       await updateUser(data.userData);
       setPhoto(null);

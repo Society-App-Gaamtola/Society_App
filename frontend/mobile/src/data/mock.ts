@@ -1,14 +1,5 @@
-// Sample data for screens that have no API yet: finance, notifications, donations, gallery and members.
-import type { AppNotification, DirectoryMember, ExpenseCategory, GalleryPhoto, MyDonation, Transaction } from '../types';
-
-export const galleryPhotos: GalleryPhoto[] = [
-  { id: 'g1', image: require('../../assets/event3.jpg'), caption: 'Diwali Rangoli Competition', category: 'Festival', date: '09 Nov 2026' },
-  { id: 'g2', image: require('../../assets/event1.jpg'), caption: 'Navratri Maha Aarti', category: 'Aarti', date: '12 Oct 2026' },
-  { id: 'g3', image: require('../../assets/event2.jpg'), caption: 'Ganesh Sthapana', category: 'Festival', date: '07 Sep 2026' },
-  { id: 'g4', image: require('../../assets/onboarding-festivals.jpg'), caption: 'Garba Night', category: 'Cultural', date: '14 Oct 2026' },
-  { id: 'g5', image: require('../../assets/onboarding-community.jpg'), caption: 'Annual General Meeting', category: 'Meeting', date: '22 Oct 2026' },
-  { id: 'g6', image: require('../../assets/event4.jpg'), caption: 'Sharad Purnima Aarti', category: 'Aarti', date: '15 Oct 2026' },
-];
+// Sample data for screens that have no API yet: finance, notifications, donations and members.
+import type { AppNotification, DirectoryMember, ExpenseCategory, MyDonation, Transaction } from '../types';
 
 export const directoryMembers: DirectoryMember[] = [
   { id: 'dm1', name: 'Dhaval Patel', memberId: 'GYMM-0042', role: 'Executive', mobile: '+91 98765 43210' },

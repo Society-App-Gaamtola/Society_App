@@ -32,7 +32,34 @@ const noticeListSchema = Joi.object({
   tag: Joi.string().trim().lowercase().valid(...constant.NOTICE_TAGS),
 });
 
+// A link to a file the app uploaded to the society's Cloudinary account
+const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+export const mediaUrl = Joi.string()
+  .trim()
+  .max(constant.MEDIA_URL_MAX_LENGTH)
+  .pattern(new RegExp(`^${escapeRegex(constant.MEDIA_URL_PREFIX)}`))
+  .messages({ "string.pattern.base": "{#label} must be a link to an uploaded file" });
+
+// Gallery: a photo or video already uploaded to Cloudinary by the app
+const saveMediaSchema = Joi.object({
+  media_url: mediaUrl.required(),
+  media_type: Joi.string().valid("photo", "video").required(),
+  thumbnail_url: mediaUrl,
+  public_id: Joi.string().trim().max(256).required(),
+  file_size_bytes: Joi.number().integer().min(0),
+  category_id: Joi.number().integer().min(1).required(),
+  event_id: Joi.number().integer().min(1),
+  caption: Joi.string().trim().max(constant.CAPTION_MAX_LENGTH).allow(""),
+});
+
+const mediaListSchema = Joi.object({
+  ...pagination,
+  category_id: Joi.number().integer().min(1),
+});
+
 export default {
   eventListSchema,
   noticeListSchema,
+  saveMediaSchema,
+  mediaListSchema,
 };
