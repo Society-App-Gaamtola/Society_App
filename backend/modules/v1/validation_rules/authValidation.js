@@ -45,26 +45,28 @@ const loginSchema = Joi.object({
   ...deviceFields,
 }).xor("email", "mobile_number");
 
-// "Login with OTP" and "Resend OTP"
-// Resending a sign-up OTP needs only the email, login OTPs are found by mobile number
+// "Login with OTP" and "Resend OTP". The code always goes to an email:
+// sign-up → the email being registered; login → the account's email, found by email
+// (or by mobile number, sent by older app versions)
 const sendOtpSchema = Joi.object({
   email: email.when("otp_purpose", requiredForSignup),
   country_code: countryCode,
-  mobile_number: mobileNumber.when("otp_purpose", { is: constant.OTP_PURPOSE.LOGIN, then: Joi.required() }),
+  mobile_number: mobileNumber,
   otp_purpose: otpPurpose,
-});
+}).or("email", "mobile_number");
 
 // On sign-up the app sends the step 1 details again: the user is created from them here
+// Login: the same email (or mobile number) the code was requested with
 const verifyOtpSchema = Joi.object({
   email: email.when("otp_purpose", requiredForSignup),
   country_code: countryCode,
-  mobile_number: mobileNumber.required(),
+  mobile_number: mobileNumber.when("otp_purpose", requiredForSignup),
   password: newPassword.when("otp_purpose", requiredForSignup),
   language,
   otp,
   otp_purpose: otpPurpose,
   ...deviceFields,
-});
+}).or("email", "mobile_number");
 
 // Signup step 1 → 2 – Profile & Address (multipart, profile_image file is optional)
 // profile_image_url: the photo the app uploaded to Cloudinary (older app versions send a profile_image file)

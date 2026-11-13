@@ -39,6 +39,8 @@ const hi = {
 	rest_password_changed_successfully: "पासवर्ड सफलतापूर्वक बदल गया",
 
 	// OTP
+	rest_otp_mail_failed: "अभी OTP ईमेल नहीं भेजा जा सका। कृपया कुछ मिनट बाद फिर से प्रयास करें",
+	rest_user_email_not_found: "यह ईमेल पंजीकृत नहीं है",
 	rest_keywords_otp_sent: "OTP सफलतापूर्वक भेजा गया",
 	rest_otp_wait_before_resend: "नया OTP माँगने से पहले कृपया प्रतीक्षा करें",
 	rest_invalid_otp: "अमान्य OTP",

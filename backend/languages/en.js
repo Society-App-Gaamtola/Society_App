@@ -39,6 +39,8 @@ const en = {
 	rest_password_changed_successfully: "Password changed successfully",
 
 	// OTP
+	rest_otp_mail_failed: "We couldn't send the OTP email right now. Please try again in a few minutes",
+	rest_user_email_not_found: "This email is not registered",
 	rest_keywords_otp_sent: "OTP sent successfully",
 	rest_otp_wait_before_resend: "Please wait before requesting a new OTP",
 	rest_invalid_otp: "Invalid OTP",

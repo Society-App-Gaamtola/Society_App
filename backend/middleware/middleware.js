@@ -79,6 +79,10 @@ const sendError = (res, msgKey, resData = null) => {
 };
 
 const sendServerError = (res, where, error) => {
+    // The OTP email couldn't be sent: tell the user that, not "An error occurred"
+    if (error?.code === constant.OTP_MAIL_FAILED) {
+        return sendApiResponse(res, Codes.SUCCESS, Codes.RESPONSE_ERROR, "rest_otp_mail_failed", null);
+    }
     console.error(`Error in ${where}: `, error);
     return sendApiResponse(res, Codes.INTERNAL_ERROR, Codes.RESPONSE_ERROR, "rest_keywords_error", null);
 };

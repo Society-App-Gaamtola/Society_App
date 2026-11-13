@@ -39,6 +39,8 @@ const gu = {
 	rest_password_changed_successfully: "પાસવર્ડ સફળતાપૂર્વક બદલાઈ ગયો",
 
 	// OTP
+	rest_otp_mail_failed: "હાલ OTP ઇમેઇલ મોકલી શકાયો નથી. કૃપા કરીને થોડી મિનિટ પછી ફરી પ્રયાસ કરો",
+	rest_user_email_not_found: "આ ઇમેઇલ નોંધાયેલ નથી",
 	rest_keywords_otp_sent: "OTP સફળતાપૂર્વક મોકલાયો",
 	rest_otp_wait_before_resend: "નવો OTP માંગતા પહેલાં કૃપા કરીને રાહ જુઓ",
 	rest_invalid_otp: "અમાન્ય OTP",

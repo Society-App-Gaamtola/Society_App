@@ -204,6 +204,8 @@ const common = {
         }
     },
 
+    // With BREVO_API_KEY the mail goes through Brevo's HTTPS API, which works where email ports are blocked
+    // (Render's free plan blocks 25 / 465 / 587). Without it, Gmail SMTP is used as before
     async sendOtpMail({ toEmail, subject, htmlMessage }) {
         if (!toEmail || !subject || !htmlMessage) {
             return { skipped: true, reason: "Missing toEmail/subject/htmlMessage" };
@@ -212,6 +214,25 @@ const common = {
         const smtpUser = process.env.SMTP_USER;
         const smtpPass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
         const mailFrom = process.env.MAIL_FROM || smtpUser;
+
+        if (process.env.BREVO_API_KEY && mailFrom) {
+            const response = await fetch(constant.BREVO_API_URL, {
+                method: "POST",
+                headers: { "api-key": process.env.BREVO_API_KEY, "content-type": "application/json", accept: "application/json" },
+                body: JSON.stringify({
+                    sender: { email: mailFrom, name: process.env.APP_NAME || "Society App" },
+                    to: [{ email: toEmail }],
+                    subject,
+                    htmlContent: htmlMessage,
+                }),
+                signal: AbortSignal.timeout(constant.MAIL_TIMEOUT_MS),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(`Brevo ${response.status}: ${data.message || "mail not sent"}`);
+            }
+            return { skipped: false, messageId: data.messageId };
+        }
 
         if (!mailFrom || !smtpUser || !smtpPass) {
             return { skipped: true, reason: "Mail env is not configured" };
@@ -231,6 +252,9 @@ const common = {
                 user: smtpUser,
                 pass: smtpPass,
             },
+            connectionTimeout: constant.MAIL_TIMEOUT_MS,
+            greetingTimeout: constant.MAIL_TIMEOUT_MS,
+            socketTimeout: constant.MAIL_TIMEOUT_MS,
         });
 
         const info = await transporter.sendMail({

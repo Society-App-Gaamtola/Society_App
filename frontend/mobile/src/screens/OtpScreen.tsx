@@ -21,7 +21,7 @@ const OTP_LENGTH = 6;
 const RESEND_SECONDS = 60;
 
 export default function OtpScreen({ navigation, route }: Props) {
-  const { mode, email, phone, country_code, mobile_number, name, resendAfter } = route.params;
+  const { mode, email, name, resendAfter } = route.params;
   const { completeLogin, updateUser } = useAuth();
   const [code, setCode] = useState('');
   const [seconds, setSeconds] = useState(resendAfter ?? RESEND_SECONDS);
@@ -39,7 +39,7 @@ export default function OtpScreen({ navigation, route }: Props) {
 
   const requestNewCode = async () => {
     if (mode === 'register') return authApi.sendOtp({ otp_purpose: 'signup', email: email ?? '' });
-    if (mode === 'login') return authApi.sendOtp({ otp_purpose: 'login', country_code: country_code ?? '', mobile_number: mobile_number ?? '' });
+    if (mode === 'login') return authApi.sendOtp({ otp_purpose: 'login', email: email ?? '' });
     return authApi.editProfile({ email });
   };
 
@@ -66,7 +66,7 @@ export default function OtpScreen({ navigation, route }: Props) {
     }
 
     if (mode === 'login') {
-      const { data } = await authApi.verifyLoginOtp(code, { country_code: country_code ?? '', mobile_number: mobile_number ?? '' });
+      const { data } = await authApi.verifyLoginOtp(code, email ?? '');
       resetAfterLogin(await completeLogin(data));
       return;
     }
@@ -107,15 +107,7 @@ export default function OtpScreen({ navigation, route }: Props) {
         {isLogin ? 'Enter Verification Code' : isEmailChange ? 'Verify New Email' : 'Verify Your Email'}
       </Text>
       <Text style={styles.subtext}>
-        Enter the 6-digit verification code sent to{' '}
-        {isLogin ? (
-          <>
-            the email registered with <Text style={styles.highlight}>{phone}</Text>
-          </>
-        ) : (
-          <Text style={styles.highlight}>{email}</Text>
-        )}
-        .
+        Enter the 6-digit verification code sent to <Text style={styles.highlight}>{email}</Text>.
       </Text>
 
       <View style={styles.otp}>

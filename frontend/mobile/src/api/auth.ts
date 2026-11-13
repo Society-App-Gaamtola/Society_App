@@ -41,8 +41,8 @@ export const signUp = (details: SignupDetails & { confirm_password: string }) =>
 export const login = async (credentials: { password: string } & ({ email: string } | MobileNumber)) =>
   request<AuthData>('POST', '/auth/login', { body: { ...credentials, ...(await getDeviceFields()) } });
 
-/** Sends the "Login with OTP" code, and resends either kind of code. */
-export const sendOtp = (target: { otp_purpose: 'signup'; email: string } | ({ otp_purpose: 'login' } & MobileNumber)) =>
+/** Sends the "Login with OTP" code to the account's email, and resends either kind of code. */
+export const sendOtp = (target: { otp_purpose: 'signup' | 'login'; email: string }) =>
   request<ResendData>('POST', '/auth/send-otp', { body: target });
 
 export const verifySignupOtp = async (otp: string, details: SignupDetails) =>
@@ -50,9 +50,9 @@ export const verifySignupOtp = async (otp: string, details: SignupDetails) =>
     body: { ...details, otp, otp_purpose: 'signup', language: getAppLanguage(), ...(await getDeviceFields()) },
   });
 
-export const verifyLoginOtp = async (otp: string, mobile: MobileNumber) =>
+export const verifyLoginOtp = async (otp: string, email: string) =>
   request<AuthData>('POST', '/auth/verify-otp', {
-    body: { ...mobile, otp, otp_purpose: 'login', ...(await getDeviceFields()) },
+    body: { email, otp, otp_purpose: 'login', ...(await getDeviceFields()) },
   });
 
 /** Sign-up final step. */

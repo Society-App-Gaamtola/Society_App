@@ -8,7 +8,7 @@ import db from "../../../config/db.js";
 import query from "../../../config/dbHelper.js";
 import { createOtpWmailTemplate } from "../../../config/mail.js";
 
-const { OTP_EXPIRY_MINUTES, OTP_RESEND_SECONDS, BCRYPT_ROUNDS, MAX_OTP_ATTEMPTS, OTP_PURPOSE, LOGGED_OUT_DEVICE } = constant;
+const { OTP_EXPIRY_MINUTES, OTP_RESEND_SECONDS, BCRYPT_ROUNDS, MAX_OTP_ATTEMPTS, OTP_PURPOSE, LOGGED_OUT_DEVICE, OTP_MAIL_FAILED } = constant;
 
 // Outside production the OTP is always DEV_OTP so the flow can be tested without a real mailbox
 const generateOtp = () => {
@@ -29,10 +29,11 @@ const findSignupConflict = async ({ email, country_code, mobile_number }) => {
 };
 
 // "Login with OTP" lookup: returns { user } or { errorKey }
-const findOtpLoginUser = async (country_code, mobile_number) => {
-    const user = await common.getUserDetails({ country_code, mobile_number });
+// Found by email (current app), or by mobile number (older app versions)
+const findOtpLoginUser = async ({ email, country_code, mobile_number }) => {
+    const user = await common.getUserDetails(email ? { email } : { country_code, mobile_number });
     if (!user) {
-        return { errorKey: "rest_user_mobile_not_found" };
+        return { errorKey: email ? "rest_user_email_not_found" : "rest_user_mobile_not_found" };
     }
     return common.isAccountInactive(user) ? { errorKey: "rest_account_inactive" } : { user };
 };
@@ -143,14 +144,24 @@ const authModule = {
         }
 
         // Mail goes first: if it fails, no OTP row starts the resend timer
+        // In production a failed mail stops here (the app shows "couldn't send the OTP email");
+        // elsewhere the OTP is always DEV_OTP, so testing goes on without mail
         const otp = generateOtp();
-        const mail = await common.sendOtpMail({
-            toEmail: email,
-            subject: "Your verification OTP",
-            htmlMessage: createOtpWmailTemplate({ otp, otpType: otp_purpose }),
-        });
-        if (mail.skipped && process.env.NODE_ENV === "production") {
-            throw new Error(`OTP mail not sent: ${mail.reason}`);
+        let mail;
+        try {
+            mail = await common.sendOtpMail({
+                toEmail: email,
+                subject: "Your verification OTP",
+                htmlMessage: createOtpWmailTemplate({ otp, otpType: otp_purpose }),
+            });
+        } catch (error) {
+            mail = { skipped: true, reason: error.message };
+        }
+        if (mail.skipped) {
+            console.error(`OTP mail to ${email} not sent: ${mail.reason}`);
+            if (process.env.NODE_ENV === "production") {
+                throw Object.assign(new Error(`OTP mail not sent: ${mail.reason}`), { code: OTP_MAIL_FAILED });
+            }
         }
 
         // Expiry is calculated by MySQL so it matches NOW() used when verifying
@@ -237,7 +248,7 @@ const authModule = {
                 }
                 otpTarget = { email };
             } else {
-                const { user, errorKey } = await findOtpLoginUser(country_code, mobile_number);
+                const { user, errorKey } = await findOtpLoginUser(request);
                 if (errorKey) {
                     return middleware.sendError(res, errorKey);
                 }
@@ -286,7 +297,7 @@ const authModule = {
                 });
                 user = await common.getUserDetails({ id: result.insertId });
             } else {
-                const found = await findOtpLoginUser(country_code, mobile_number);
+                const found = await findOtpLoginUser(request);
                 if (found.errorKey) {
                     return middleware.sendError(res, found.errorKey);
                 }
