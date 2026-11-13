@@ -49,12 +49,8 @@ export type RootStackParamList = {
   Register: undefined;
   Otp: {
     mode: 'login' | 'register' | 'email_change';
-    /** Where the code was mailed (register and email_change). */
+    /** Where the code was mailed. */
     email?: string;
-    /** The number as typed, for display (login). */
-    phone?: string;
-    country_code?: string;
-    mobile_number?: string;
     /** Carried over to the Profile & Address step (register). */
     name?: string;
     /** Seconds until a new code can be requested. */

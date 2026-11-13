@@ -45,6 +45,13 @@ export default {
     // users.signup_step → the `steps` number the app receives
     SIGNUP_STEPS: { otp_pending: 0, profile_pending: 1, completed: 2 },
 
+    // ---------- Email ----------
+    // Give up on a mail server after this long, so the app gets an answer instead of waiting minutes
+    MAIL_TIMEOUT_MS: 10000,
+    BREVO_API_URL: "https://api.brevo.com/v3/smtp/email",
+    // Error code for "the OTP email could not be sent"; the app is told so instead of a general error
+    OTP_MAIL_FAILED: "OTP_MAIL_FAILED",
+
     // ---------- OTP ----------
     OTP_EXPIRY_MINUTES: 5,
     OTP_RESEND_SECONDS: 60, // matches the resend timer on the OTP screen

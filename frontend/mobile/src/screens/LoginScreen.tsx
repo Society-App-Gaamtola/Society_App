@@ -5,30 +5,26 @@ import * as authApi from '../api/auth';
 import { ApiError } from '../api/client';
 import type { RootStackParamList } from '../navigation/types';
 import { resetAfterLogin } from '../navigation/navigationRef';
-import { common } from '../styles/common';
 import { colors, fonts, spacing } from '../theme';
 import { useAuth, type LoginAs } from '../context/AuthContext';
 import { useFormErrors } from '../hooks/useFormErrors';
-import { digitsOnly, INDIA_DIAL_CODE, isEmail, isIndianMobile, isLocalMobile, localIndianNumber, MIN_PASSWORD_LENGTH } from '../utils/validation';
+import { INDIA_DIAL_CODE, isEmail, isIndianMobile, localIndianNumber, MIN_PASSWORD_LENGTH } from '../utils/validation';
 import {
   AuthScreenLayout,
   BackButton,
   BrandBlock,
   Checkbox,
-  COUNTRIES,
-  CountryCodePicker,
   InputField,
   Loader,
   OrDivider,
   OutlineButton,
   PrimaryButton,
   SegmentedTabs,
-  type Country,
 } from '../components';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 type Tab = 'password' | 'otp';
-type Field = 'identifier' | 'mobile' | 'password' | 'otpMobile';
+type Field = 'identifier' | 'password' | 'otpEmail';
 
 const ROLE_TABS = [
   ['member', 'Member', 'person-outline'],
@@ -36,7 +32,7 @@ const ROLE_TABS = [
 ] as const;
 
 const TABS = [
-  ['password', 'Mobile / Email'],
+  ['password', 'With Password'],
   ['otp', 'Login with OTP'],
 ] as const;
 
@@ -45,19 +41,16 @@ const ROLE_TEXT: Record<LoginAs, { heading: string; subtext: string }> = {
   executive: { heading: 'Executive Login', subtext: 'Use the login details given to you by the Society admin.' },
 };
 
-const API_FIELDS: Record<string, Field> = { email: 'identifier', mobile_number: 'mobile', password: 'password' };
+const API_FIELDS: Record<string, Field> = { email: 'identifier', mobile_number: 'identifier', password: 'password' };
 
 export default function LoginScreen({ navigation }: Props) {
   const { completeLogin, setLoginAs } = useAuth();
   const [loginAs, setLoginAsTab] = useState<LoginAs>('member');
   const [tab, setTab] = useState<Tab>('password');
   const [identifier, setIdentifier] = useState('');
-  const [country, setCountry] = useState<Country>(COUNTRIES[0]);
-  const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
-  const [otpCountry, setOtpCountry] = useState<Country>(COUNTRIES[0]);
-  const [otpMobile, setOtpMobile] = useState('');
+  const [otpEmail, setOtpEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const { errors, setErrors, fieldProps, handleApiError } = useFormErrors<Field>();
@@ -65,19 +58,12 @@ export default function LoginScreen({ navigation }: Props) {
   // Password login, OTP login and sign-up all check the account's role against this tab.
   useEffect(() => setLoginAs(loginAs), [loginAs, setLoginAs]);
 
-  // The first field takes an email or an Indian mobile; the second takes a number for any country.
-  const buildCredentials = (id: string) => {
-    if (isEmail(id)) return { email: id, password };
-    if (id) return { country_code: INDIA_DIAL_CODE, mobile_number: localIndianNumber(id), password };
-    return { country_code: country.dial, mobile_number: digitsOnly(mobile), password };
-  };
-
+  // One field takes either an email or an Indian mobile number (with or without +91).
   const onLogin = async () => {
     const next: typeof errors = {};
     const id = identifier.trim();
-    if (!id && !mobile.trim()) next.identifier = 'Please enter your email or mobile number.';
-    else if (id && !isEmail(id) && !isIndianMobile(id)) next.identifier = 'Enter a valid email or 10-digit mobile number.';
-    if (mobile.trim() && !isLocalMobile(mobile)) next.mobile = 'Enter a valid mobile number.';
+    if (!id) next.identifier = 'Please enter your email or mobile number.';
+    else if (!isEmail(id) && !isIndianMobile(id)) next.identifier = 'Enter a valid email or 10-digit mobile number.';
     if (!password) next.password = 'Please enter your password.';
     else if (password.length < MIN_PASSWORD_LENGTH) next.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
     setErrors(next);
@@ -85,7 +71,10 @@ export default function LoginScreen({ navigation }: Props) {
 
     setLoading(true);
     try {
-      const { data } = await authApi.login(buildCredentials(id));
+      const credentials = isEmail(id)
+        ? { email: id, password }
+        : { country_code: INDIA_DIAL_CODE, mobile_number: localIndianNumber(id), password };
+      const { data } = await authApi.login(credentials);
       const user = await completeLogin(data, remember);
       setLoading(false);
       resetAfterLogin(user);
@@ -95,24 +84,24 @@ export default function LoginScreen({ navigation }: Props) {
     }
   };
 
+  // The code is emailed to the registered email; the OTP screen verifies it and opens Home.
   const onSendOtp = async () => {
-    if (!otpMobile.trim()) return setErrors({ otpMobile: 'Please enter your mobile number.' });
-    if (!isLocalMobile(otpMobile)) return setErrors({ otpMobile: 'Enter a valid mobile number.' });
+    const email = otpEmail.trim().toLowerCase();
+    if (!email) return setErrors({ otpEmail: 'Please enter your registered email.' });
+    if (!isEmail(email)) return setErrors({ otpEmail: 'Enter a valid email address.' });
     setErrors({});
 
-    const number = { country_code: otpCountry.dial, mobile_number: digitsOnly(otpMobile) };
-    const openOtpScreen = (resendAfter?: number) =>
-      navigation.navigate('Otp', { ...number, mode: 'login', phone: `${otpCountry.dial} ${number.mobile_number}`, resendAfter });
+    const openOtpScreen = (resendAfter?: number) => navigation.navigate('Otp', { mode: 'login', email, resendAfter });
 
     setSendingOtp(true);
     try {
-      const { data } = await authApi.sendOtp({ otp_purpose: 'login', ...number });
+      const { data } = await authApi.sendOtp({ otp_purpose: 'login', email });
       openOtpScreen(data.resend_after_seconds);
     } catch (error) {
       // A code sent moments ago is still valid, so continue with it instead of stopping here.
       const wait = error instanceof ApiError ? error.resendAfter : undefined;
       if (wait) openOtpScreen(wait);
-      else handleApiError(error, { mobile_number: 'otpMobile' }, 'Could not send OTP');
+      else handleApiError(error, { email: 'otpEmail' }, 'Could not send OTP');
     } finally {
       setSendingOtp(false);
     }
@@ -145,34 +134,20 @@ export default function LoginScreen({ navigation }: Props) {
         <View style={styles.form}>
           <View>
             <InputField
-              icon="mail-outline"
+              icon="person-outline"
               placeholder="Email or Mobile Number"
               value={identifier}
               {...fieldProps('identifier', setIdentifier)}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
+              textContentType="username"
             />
             {errors.identifier ? (
               <Text style={styles.error}>{errors.identifier}</Text>
             ) : (
-              <Text style={styles.helper}>example@domain.com or +91 98765 43210</Text>
+              <Text style={styles.helper}>example@domain.com or 98765 43210</Text>
             )}
-          </View>
-
-          <View>
-            <View style={styles.row}>
-              <CountryCodePicker value={country} onChange={setCountry} />
-              <InputField
-                placeholder="Mobile Number (Optional)"
-                value={mobile}
-                {...fieldProps('mobile', setMobile)}
-                keyboardType="phone-pad"
-                maxLength={15}
-                containerStyle={common.flex}
-              />
-            </View>
-            {errors.mobile ? <Text style={styles.error}>{errors.mobile}</Text> : null}
           </View>
 
           <View>
@@ -183,6 +158,7 @@ export default function LoginScreen({ navigation }: Props) {
               {...fieldProps('password', setPassword)}
               secureTextEntry
               autoCapitalize="none"
+              textContentType="password"
             />
             {errors.password ? <Text style={styles.error}>{errors.password}</Text> : null}
           </View>
@@ -199,18 +175,21 @@ export default function LoginScreen({ navigation }: Props) {
       ) : (
         <View style={styles.form}>
           <View>
-            <View style={styles.row}>
-              <CountryCodePicker value={otpCountry} onChange={setOtpCountry} />
-              <InputField
-                placeholder="Mobile Number"
-                value={otpMobile}
-                {...fieldProps('otpMobile', setOtpMobile)}
-                keyboardType="phone-pad"
-                maxLength={15}
-                containerStyle={common.flex}
-              />
-            </View>
-            {errors.otpMobile ? <Text style={styles.error}>{errors.otpMobile}</Text> : null}
+            <InputField
+              icon="mail-outline"
+              placeholder="Registered Email"
+              value={otpEmail}
+              {...fieldProps('otpEmail', setOtpEmail)}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              textContentType="emailAddress"
+            />
+            {errors.otpEmail ? (
+              <Text style={styles.error}>{errors.otpEmail}</Text>
+            ) : (
+              <Text style={styles.helper}>We'll email you a 6-digit code to log in.</Text>
+            )}
           </View>
 
           <PrimaryButton title="Send OTP" onPress={onSendOtp} loading={sendingOtp} />
@@ -246,7 +225,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   form: { gap: 14 },
-  row: { flexDirection: 'row', gap: spacing.sm },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   helper: { fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted, marginTop: 4, marginLeft: 2 },
   error: { fontFamily: fonts.regular, fontSize: 11, color: colors.danger, marginTop: 4, marginLeft: 2 },
