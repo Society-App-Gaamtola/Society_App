@@ -11,7 +11,11 @@
       "address": "B-101, Galaxy Society, Vadodara",
       "joinedOn": "2019-02-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Male",
+      "dob": "1975-01-01",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 2,
@@ -24,7 +28,11 @@
       "address": "C-102, Galaxy Society, Vadodara",
       "joinedOn": "2020-03-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Male",
+      "dob": "1976-02-02",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 3,
@@ -37,7 +45,11 @@
       "address": "D-103, Galaxy Society, Vadodara",
       "joinedOn": "2021-04-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Female",
+      "dob": "1977-03-03",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 4,
@@ -50,7 +62,11 @@
       "address": "A-104, Galaxy Society, Vadodara",
       "joinedOn": "2022-05-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Male",
+      "dob": "1978-04-04",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 5,
@@ -63,7 +79,11 @@
       "address": "B-105, Galaxy Society, Vadodara",
       "joinedOn": "2023-06-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Male",
+      "dob": "1979-05-05",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 6,
@@ -76,7 +96,11 @@
       "address": "C-106, Galaxy Society, Vadodara",
       "joinedOn": "2024-07-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Female",
+      "dob": "1980-06-06",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 7,
@@ -89,7 +113,11 @@
       "address": "D-107, Galaxy Society, Vadodara",
       "joinedOn": "2025-08-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Male",
+      "dob": "1981-07-07",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 8,
@@ -102,7 +130,11 @@
       "address": "A-108, Galaxy Society, Vadodara",
       "joinedOn": "2018-09-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Female",
+      "dob": "1982-08-08",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 9,
@@ -115,7 +147,11 @@
       "address": "B-109, Galaxy Society, Vadodara",
       "joinedOn": "2019-10-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Male",
+      "dob": "1983-09-09",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 10,
@@ -128,7 +164,11 @@
       "address": "C-110, Galaxy Society, Vadodara",
       "joinedOn": "2020-11-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Female",
+      "dob": "1984-10-10",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 11,
@@ -141,7 +181,11 @@
       "address": "D-111, Galaxy Society, Vadodara",
       "joinedOn": "2021-12-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Male",
+      "dob": "1985-11-11",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 12,
@@ -154,7 +198,11 @@
       "address": "A-112, Galaxy Society, Vadodara",
       "joinedOn": "2022-01-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Female",
+      "dob": "1986-12-12",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 13,
@@ -167,7 +215,11 @@
       "address": "B-113, Galaxy Society, Vadodara",
       "joinedOn": "2023-02-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Male",
+      "dob": "1987-01-13",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 14,
@@ -180,7 +232,11 @@
       "address": "C-114, Galaxy Society, Vadodara",
       "joinedOn": "2024-03-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Female",
+      "dob": "1988-02-14",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 15,
@@ -193,7 +249,11 @@
       "address": "D-115, Galaxy Society, Vadodara",
       "joinedOn": "2025-04-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Male",
+      "dob": "1989-03-15",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 16,
@@ -206,7 +266,11 @@
       "address": "A-116, Galaxy Society, Vadodara",
       "joinedOn": "2018-05-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Female",
+      "dob": "1990-04-16",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 17,
@@ -219,7 +283,11 @@
       "address": "B-117, Galaxy Society, Vadodara",
       "joinedOn": "2019-06-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Male",
+      "dob": "1991-05-17",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 18,
@@ -232,7 +300,11 @@
       "address": "C-118, Galaxy Society, Vadodara",
       "joinedOn": "2020-07-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Male",
+      "dob": "1992-06-18",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 19,
@@ -245,7 +317,11 @@
       "address": "D-119, Galaxy Society, Vadodara",
       "joinedOn": "2021-08-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Female",
+      "dob": "1993-07-19",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 20,
@@ -258,7 +334,11 @@
       "address": "A-120, Galaxy Society, Vadodara",
       "joinedOn": "2022-09-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Male",
+      "dob": "1994-08-20",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 21,
@@ -271,7 +351,11 @@
       "address": "B-121, Galaxy Society, Vadodara",
       "joinedOn": "2023-10-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Male",
+      "dob": "1975-09-21",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 22,
@@ -284,7 +368,11 @@
       "address": "C-122, Galaxy Society, Vadodara",
       "joinedOn": "2024-11-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Female",
+      "dob": "1976-10-22",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 23,
@@ -297,7 +385,11 @@
       "address": "D-123, Galaxy Society, Vadodara",
       "joinedOn": "2025-12-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Male",
+      "dob": "1977-11-23",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 24,
@@ -310,7 +402,11 @@
       "address": "A-124, Galaxy Society, Vadodara",
       "joinedOn": "2018-01-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Female",
+      "dob": "1978-12-24",
+      "photo": null,
+      "notes": ""
     },
     {
       "id": 25,
@@ -323,7 +419,11 @@
       "address": "B-125, Galaxy Society, Vadodara",
       "joinedOn": "2019-02-15",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "gender": "Male",
+      "dob": "1979-01-25",
+      "photo": null,
+      "notes": ""
     }
   ],
   "events": [
@@ -335,7 +435,7 @@
       "time": "7:00 PM - 10:00 PM",
       "venue": "Society Premises, Vadodara",
       "category": "Festival",
-      "status": "Upcoming",
+      "status": "Published",
       "organizer": "Executive Committee",
       "contact": "+91 98765 43210",
       "latitude": 22.3072,
@@ -343,7 +443,8 @@
       "description": "Five nights of traditional Garba and Dandiya with live music and evening aarti.",
       "image": null,
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "featured": false
     },
     {
       "id": 2,
@@ -353,7 +454,7 @@
       "time": "8:00 PM",
       "venue": "Temple Premises, Vadodara",
       "category": "Festival",
-      "status": "Upcoming",
+      "status": "Published",
       "organizer": "Executive Committee",
       "contact": "+91 98765 43210",
       "latitude": 22.3105,
@@ -361,7 +462,8 @@
       "description": "Bhajans, Matki Phod and a midnight cradle ceremony with prasad.",
       "image": null,
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "featured": false
     },
     {
       "id": 3,
@@ -371,7 +473,7 @@
       "time": "8:00 AM",
       "venue": "Temple Premises, Vadodara",
       "category": "Festival",
-      "status": "Upcoming",
+      "status": "Published",
       "organizer": "Executive Committee",
       "contact": "+91 98765 43210",
       "latitude": 22.3105,
@@ -379,7 +481,8 @@
       "description": "Ganpati sthapana, daily aarti and a grand visarjan procession.",
       "image": null,
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "featured": false
     },
     {
       "id": 4,
@@ -389,7 +492,7 @@
       "time": "7:30 PM",
       "venue": "Society Community Hall, Vadodara",
       "category": "Aarti",
-      "status": "Upcoming",
+      "status": "Published",
       "organizer": "Executive Committee",
       "contact": "+91 98765 43210",
       "latitude": 22.3049,
@@ -397,7 +500,8 @@
       "description": "Devotional bhajans by local artists followed by maha aarti.",
       "image": null,
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "featured": false
     },
     {
       "id": 5,
@@ -407,7 +511,7 @@
       "time": "6:00 PM",
       "venue": "Society Premises, Vadodara",
       "category": "Cultural",
-      "status": "Featured",
+      "status": "Draft",
       "organizer": "Executive Committee",
       "contact": "+91 98765 43210",
       "latitude": 22.3072,
@@ -415,7 +519,8 @@
       "description": "Folk dance, drama and music by the children and youth of the society.",
       "image": null,
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "featured": true
     },
     {
       "id": 6,
@@ -425,7 +530,7 @@
       "time": "10:00 AM",
       "venue": "Community Hall, Vadodara",
       "category": "Meeting",
-      "status": "Meeting",
+      "status": "Published",
       "organizer": "Executive Committee",
       "contact": "+91 98765 43210",
       "latitude": 22.3049,
@@ -433,7 +538,8 @@
       "description": "Review of accounts and activities, and election of committee members.",
       "image": null,
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "featured": false
     }
   ],
   "notices": [
@@ -445,7 +551,8 @@
       "tag": "Important",
       "icon": "megaphone",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "status": "Published"
     },
     {
       "id": 2,
@@ -455,7 +562,8 @@
       "tag": "General",
       "icon": "file-text",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "status": "Published"
     },
     {
       "id": 3,
@@ -465,7 +573,8 @@
       "tag": "Important",
       "icon": "alert-circle",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "status": "Published"
     },
     {
       "id": 4,
@@ -475,7 +584,8 @@
       "tag": "Event",
       "icon": "flower",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "status": "Published"
     },
     {
       "id": 5,
@@ -485,7 +595,8 @@
       "tag": "General",
       "icon": "droplet",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "status": "Draft"
     },
     {
       "id": 6,
@@ -495,7 +606,8 @@
       "tag": "Other",
       "icon": "user-plus",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "status": "Published"
     }
   ],
   "donations": [
@@ -510,7 +622,8 @@
       "date": "2026-10-25T09:15:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 2,
@@ -523,7 +636,8 @@
       "date": "2026-10-24T10:30:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 3,
@@ -536,7 +650,8 @@
       "date": "2026-10-23T11:15:00",
       "status": "Pending",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 4,
@@ -549,7 +664,8 @@
       "date": "2026-10-22T12:30:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 5,
@@ -562,7 +678,8 @@
       "date": "2026-10-21T13:15:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 6,
@@ -575,7 +692,8 @@
       "date": "2026-10-20T14:30:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 7,
@@ -588,7 +706,8 @@
       "date": "2026-10-19T15:15:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 8,
@@ -601,7 +720,8 @@
       "date": "2026-10-18T16:30:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 9,
@@ -614,7 +734,8 @@
       "date": "2026-10-17T17:15:00",
       "status": "Pending",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 10,
@@ -627,7 +748,8 @@
       "date": "2026-10-16T18:30:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 11,
@@ -640,7 +762,8 @@
       "date": "2026-10-15T09:15:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 12,
@@ -653,7 +776,8 @@
       "date": "2026-10-14T10:30:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 13,
@@ -666,7 +790,8 @@
       "date": "2026-10-13T11:15:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 14,
@@ -679,7 +804,8 @@
       "date": "2026-10-12T12:30:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 15,
@@ -692,7 +818,8 @@
       "date": "2026-10-11T13:15:00",
       "status": "Pending",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 16,
@@ -705,7 +832,8 @@
       "date": "2026-10-10T14:30:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 17,
@@ -718,7 +846,8 @@
       "date": "2026-10-09T15:15:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 18,
@@ -731,7 +860,8 @@
       "date": "2026-10-08T16:30:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 19,
@@ -744,7 +874,8 @@
       "date": "2026-10-07T17:15:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 20,
@@ -757,7 +888,8 @@
       "date": "2026-10-06T18:30:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 21,
@@ -770,7 +902,8 @@
       "date": "2026-09-08T09:15:00",
       "status": "Pending",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 22,
@@ -783,7 +916,8 @@
       "date": "2026-09-07T10:30:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 23,
@@ -796,7 +930,8 @@
       "date": "2026-09-06T11:15:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 24,
@@ -809,7 +944,8 @@
       "date": "2026-09-05T12:30:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 25,
@@ -822,7 +958,8 @@
       "date": "2026-09-04T13:15:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 26,
@@ -835,7 +972,8 @@
       "date": "2026-09-03T14:30:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 27,
@@ -848,7 +986,8 @@
       "date": "2026-09-02T15:15:00",
       "status": "Pending",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 28,
@@ -861,7 +1000,8 @@
       "date": "2026-09-28T16:30:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 29,
@@ -874,7 +1014,8 @@
       "date": "2026-09-27T17:15:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 30,
@@ -887,7 +1028,8 @@
       "date": "2026-09-26T18:30:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 31,
@@ -900,7 +1042,8 @@
       "date": "2026-09-25T09:15:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     },
     {
       "id": 32,
@@ -913,207 +1056,570 @@
       "date": "2026-09-24T10:30:00",
       "status": "Verified",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
+    },
+    {
+      "id": 33,
+      "donorName": "Kiran Joshi",
+      "memberId": "GM005",
+      "amount": 2100,
+      "mode": "UPI",
+      "purpose": "General Fund",
+      "reference": "UTR260500",
+      "date": "2026-05-04T10:30:00",
+      "status": "Verified",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
+    },
+    {
+      "id": 34,
+      "donorName": "Komal Pandya",
+      "memberId": "GM012",
+      "amount": 5001,
+      "mode": "UPI",
+      "purpose": "Festival",
+      "reference": "UTR260501",
+      "date": "2026-05-10T10:30:00",
+      "status": "Verified",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
+    },
+    {
+      "id": 35,
+      "donorName": "Tejal Amin",
+      "memberId": "GM019",
+      "amount": 3500,
+      "mode": "Bank Transfer",
+      "purpose": "Aarti",
+      "reference": "UTR260502",
+      "date": "2026-05-16T10:30:00",
+      "status": "Verified",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
+    },
+    {
+      "id": 36,
+      "donorName": "Rina Bhatt",
+      "memberId": "GM016",
+      "amount": 11000,
+      "mode": "Cash",
+      "purpose": "General Fund",
+      "reference": "UTR260600",
+      "date": "2026-06-04T10:30:00",
+      "status": "Verified",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
+    },
+    {
+      "id": 37,
+      "donorName": "Daksha Raval",
+      "memberId": "GM022",
+      "amount": 4500,
+      "mode": "UPI",
+      "purpose": "Festival",
+      "reference": "UTR260601",
+      "date": "2026-06-10T10:30:00",
+      "status": "Verified",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
+    },
+    {
+      "id": 38,
+      "donorName": "Sejal Kothari",
+      "memberId": "GM003",
+      "amount": 2500,
+      "mode": "UPI",
+      "purpose": "Aarti",
+      "reference": "UTR260602",
+      "date": "2026-06-16T10:30:00",
+      "status": "Verified",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
+    },
+    {
+      "id": 39,
+      "donorName": "Nisha Parmar",
+      "memberId": "GM008",
+      "amount": 5100,
+      "mode": "Bank Transfer",
+      "purpose": "Cultural",
+      "reference": "UTR260603",
+      "date": "2026-06-22T10:30:00",
+      "status": "Verified",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
+    },
+    {
+      "id": 40,
+      "donorName": "Sejal Kothari",
+      "memberId": "GM003",
+      "amount": 3100,
+      "mode": "UPI",
+      "purpose": "General Fund",
+      "reference": "UTR260700",
+      "date": "2026-07-04T10:30:00",
+      "status": "Verified",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
+    },
+    {
+      "id": 41,
+      "donorName": "Nisha Parmar",
+      "memberId": "GM008",
+      "amount": 6000,
+      "mode": "Bank Transfer",
+      "purpose": "Festival",
+      "reference": "UTR260701",
+      "date": "2026-07-10T10:30:00",
+      "status": "Verified",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
+    },
+    {
+      "id": 42,
+      "donorName": "Rina Bhatt",
+      "memberId": "GM016",
+      "amount": 2100,
+      "mode": "Cheque",
+      "purpose": "Aarti",
+      "reference": "UTR260702",
+      "date": "2026-07-16T10:30:00",
+      "status": "Verified",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
+    },
+    {
+      "id": 43,
+      "donorName": "Komal Pandya",
+      "memberId": "GM012",
+      "amount": 9000,
+      "mode": "UPI",
+      "purpose": "General Fund",
+      "reference": "UTR260800",
+      "date": "2026-08-04T10:30:00",
+      "status": "Verified",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
+    },
+    {
+      "id": 44,
+      "donorName": "Tejal Amin",
+      "memberId": "GM019",
+      "amount": 5500,
+      "mode": "UPI",
+      "purpose": "Festival",
+      "reference": "UTR260801",
+      "date": "2026-08-10T10:30:00",
+      "status": "Verified",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
+    },
+    {
+      "id": 45,
+      "donorName": "Nilesh Prajapati",
+      "memberId": "GM025",
+      "amount": 7001,
+      "mode": "Bank Transfer",
+      "purpose": "Aarti",
+      "reference": "UTR260802",
+      "date": "2026-08-16T10:30:00",
+      "status": "Verified",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
+    },
+    {
+      "id": 46,
+      "donorName": "Kiran Joshi",
+      "memberId": "GM005",
+      "amount": 1100,
+      "mode": "Cheque",
+      "purpose": "Cultural",
+      "reference": "UTR260803",
+      "date": "2026-08-22T10:30:00",
+      "status": "Verified",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "receipt": null
     }
   ],
   "expenses": [
     {
       "id": 1,
       "category": "Festival",
-      "note": "Stage decoration",
       "amount": 12000,
       "date": "2026-10-20",
-      "status": "Completed",
+      "status": "Verified",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Stage decoration",
+      "vendor": "Shree Events",
+      "mode": "Bank Transfer",
+      "receipt": null
     },
     {
       "id": 2,
       "category": "Festival",
-      "note": "Garba ground setup",
       "amount": 10000,
       "date": "2026-10-19",
-      "status": "Completed",
+      "status": "Verified",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Garba ground setup",
+      "vendor": "Shree Events",
+      "mode": "UPI",
+      "receipt": null
     },
     {
       "id": 3,
       "category": "Decorations",
-      "note": "Decoration items",
       "amount": 8500,
       "date": "2026-10-18",
-      "status": "Completed",
+      "status": "Verified",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Decoration items",
+      "vendor": "Shree Decor",
+      "mode": "Cash",
+      "receipt": null
     },
     {
       "id": 4,
       "category": "Prasad",
-      "note": "Prasad items",
       "amount": 6000,
       "date": "2026-10-17",
-      "status": "Completed",
+      "status": "Pending",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Prasad items",
+      "vendor": "Local Market",
+      "mode": "Bank Transfer",
+      "receipt": null
     },
     {
       "id": 5,
       "category": "Sound & Lights",
-      "note": "Sound system rental",
       "amount": 5000,
       "date": "2026-10-16",
-      "status": "Completed",
+      "status": "Verified",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Sound system rental",
+      "vendor": "Shree Sound",
+      "mode": "UPI",
+      "receipt": null
     },
     {
       "id": 6,
       "category": "Sound & Lights",
-      "note": "LED lights rental",
       "amount": 3500,
       "date": "2026-10-15",
-      "status": "Completed",
+      "status": "Verified",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "LED lights rental",
+      "vendor": "Shree Sound",
+      "mode": "Cash",
+      "receipt": null
     },
     {
       "id": 7,
       "category": "Decorations",
-      "note": "Flower garlands",
       "amount": 2200,
       "date": "2026-10-14",
-      "status": "Completed",
+      "status": "Verified",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Flower garlands",
+      "vendor": "Shree Decor",
+      "mode": "Bank Transfer",
+      "receipt": null
     },
     {
       "id": 8,
       "category": "Prasad",
-      "note": "Sweets for Janmashtami",
       "amount": 3200,
       "date": "2026-10-13",
-      "status": "Completed",
+      "status": "Verified",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Sweets for Janmashtami",
+      "vendor": "Local Market",
+      "mode": "UPI",
+      "receipt": null
     },
     {
       "id": 9,
       "category": "Festival",
-      "note": "Ganesh murti",
       "amount": 7500,
       "date": "2026-10-12",
-      "status": "Completed",
+      "status": "Verified",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Ganesh murti",
+      "vendor": "Shree Events",
+      "mode": "Cash",
+      "receipt": null
     },
     {
       "id": 10,
       "category": "Festival",
-      "note": "Priest dakshina",
       "amount": 2100,
       "date": "2026-10-11",
-      "status": "Completed",
+      "status": "Pending",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Priest dakshina",
+      "vendor": "Shree Events",
+      "mode": "Bank Transfer",
+      "receipt": null
     },
     {
       "id": 11,
       "category": "Maintenance",
-      "note": "Community hall cleaning",
       "amount": 1500,
       "date": "2026-09-30",
-      "status": "Completed",
+      "status": "Verified",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Community hall cleaning",
+      "vendor": "Raj Electrical",
+      "mode": "UPI",
+      "receipt": null
     },
     {
       "id": 12,
       "category": "Maintenance",
-      "note": "Temple painting",
       "amount": 9000,
       "date": "2026-09-29",
-      "status": "Completed",
+      "status": "Verified",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Temple painting",
+      "vendor": "Raj Electrical",
+      "mode": "Cash",
+      "receipt": null
     },
     {
       "id": 13,
       "category": "Printing",
-      "note": "Invitation cards",
       "amount": 1800,
       "date": "2026-09-28",
-      "status": "Completed",
+      "status": "Verified",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Invitation cards",
+      "vendor": "Print Hub",
+      "mode": "Bank Transfer",
+      "receipt": null
     },
     {
       "id": 14,
       "category": "Printing",
-      "note": "Banners and flex",
       "amount": 2600,
       "date": "2026-09-27",
-      "status": "Completed",
+      "status": "Verified",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Banners and flex",
+      "vendor": "Print Hub",
+      "mode": "UPI",
+      "receipt": null
     },
     {
       "id": 15,
       "category": "Refreshments",
-      "note": "Tea and snacks for meeting",
       "amount": 1200,
       "date": "2026-09-26",
-      "status": "Completed",
+      "status": "Verified",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Tea and snacks for meeting",
+      "vendor": "Annapurna Caterers",
+      "mode": "Cash",
+      "receipt": null
     },
     {
       "id": 16,
       "category": "Refreshments",
-      "note": "Volunteer meals",
       "amount": 2400,
       "date": "2026-09-25",
-      "status": "Completed",
+      "status": "Pending",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Volunteer meals",
+      "vendor": "Annapurna Caterers",
+      "mode": "Bank Transfer",
+      "receipt": null
     },
     {
       "id": 17,
       "category": "Prizes",
-      "note": "Garba competition prizes",
       "amount": 4500,
       "date": "2026-09-24",
-      "status": "Completed",
+      "status": "Verified",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Garba competition prizes",
+      "vendor": "Gift Corner",
+      "mode": "UPI",
+      "receipt": null
     },
     {
       "id": 18,
       "category": "Other",
-      "note": "Stationery",
       "amount": 650,
       "date": "2026-09-23",
-      "status": "Completed",
+      "status": "Verified",
       "approvedBy": "Dhaval Patel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Stationery",
+      "vendor": "Office Mart",
+      "mode": "Cash",
+      "receipt": null
+    },
+    {
+      "id": 19,
+      "category": "Maintenance",
+      "amount": 1800,
+      "date": "2026-05-08",
+      "status": "Verified",
+      "approvedBy": "Dhaval Patel",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Water tank cleaning",
+      "vendor": "Raj Electrical",
+      "mode": "Bank Transfer",
+      "receipt": null
+    },
+    {
+      "id": 20,
+      "category": "Printing",
+      "amount": 600,
+      "date": "2026-05-18",
+      "status": "Verified",
+      "approvedBy": "Dhaval Patel",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Membership forms",
+      "vendor": "Print Hub",
+      "mode": "UPI",
+      "receipt": null
+    },
+    {
+      "id": 21,
+      "category": "Refreshments",
+      "amount": 1400,
+      "date": "2026-06-08",
+      "status": "Verified",
+      "approvedBy": "Dhaval Patel",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Monthly meeting snacks",
+      "vendor": "Annapurna Caterers",
+      "mode": "Cash",
+      "receipt": null
+    },
+    {
+      "id": 22,
+      "category": "Maintenance",
+      "amount": 3200,
+      "date": "2026-06-18",
+      "status": "Pending",
+      "approvedBy": "Dhaval Patel",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Electrical repairs",
+      "vendor": "Raj Electrical",
+      "mode": "Bank Transfer",
+      "receipt": null
+    },
+    {
+      "id": 23,
+      "category": "Other",
+      "amount": 900,
+      "date": "2026-07-08",
+      "status": "Verified",
+      "approvedBy": "Dhaval Patel",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Office stationery",
+      "vendor": "Office Mart",
+      "mode": "UPI",
+      "receipt": null
+    },
+    {
+      "id": 24,
+      "category": "Prasad",
+      "amount": 2500,
+      "date": "2026-07-18",
+      "status": "Verified",
+      "approvedBy": "Dhaval Patel",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Guru Purnima prasad",
+      "vendor": "Local Market",
+      "mode": "Cash",
+      "receipt": null
+    },
+    {
+      "id": 25,
+      "category": "Decorations",
+      "amount": 6500,
+      "date": "2026-08-08",
+      "status": "Verified",
+      "approvedBy": "Dhaval Patel",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Janmashtami decoration",
+      "vendor": "Shree Decor",
+      "mode": "Bank Transfer",
+      "receipt": null
+    },
+    {
+      "id": 26,
+      "category": "Sound & Lights",
+      "amount": 4000,
+      "date": "2026-08-18",
+      "status": "Verified",
+      "approvedBy": "Dhaval Patel",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "description": "Sound system for Janmashtami",
+      "vendor": "Shree Sound",
+      "mode": "UPI",
+      "receipt": null
     }
   ],
   "volunteerDuties": [
@@ -1207,7 +1713,17 @@
       "status": "Pending review",
       "submittedOn": "2026-10-18",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "documents": [
+        {
+          "name": "ID Proof",
+          "url": null
+        },
+        {
+          "name": "Self Introduction",
+          "url": null
+        }
+      ]
     },
     {
       "id": 2,
@@ -1220,7 +1736,17 @@
       "status": "Pending review",
       "submittedOn": "2026-10-19",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "documents": [
+        {
+          "name": "ID Proof",
+          "url": null
+        },
+        {
+          "name": "Self Introduction",
+          "url": null
+        }
+      ]
     },
     {
       "id": 3,
@@ -1232,6 +1758,74 @@
       "paymentProof": null,
       "status": "Pending review",
       "submittedOn": "2026-10-20",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "documents": [
+        {
+          "name": "ID Proof",
+          "url": null
+        },
+        {
+          "name": "Self Introduction",
+          "url": null
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "memberName": "Hetal Shah",
+      "memberId": "GM010",
+      "contact": "+91 98320 11370",
+      "donationReference": "UPI260900",
+      "reason": "Happy to manage the donation desk.",
+      "paymentProof": null,
+      "documents": [
+        {
+          "name": "ID Proof",
+          "url": null
+        }
+      ],
+      "status": "Approved",
+      "submittedOn": "2026-09-02",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z"
+    },
+    {
+      "id": 5,
+      "memberName": "Jignesh Mehta",
+      "memberId": "GM007",
+      "contact": "+91 98299 10959",
+      "donationReference": "UPI260910",
+      "reason": "Can handle sound and stage for events.",
+      "paymentProof": null,
+      "documents": [
+        {
+          "name": "ID Proof",
+          "url": null
+        }
+      ],
+      "status": "Approved",
+      "submittedOn": "2026-08-20",
+      "created_at": "2026-10-01T09:00:00.000Z",
+      "updated_at": "2026-10-01T09:00:00.000Z"
+    },
+    {
+      "id": 6,
+      "memberName": "Vipul Modi",
+      "memberId": "GM020",
+      "contact": "+91 98390 12740",
+      "donationReference": "UPI260920",
+      "reason": "Want to help with notices.",
+      "paymentProof": null,
+      "documents": [
+        {
+          "name": "ID Proof",
+          "url": null
+        }
+      ],
+      "status": "Rejected",
+      "submittedOn": "2026-09-15",
+      "rejectionReason": "Minimum donation not completed.",
       "created_at": "2026-10-01T09:00:00.000Z",
       "updated_at": "2026-10-01T09:00:00.000Z"
     }
@@ -1248,7 +1842,8 @@
       "media": true,
       "eventsNeedApproval": false,
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "settings": true
     },
     {
       "id": 2,
@@ -1261,7 +1856,8 @@
       "media": true,
       "eventsNeedApproval": true,
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "settings": false
     },
     {
       "id": 3,
@@ -1274,7 +1870,8 @@
       "media": true,
       "eventsNeedApproval": true,
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "settings": false
     },
     {
       "id": 4,
@@ -1287,7 +1884,8 @@
       "media": true,
       "eventsNeedApproval": true,
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "settings": false
     },
     {
       "id": 5,
@@ -1300,7 +1898,8 @@
       "media": true,
       "eventsNeedApproval": true,
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "settings": false
     }
   ],
   "media": [
@@ -1314,7 +1913,8 @@
       "uploadedOn": "2026-10-05",
       "created_at": "2026-10-01T09:00:00.000Z",
       "updated_at": "2026-10-01T09:00:00.000Z",
-      "status": "Approved"
+      "status": "Approved",
+      "uploaderName": "Dhaval Patel"
     },
     {
       "id": 2,
@@ -1322,11 +1922,12 @@
       "album": "Ganesh Chaturthi",
       "type": "image",
       "url": null,
-      "uploadedBy": "GM001",
+      "uploadedBy": "GM002",
       "uploadedOn": "2026-10-06",
       "created_at": "2026-10-01T09:00:00.000Z",
       "updated_at": "2026-10-01T09:00:00.000Z",
-      "status": "Approved"
+      "status": "Approved",
+      "uploaderName": "Ramesh Patel"
     },
     {
       "id": 3,
@@ -1334,11 +1935,12 @@
       "album": "Janmashtami Celebration",
       "type": "image",
       "url": null,
-      "uploadedBy": "GM001",
+      "uploadedBy": "GM003",
       "uploadedOn": "2026-10-07",
       "created_at": "2026-10-01T09:00:00.000Z",
       "updated_at": "2026-10-01T09:00:00.000Z",
-      "status": "Approved"
+      "status": "Approved",
+      "uploaderName": "Sejal Kothari"
     },
     {
       "id": 4,
@@ -1346,11 +1948,12 @@
       "album": "Cultural Programme",
       "type": "image",
       "url": null,
-      "uploadedBy": "GM001",
+      "uploadedBy": "GM004",
       "uploadedOn": "2026-10-08",
       "created_at": "2026-10-01T09:00:00.000Z",
       "updated_at": "2026-10-01T09:00:00.000Z",
-      "status": "Approved"
+      "status": "Approved",
+      "uploaderName": "Hitesh Desai"
     },
     {
       "id": 5,
@@ -1358,11 +1961,12 @@
       "album": "Navratri Garba Mahotsav",
       "type": "image",
       "url": null,
-      "uploadedBy": "GM001",
+      "uploadedBy": "GM005",
       "uploadedOn": "2026-10-09",
       "created_at": "2026-10-01T09:00:00.000Z",
       "updated_at": "2026-10-01T09:00:00.000Z",
-      "status": "Approved"
+      "status": "Approved",
+      "uploaderName": "Kiran Joshi"
     },
     {
       "id": 6,
@@ -1370,11 +1974,12 @@
       "album": "Ganesh Chaturthi",
       "type": "video",
       "url": null,
-      "uploadedBy": "GM001",
+      "uploadedBy": "GM006",
       "uploadedOn": "2026-10-10",
       "created_at": "2026-10-01T09:00:00.000Z",
       "updated_at": "2026-10-01T09:00:00.000Z",
-      "status": "Approved"
+      "status": "Approved",
+      "uploaderName": "Pooja Trivedi"
     },
     {
       "id": 7,
@@ -1382,11 +1987,12 @@
       "album": "Janmashtami Celebration",
       "type": "image",
       "url": null,
-      "uploadedBy": "GM001",
+      "uploadedBy": "GM007",
       "uploadedOn": "2026-10-11",
       "created_at": "2026-10-01T09:00:00.000Z",
       "updated_at": "2026-10-01T09:00:00.000Z",
-      "status": "Approved"
+      "status": "Approved",
+      "uploaderName": "Jignesh Mehta"
     },
     {
       "id": 8,
@@ -1394,11 +2000,12 @@
       "album": "Cultural Programme",
       "type": "image",
       "url": null,
-      "uploadedBy": "GM001",
+      "uploadedBy": "GM008",
       "uploadedOn": "2026-10-12",
       "created_at": "2026-10-01T09:00:00.000Z",
       "updated_at": "2026-10-01T09:00:00.000Z",
-      "status": "Approved"
+      "status": "Approved",
+      "uploaderName": "Nisha Parmar"
     },
     {
       "id": 9,
@@ -1406,11 +2013,12 @@
       "album": "Navratri Garba Mahotsav",
       "type": "image",
       "url": null,
-      "uploadedBy": "GM001",
+      "uploadedBy": "GM009",
       "uploadedOn": "2026-10-13",
       "created_at": "2026-10-01T09:00:00.000Z",
       "updated_at": "2026-10-01T09:00:00.000Z",
-      "status": "Pending"
+      "status": "Pending",
+      "uploaderName": "Bhavesh Solanki"
     },
     {
       "id": 10,
@@ -1418,11 +2026,12 @@
       "album": "Ganesh Chaturthi",
       "type": "image",
       "url": null,
-      "uploadedBy": "GM001",
+      "uploadedBy": "GM010",
       "uploadedOn": "2026-10-14",
       "created_at": "2026-10-01T09:00:00.000Z",
       "updated_at": "2026-10-01T09:00:00.000Z",
-      "status": "Pending"
+      "status": "Pending",
+      "uploaderName": "Hetal Shah"
     },
     {
       "id": 11,
@@ -1430,11 +2039,12 @@
       "album": "Janmashtami Celebration",
       "type": "image",
       "url": null,
-      "uploadedBy": "GM001",
+      "uploadedBy": "GM011",
       "uploadedOn": "2026-10-15",
       "created_at": "2026-10-01T09:00:00.000Z",
       "updated_at": "2026-10-01T09:00:00.000Z",
-      "status": "Pending"
+      "status": "Pending",
+      "uploaderName": "Chirag Chauhan"
     },
     {
       "id": 12,
@@ -1442,11 +2052,12 @@
       "album": "Cultural Programme",
       "type": "video",
       "url": null,
-      "uploadedBy": "GM001",
+      "uploadedBy": "GM012",
       "uploadedOn": "2026-10-16",
       "created_at": "2026-10-01T09:00:00.000Z",
       "updated_at": "2026-10-01T09:00:00.000Z",
-      "status": "Rejected"
+      "status": "Rejected",
+      "uploaderName": "Komal Pandya"
     }
   ],
   "reports": [
@@ -1455,27 +2066,65 @@
       "title": "Monthly Report - October 2026",
       "period": "01 Oct 2026 - 31 Oct 2026",
       "generatedOn": "2026-10-14T17:30:00",
-      "format": "PDF",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "type": "monthly",
+      "from": "2026-10-01",
+      "to": "2026-10-31",
+      "category": "",
+      "mode": ""
     },
     {
       "id": 2,
       "title": "Monthly Report - September 2026",
       "period": "01 Sep 2026 - 30 Sep 2026",
       "generatedOn": "2026-10-01T11:20:00",
-      "format": "PDF",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "type": "monthly",
+      "from": "2026-09-01",
+      "to": "2026-09-30",
+      "category": "",
+      "mode": ""
     },
     {
       "id": 3,
       "title": "Donation Summary - Q3 2026",
       "period": "01 Jul 2026 - 30 Sep 2026",
       "generatedOn": "2026-10-01T10:15:00",
-      "format": "Excel",
       "created_at": "2026-10-01T09:00:00.000Z",
-      "updated_at": "2026-10-01T09:00:00.000Z"
+      "updated_at": "2026-10-01T09:00:00.000Z",
+      "type": "donation",
+      "from": "2026-07-01",
+      "to": "2026-09-30",
+      "category": "",
+      "mode": ""
+    },
+    {
+      "type": "expense",
+      "from": null,
+      "to": null,
+      "category": "",
+      "mode": "",
+      "title": "Expense Report",
+      "period": "All time",
+      "generatedOn": "2026-11-14T15:23:39",
+      "created_at": "2026-11-14T09:53:39.789Z",
+      "updated_at": "2026-11-14T09:53:39.789Z",
+      "id": 4
+    },
+    {
+      "type": "custom",
+      "from": null,
+      "to": null,
+      "category": "",
+      "mode": "",
+      "title": "Custom Report",
+      "period": "All time",
+      "generatedOn": "2026-11-14T15:23:57",
+      "created_at": "2026-11-14T09:53:57.496Z",
+      "updated_at": "2026-11-14T09:53:57.496Z",
+      "id": 5
     }
   ],
   "auditLogs": [
@@ -1514,9 +2163,64 @@
       "at": "2026-10-20T16:10:00",
       "created_at": "2026-10-01T09:00:00.000Z",
       "updated_at": "2026-10-01T09:00:00.000Z"
+    },
+    {
+      "actor": "admin@suvarna.com",
+      "action": "Created report",
+      "target": "Expense Report",
+      "at": "2026-11-14T15:23:40",
+      "created_at": "2026-11-14T09:53:40.195Z",
+      "updated_at": "2026-11-14T09:53:40.195Z",
+      "id": 5
+    },
+    {
+      "actor": "admin@suvarna.com",
+      "action": "Created report",
+      "target": "Custom Report",
+      "at": "2026-11-14T15:23:57",
+      "created_at": "2026-11-14T09:53:57.843Z",
+      "updated_at": "2026-11-14T09:53:57.843Z",
+      "id": 6
     }
   ],
   "settings": {
+    "logo": null,
+    "showGujaratiName": true,
+    "eventCategories": [
+      "Festival",
+      "Aarti",
+      "Cultural",
+      "Meeting"
+    ],
+    "donationPurposes": [
+      "Festival",
+      "Aarti",
+      "Cultural",
+      "General Fund",
+      "Other"
+    ],
+    "expenseCategories": [
+      "Festival",
+      "Decorations",
+      "Prasad",
+      "Sound & Lights",
+      "Maintenance",
+      "Printing",
+      "Refreshments",
+      "Prizes",
+      "Other"
+    ],
+    "noticeTags": [
+      "Important",
+      "General",
+      "Event",
+      "Other"
+    ],
+    "notifyNewMember": true,
+    "notifyDonation": true,
+    "notifyExecutiveRequest": true,
+    "notifyMediaUpload": true,
+    "requireMediaApproval": true,
     "id": 1,
     "created_at": "2026-10-01T09:00:00.000Z",
     "updated_at": "2026-10-01T09:00:00.000Z",
@@ -1526,7 +2230,6 @@
     "address": "A-101, Galaxy Society, Vadodara, Gujarat - 390001",
     "MIN_EXECUTIVE_DONATION": 10000,
     "allowRegistration": true,
-    "requireMemberApproval": false,
     "enableEventNotifications": true,
     "allowUploads": true
   },

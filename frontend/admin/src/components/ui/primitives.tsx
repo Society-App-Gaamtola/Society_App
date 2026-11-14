@@ -4,11 +4,12 @@
 import * as React from 'react';
 import { Slot } from '@radix-ui/react-slot';
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import * as DropdownPrimitive from '@radix-ui/react-dropdown-menu';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { cva, type VariantProps } from 'class-variance-authority';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
@@ -159,5 +160,97 @@ export function AlertDialogContent({ className, ...props }: AlertDialogPrimitive
         {...props}
       />
     </AlertDialogPrimitive.Portal>
+  );
+}
+
+export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
+  ({ className, ...props }, ref) => (
+    <textarea
+      ref={ref}
+      className={cn(
+        'min-h-20 w-full rounded-lg border border-input bg-white px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50',
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
+Textarea.displayName = 'Textarea';
+
+/** Plain <select>: simplest choice inside forms, and works with the browser's own keyboard handling. */
+export const NativeSelect = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(
+  ({ className, ...props }, ref) => (
+    <select
+      ref={ref}
+      className={cn(
+        'h-10 w-full rounded-lg border border-input bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50',
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
+NativeSelect.displayName = 'NativeSelect';
+
+export function Switch({
+  checked,
+  onCheckedChange,
+  disabled,
+  label,
+  className,
+}: {
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  disabled?: boolean;
+  /** Read by screen readers; the visible label sits next to the switch. */
+  label: string;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onCheckedChange(!checked)}
+      className={cn(
+        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50',
+        checked ? 'bg-[#1E8E4E]' : 'bg-[#D6D0C8]',
+        className,
+      )}
+    >
+      <span
+        className={cn(
+          'inline-block h-4 w-4 rounded-full bg-white shadow transition-transform',
+          checked ? 'translate-x-[18px]' : 'translate-x-0.5',
+        )}
+      />
+    </button>
+  );
+}
+
+export const Dialog = DialogPrimitive.Root;
+export const DialogTitle = DialogPrimitive.Title;
+export const DialogDescription = DialogPrimitive.Description;
+export const DialogClose = DialogPrimitive.Close;
+
+export function DialogContent({ className, children, ...props }: DialogPrimitive.DialogContentProps) {
+  return (
+    <DialogPrimitive.Portal>
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40" />
+      <DialogPrimitive.Content
+        className={cn(
+          'fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl bg-white shadow-lg focus:outline-none',
+          className,
+        )}
+        {...props}
+      >
+        {children}
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground hover:bg-accent" aria-label="Close">
+          <X className="h-4 w-4" />
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Portal>
   );
 }

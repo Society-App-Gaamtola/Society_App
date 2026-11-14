@@ -1,4 +1,5 @@
 import { getSession } from '@/lib/session';
+import { nowLocal } from '@/lib/utils';
 import type { BaseRecord, Id, NewRecord } from '@/types';
 import { adapter, type ListParams, type ListResult } from './adapter';
 
@@ -10,7 +11,7 @@ export async function writeAudit(action: string, target: string) {
       actor: getSession()?.email ?? 'Super Admin',
       action,
       target,
-      at: now,
+      at: nowLocal(),
       created_at: now,
       updated_at: now,
     });

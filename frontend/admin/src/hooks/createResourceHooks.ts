@@ -10,7 +10,7 @@ export function useAction<In, Out>(fn: (input: In) => Promise<Out>, keys: string
   return useMutation({
     mutationFn: fn,
     onSuccess: () => {
-      for (const key of [...keys, 'dashboard', 'auditLogs']) client.invalidateQueries({ queryKey: [key] });
+      for (const key of [...keys, 'dashboard', 'finance', 'auditLogs']) client.invalidateQueries({ queryKey: [key] });
       toast.success(successMessage);
     },
     onError: (error: Error) => toast.error(error.message),

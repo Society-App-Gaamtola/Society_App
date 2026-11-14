@@ -26,3 +26,17 @@ export const useUpdatePermissions = () =>
     ['permissions'],
     'Permissions updated',
   );
+
+export const useAddExecutive = () =>
+  useAction(
+    (input: Parameters<typeof permissionsService.addExecutive>[0]) => permissionsService.addExecutive(input),
+    ['permissions', 'members'],
+    'Executive added',
+  );
+
+export const useRemoveExecutive = () =>
+  useAction(
+    (permission: ExecutivePermission) => permissionsService.removeExecutive(permission),
+    ['permissions', 'members'],
+    'Executive access removed',
+  );
