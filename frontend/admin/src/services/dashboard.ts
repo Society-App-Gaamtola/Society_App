@@ -1,48 +1,43 @@
-import type { DashboardStats } from '@/types';
-import { donationsService } from './donations';
+import type { AuditLog, DashboardStats, DateRange } from '@/types';
+import { auditLogsService } from './auditLogs';
 import { eventsService } from './events';
 import { executiveRequestsService } from './executives';
-import { expensesService } from './expenses';
+import { loadFinanceRows, summarize } from './finance';
 import { mediaService } from './media';
 import { membersService } from './members';
+import { noticesService } from './notices';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const ACTIVITY_COUNT = 5;
 
 export const dashboardService = {
-  async getDashboardStats(): Promise<DashboardStats> {
-    const [members, events, donations, expenses, requests, media] = await Promise.all([
+  async getDashboardStats(range: DateRange): Promise<DashboardStats> {
+    const [members, events, notices, finance, requests, media, logs] = await Promise.all([
       membersService.list(),
-      eventsService.list(),
-      donationsService.list(),
-      expensesService.list(),
+      eventsService.list({ filters: { status: 'Published' } }),
+      noticesService.list(),
+      loadFinanceRows(),
       executiveRequestsService.list({ filters: { status: 'Pending review' } }),
       mediaService.list({ filters: { status: 'Pending' } }),
+      auditLogsService.list({ page: 1, pageSize: ACTIVITY_COUNT, sort: { field: 'at', order: 'desc' } }),
     ]);
 
-    const verified = donations.data.filter((d) => d.status === 'Verified');
-    const totalDonations = verified.reduce((sum, d) => sum + d.amount, 0);
-    const totalExpenses = expenses.data.reduce((sum, e) => sum + e.amount, 0);
-
-    const byMonth = new Map<string, number>();
-    for (const d of verified) {
-      const key = d.date.slice(0, 7);
-      byMonth.set(key, (byMonth.get(key) ?? 0) + d.amount);
-    }
+    const pendingDonations = finance.donations.filter((d) => d.status === 'Pending').length;
+    const pendingExpenses = finance.expenses.filter((e) => e.status === 'Pending').length;
 
     return {
+      ...summarize(finance.donations, finance.expenses, range),
       totalMembers: members.total,
-      activeMembers: members.data.filter((m) => m.status === 'Active').length,
       executives: members.data.filter((m) => m.type === 'Executive').length,
-      upcomingEvents: events.data.filter((e) => e.status === 'Upcoming').length,
-      totalDonations,
-      totalExpenses,
-      balance: totalDonations - totalExpenses,
-      pendingDonations: donations.data.filter((d) => d.status === 'Pending').length,
+      activeEvents: events.total,
+      totalNotices: notices.total,
+      pendingDonations,
+      pendingExpenses,
       pendingRequests: requests.total,
       pendingMedia: media.total,
-      donationTrend: [...byMonth.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([key, amount]) => ({ month: MONTHS[Number(key.slice(5)) - 1], amount })),
+      pendingApprovals: pendingDonations + pendingExpenses + requests.total + media.total,
+      activities: logs.data,
     };
   },
+  listActivities: (page: number, pageSize: number) =>
+    auditLogsService.list({ page, pageSize, sort: { field: 'at', order: 'desc' } }) as Promise<{ data: AuditLog[]; total: number }>,
 };

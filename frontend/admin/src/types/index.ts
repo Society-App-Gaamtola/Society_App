@@ -9,6 +9,15 @@ export type BaseRecord = {
 /** Fields the server or service layer fills in. */
 export type NewRecord<T extends BaseRecord> = Omit<T, 'id' | 'created_at' | 'updated_at'>;
 
+export type PaymentMode = 'Cash' | 'UPI' | 'Bank Transfer' | 'Cheque';
+export const PAYMENT_MODES: PaymentMode[] = ['UPI', 'Cash', 'Bank Transfer', 'Cheque'];
+
+export type ReviewStatus = 'Verified' | 'Pending' | 'Rejected';
+export const REVIEW_STATUSES: ReviewStatus[] = ['Verified', 'Pending', 'Rejected'];
+
+export type PublishStatus = 'Published' | 'Draft';
+export const PUBLISH_STATUSES: PublishStatus[] = ['Published', 'Draft'];
+
 export type Member = BaseRecord & {
   memberId: string;
   name: string;
@@ -18,6 +27,10 @@ export type Member = BaseRecord & {
   status: 'Active' | 'Inactive';
   address: string;
   joinedOn: string;
+  gender?: 'Male' | 'Female' | 'Other';
+  dob?: string;
+  photo?: string | null;
+  notes?: string;
 };
 
 export type Event = BaseRecord & {
@@ -26,8 +39,9 @@ export type Event = BaseRecord & {
   endDate: string | null;
   time: string;
   venue: string;
-  category: 'Festival' | 'Aarti' | 'Cultural' | 'Meeting';
-  status: string;
+  category: string;
+  status: PublishStatus;
+  featured?: boolean;
   organizer: string;
   contact: string;
   latitude: number;
@@ -40,28 +54,34 @@ export type Notice = BaseRecord & {
   title: string;
   date: string;
   description: string;
-  tag: 'Important' | 'General' | 'Event' | 'Other';
+  tag: string;
   icon: string;
+  status: PublishStatus;
 };
 
 export type Donation = BaseRecord & {
   donorName: string;
   memberId: string;
   amount: number;
-  mode: 'Cash' | 'UPI' | 'Bank Transfer' | 'Cheque';
+  mode: PaymentMode;
   purpose: string;
   reference: string;
   date: string;
-  status: 'Verified' | 'Pending' | 'Rejected';
+  status: ReviewStatus;
+  /** Uploaded payment proof. */
+  receipt?: string | null;
 };
 
 export type Expense = BaseRecord & {
+  description: string;
+  vendor: string;
   category: string;
-  note: string;
   amount: number;
+  mode: PaymentMode;
   date: string;
-  status: string;
+  status: ReviewStatus;
   approvedBy: string;
+  receipt?: string | null;
 };
 
 export type ExecutiveRequest = BaseRecord & {
@@ -71,21 +91,20 @@ export type ExecutiveRequest = BaseRecord & {
   donationReference: string;
   reason: string;
   paymentProof: string | null;
+  documents?: { name: string; url: string | null }[];
   status: 'Pending review' | 'Approved' | 'Rejected';
   submittedOn: string;
   rejectionReason?: string;
 };
 
-export type ExecutivePermission = BaseRecord & {
-  memberId: string;
-  events: boolean;
-  notices: boolean;
-  donations: boolean;
-  expenses: boolean;
-  reports: boolean;
-  media: boolean;
-  eventsNeedApproval: boolean;
-};
+export const PERMISSION_KEYS = ['events', 'notices', 'donations', 'expenses', 'reports', 'media', 'settings'] as const;
+export type PermissionKey = (typeof PERMISSION_KEYS)[number];
+
+export type ExecutivePermission = BaseRecord &
+  Record<PermissionKey, boolean> & {
+    memberId: string;
+    eventsNeedApproval: boolean;
+  };
 
 export type MediaItem = BaseRecord & {
   title: string;
@@ -93,16 +112,23 @@ export type MediaItem = BaseRecord & {
   type: 'image' | 'video';
   url: string | null;
   uploadedBy: string;
+  uploaderName?: string;
   uploadedOn: string;
   status: 'Pending' | 'Approved' | 'Rejected';
   rejectionReason?: string;
 };
 
+export type ReportType = 'summary' | 'donation' | 'expense' | 'category' | 'monthly' | 'custom';
+
 export type Report = BaseRecord & {
   title: string;
+  type: ReportType;
   period: string;
+  from: string | null;
+  to: string | null;
+  category: string;
+  mode: string;
   generatedOn: string;
-  format: 'PDF' | 'Excel';
 };
 
 export type AuditLog = BaseRecord & {
@@ -112,28 +138,68 @@ export type AuditLog = BaseRecord & {
   at: string;
 };
 
+export type VolunteerDuty = BaseRecord & { title: string; date: string; time: string; venue: string; category: string; status: string };
+export type Assignment = BaseRecord & { dutyId: Id; memberId: string; status: string; date: string };
+
 export type AppSettings = BaseRecord & {
   societyName: string;
   contactEmail: string;
   phone: string;
   address: string;
+  logo: string | null;
+  showGujaratiName: boolean;
   MIN_EXECUTIVE_DONATION: number;
   allowRegistration: boolean;
-  requireMemberApproval: boolean;
   enableEventNotifications: boolean;
   allowUploads: boolean;
+  requireMediaApproval: boolean;
+  notifyNewMember: boolean;
+  notifyDonation: boolean;
+  notifyExecutiveRequest: boolean;
+  notifyMediaUpload: boolean;
+  eventCategories: string[];
+  donationPurposes: string[];
+  expenseCategories: string[];
+  noticeTags: string[];
 };
 
-export type DashboardStats = {
-  totalMembers: number;
-  activeMembers: number;
-  executives: number;
-  upcomingEvents: number;
+export type DateRange = { from?: string; to?: string };
+
+export type MonthTotals = { month: string; donations: number; expenses: number };
+
+export type Transaction = {
+  key: string;
+  kind: 'Donation' | 'Expense';
+  date: string;
+  description: string;
+  category: string;
+  mode: PaymentMode;
+  amount: number;
+  status: ReviewStatus;
+  href: string;
+};
+
+export type FinanceSummary = {
   totalDonations: number;
   totalExpenses: number;
   balance: number;
+  transactions: number;
+  /** Percent change against the previous period of the same length; null without a full date range. */
+  donationTrend: number | null;
+  expenseTrend: number | null;
+  monthly: MonthTotals[];
+  recent: Transaction[];
+};
+
+export type DashboardStats = FinanceSummary & {
+  totalMembers: number;
+  executives: number;
+  activeEvents: number;
+  totalNotices: number;
+  pendingApprovals: number;
   pendingDonations: number;
+  pendingExpenses: number;
   pendingRequests: number;
   pendingMedia: number;
-  donationTrend: { month: string; amount: number }[];
+  activities: AuditLog[];
 };

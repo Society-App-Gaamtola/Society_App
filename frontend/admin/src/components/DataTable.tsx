@@ -1,11 +1,11 @@
 'use client';
 
 import { memo, useCallback, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { DEFAULT_PAGE_SIZE } from '@/config';
 import type { Id } from '@/types';
 import { ErrorState, SortIcon, TableRowsSkeleton } from './common';
-import { Button, Checkbox } from './ui/primitives';
+import { Pagination } from './Pagination';
+import { Checkbox } from './ui/primitives';
 
 export type Column<T> = {
   key: string;
@@ -32,6 +32,8 @@ type Props<T extends { id: Id }> = {
   selectedIds?: Id[];
   onSelectionChange?: (ids: Id[]) => void;
   emptyMessage?: string;
+  /** Used in "Showing 1 to 10 of 245 members". */
+  itemLabel?: string;
 };
 
 type RowProps<T extends { id: Id }> = {
@@ -80,11 +82,9 @@ export function DataTable<T extends { id: Id }>({
   selectedIds,
   onSelectionChange,
   emptyMessage = 'No records found.',
+  itemLabel,
 }: Props<T>) {
   const selectable = !!onSelectionChange;
-  const lastPage = Math.max(1, Math.ceil(total / pageSize));
-  const from = total ? (page - 1) * pageSize + 1 : 0;
-  const to = Math.min(page * pageSize, total);
   const pageIds = rows?.map((r) => r.id) ?? [];
   const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds?.includes(id));
 
@@ -111,7 +111,7 @@ export function DataTable<T extends { id: Id }>({
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-[#FBF5EC] text-xs font-semibold text-muted-foreground">
+            <thead className="bg-[#FBF5EC] text-xs font-semibold text-[#1F2A44]">
               <tr>
                 {selectable ? (
                   <th className="w-10 px-4 py-3">
@@ -174,22 +174,7 @@ export function DataTable<T extends { id: Id }>({
           </table>
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3 text-xs text-muted-foreground">
-        <span>
-          Showing {from} to {to} of {total}
-        </span>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)} aria-label="Previous page">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span>
-            Page {page} of {lastPage}
-          </span>
-          <Button variant="outline" size="sm" disabled={page >= lastPage} onClick={() => onPageChange(page + 1)} aria-label="Next page">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      <Pagination page={page} total={total} pageSize={pageSize} onPageChange={onPageChange} itemLabel={itemLabel} className="border-t border-border" />
     </div>
   );
 }

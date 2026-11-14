@@ -1,6 +1,7 @@
-import { PageHeader } from '@/components/common';
+'use client';
 
-// Placeholder until this page is designed.
+import { EventsNoticesPage } from '@/components/EventsNotices';
+
 export default function NoticesPage() {
-  return <PageHeader title="Notices" subtitle="Coming soon." />;
+  return <EventsNoticesPage kind="notices" />;
 }

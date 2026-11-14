@@ -26,7 +26,19 @@ export function useUrlState() {
     [params, pathname, router],
   );
 
-  const reset = useCallback(() => router.replace(pathname, { scroll: false }), [pathname, router]);
+  /** Clears filters, search and page. Params named in `keep` (such as the open tab) stay. */
+  const reset = useCallback(
+    (keep: string[] = []) => {
+      const next = new URLSearchParams();
+      for (const key of keep) {
+        const value = params.get(key);
+        if (value) next.set(key, value);
+      }
+      const query = next.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [params, pathname, router],
+  );
 
   const page = Math.max(1, Number(params.get('page')) || 1);
   const search = params.get('search') ?? '';
@@ -38,7 +50,7 @@ export function useUrlState() {
 
   /** Builds service list params. `dateField` turns the from/to URL params into a range filter. */
   const toListParams = useCallback(
-    (filterNames: string[] = [], dateField?: string): ListParams => {
+    (filterNames: string[] = [], dateField?: string, pageSize = DEFAULT_PAGE_SIZE): ListParams => {
       const filters: Filters = {};
       for (const name of filterNames) filters[name] = params.get(name) ?? undefined;
       if (dateField) {
@@ -47,10 +59,14 @@ export function useUrlState() {
         // Dates may carry a time, so the last day must include all of it.
         filters[`${dateField}_lte`] = to ? `${to}T23:59:59` : undefined;
       }
-      return { page, pageSize: DEFAULT_PAGE_SIZE, search: search || undefined, filters, sort };
+      return { page, pageSize, search: search || undefined, filters, sort };
     },
     [page, params, search, sort],
   );
 
-  return { get: (name: string) => params.get(name) ?? '', page, search, sort, setParams, reset, toListParams };
+  const from = params.get('from') ?? undefined;
+  const to = params.get('to') ?? undefined;
+  const range = useMemo(() => ({ from, to }), [from, to]);
+
+  return { get: (name: string) => params.get(name) ?? '', page, search, sort, range, setParams, reset, toListParams };
 }
