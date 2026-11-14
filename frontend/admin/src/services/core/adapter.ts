@@ -1,4 +1,4 @@
-import { API_URL, DATA_MODE } from '@/config';
+import { API_URL, DATA_MODE, MOCK_UPLOAD_MAX_MB, SEED_VERSION } from '@/config';
 import type { Id } from '@/types';
 
 export type Filters = Record<string, string | number | boolean | undefined>;
@@ -71,19 +71,52 @@ const localServerAdapter: DataAdapter = {
   },
 };
 
-// --- mock mode: the whole database lives in localStorage.
+// --- mock mode: the whole database lives in this browser's localStorage, starting from seed.json.
 const MOCK_KEY = 'admin_mock_db';
+const MOCK_VERSION_KEY = 'admin_mock_db_version';
 type MockDb = Record<string, unknown>;
 
-async function readMock(): Promise<MockDb> {
-  const saved = localStorage.getItem(MOCK_KEY);
-  if (saved) return JSON.parse(saved);
-  const seed = (await import('../seed.json')).default as MockDb;
-  localStorage.setItem(MOCK_KEY, JSON.stringify(seed));
-  return seed;
+function writeMock(db: MockDb) {
+  try {
+    localStorage.setItem(MOCK_KEY, JSON.stringify(db));
+    localStorage.setItem(MOCK_VERSION_KEY, SEED_VERSION);
+  } catch {
+    throw new Error('Demo storage is full. Remove some uploaded photos or reset the demo data in Settings.');
+  }
 }
 
-const writeMock = (db: MockDb) => localStorage.setItem(MOCK_KEY, JSON.stringify(db));
+// Pages fire many reads at once on first visit; they must share one seeding, not each write their own copy.
+let seeding: Promise<void> | null = null;
+
+async function readMock(): Promise<MockDb> {
+  const fresh = () => !!localStorage.getItem(MOCK_KEY) && localStorage.getItem(MOCK_VERSION_KEY) === SEED_VERSION;
+  if (!fresh()) {
+    seeding ??= import('../seed.json')
+      .then(({ default: seed }) => {
+        if (!fresh()) writeMock(structuredClone(seed) as MockDb);
+      })
+      .finally(() => {
+        seeding = null;
+      });
+    await seeding;
+  }
+  return JSON.parse(localStorage.getItem(MOCK_KEY) as string);
+}
+
+/** Throws away this browser's changes and starts again from seed.json. */
+export function resetMockData() {
+  localStorage.removeItem(MOCK_KEY);
+  localStorage.removeItem(MOCK_VERSION_KEY);
+}
+
+/** Uploads become data: URLs so they survive a reload; size is capped to fit browser storage. */
+const readAsDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error('Could not read the file.'));
+    reader.readAsDataURL(file);
+  });
 
 const matches = (row: Row, key: string, value: string | number | boolean) => {
   if (key.endsWith('_gte')) return String(row[key.slice(0, -4)] ?? '') >= String(value);
@@ -148,8 +181,12 @@ const mockAdapter: DataAdapter = {
     writeMock(db);
     return db[name] as Row;
   },
-  // Only stays valid until reload; mock mode has no file storage.
-  upload: async (file) => ({ url: URL.createObjectURL(file) }),
+  async upload(file) {
+    if (file.size > MOCK_UPLOAD_MAX_MB * 1024 * 1024) {
+      throw new Error(`In the demo, files must be smaller than ${MOCK_UPLOAD_MAX_MB} MB.`);
+    }
+    return { url: await readAsDataUrl(file) };
+  },
 };
 
 const notImplemented = async (): Promise<never> => {
