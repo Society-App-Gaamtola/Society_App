@@ -1,13 +1,8 @@
 # Admin Panel
 
-Super Admin web panel. It reads its data from `../mock-server` by default.
+Super Admin web panel. It runs on built-in demo data by default, so it needs no server (see below).
 
 ```powershell
-# terminal 1
-cd mock-server
-npm run mock
-
-# terminal 2
 cd admin
 npm install
 npm run dev
@@ -19,4 +14,6 @@ Pages: Dashboard, Members (with member details), Executives (requests and permis
 
 The mock data lives in `../mock-server/db.json`; `src/services/seed.json` is a copy used by `mock` mode. Keep them in sync when you change the data shape.
 
-Change the data source with `DATA_MODE` in `src/config.ts`: `local-server`, `mock` (browser localStorage) or `supabase` (not implemented yet).
+By default the panel runs on **demo data** (`DATA_MODE = 'mock'` in `src/config.ts`): `src/services/seed.json` is copied into each browser's localStorage, so no server is needed. This is what gets deployed (e.g. Vercel, root directory `frontend/admin`) for client UI approval. Changes stay in that browser; Settings → Backup & Data → Reset Demo Data starts over. After editing `seed.json`, bump `SEED_VERSION` in `src/config.ts` so browsers pick up the new data.
+
+To use the shared mock server instead, set `NEXT_PUBLIC_DATA_MODE=local-server` (and `NEXT_PUBLIC_API_URL` if it is not on localhost:4000). `supabase` mode is not implemented.

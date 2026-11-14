@@ -15,6 +15,7 @@ import {
   StatCardsSkeleton,
   StatusBadge,
   ViewDialog,
+  FileLink,
 } from '@/components/common';
 import { DataTable, type Column } from '@/components/DataTable';
 import { FilterBar } from '@/components/FilterBar';
@@ -169,9 +170,9 @@ export default function ExpensesPage() {
         header: 'Receipt',
         render: (e) =>
           e.receipt ? (
-            <a href={e.receipt} target="_blank" rel="noreferrer" className="inline-flex rounded-md p-1.5 text-[#C62828] hover:bg-accent" aria-label={`Open bill for ${recordNo('EXP', e.id)}`} title="Open bill">
+            <FileLink href={e.receipt} className="inline-flex rounded-md p-1.5 text-[#C62828] hover:bg-accent" aria-label={`Open bill for ${recordNo('EXP', e.id)}`} title="Open bill">
               <FileText className="h-4 w-4" />
-            </a>
+            </FileLink>
           ) : (
             <span className="inline-flex p-1.5 text-[#CFC6BB]" title="No bill uploaded">
               <FileText className="h-4 w-4" aria-label="No bill uploaded" />
@@ -287,9 +288,9 @@ export default function ExpensesPage() {
               [
                 'Bill / Receipt',
                 viewing.receipt ? (
-                  <a key="r" href={viewing.receipt} target="_blank" rel="noreferrer" className={cn('text-maroon underline')}>
+                  <FileLink key="r" href={viewing.receipt} className={cn('text-maroon underline')}>
                     Open file
-                  </a>
+                  </FileLink>
                 ) : (
                   'Not uploaded'
                 ),

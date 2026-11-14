@@ -15,6 +15,7 @@ import {
   StatCardsSkeleton,
   StatusBadge,
   ViewDialog,
+  FileLink,
 } from '@/components/common';
 import { DataTable, type Column } from '@/components/DataTable';
 import { FilterBar } from '@/components/FilterBar';
@@ -314,9 +315,9 @@ export default function DonationsPage() {
               [
                 'Payment Proof',
                 viewing.receipt ? (
-                  <a key="p" href={viewing.receipt} target="_blank" rel="noreferrer" className="text-maroon underline">
+                  <FileLink key="p" href={viewing.receipt} className="text-maroon underline">
                     Open file
-                  </a>
+                  </FileLink>
                 ) : (
                   'Not uploaded'
                 ),

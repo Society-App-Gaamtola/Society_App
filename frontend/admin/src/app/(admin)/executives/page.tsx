@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FileText, Pencil, Plus } from 'lucide-react';
-import { Avatar, ConfirmDialog, Field, FormDialog, PageHeader, ReasonDialog, StatusBadge, Tabs } from '@/components/common';
+import { Avatar, FileLink, ConfirmDialog, Field, FormDialog, PageHeader, ReasonDialog, StatusBadge, Tabs } from '@/components/common';
 import { DataTable, type Column } from '@/components/DataTable';
 import { FilterBar } from '@/components/FilterBar';
 import { Button, NativeSelect, Switch } from '@/components/ui/primitives';
@@ -110,9 +110,9 @@ function RequestsView() {
                 <li key={d.name} className="flex items-center gap-1.5">
                   <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                   {d.url ? (
-                    <a href={d.url} target="_blank" rel="noreferrer" className="text-maroon underline">
+                    <FileLink href={d.url} className="text-maroon underline">
                       {d.name}
-                    </a>
+                    </FileLink>
                   ) : (
                     <span title="File not uploaded">{d.name}</span>
                   )}

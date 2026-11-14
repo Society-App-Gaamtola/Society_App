@@ -50,7 +50,7 @@ export const initials = (name: string) =>
     .map((part) => part[0]?.toUpperCase())
     .join('');
 
-export const isImageUrl = (url: string) => /\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(url) || url.startsWith('blob:');
+export const isImageUrl = (url: string) => /\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(url) || url.startsWith('blob:') || url.startsWith('data:image/');
 
 export const periodLabel = (from?: string | null, to?: string | null) =>
   from || to ? `${from ? formatDate(from) : 'Start'} - ${to ? formatDate(to) : 'Today'}` : 'All time';

@@ -497,7 +497,7 @@ export function ConfirmDialog({
 export function ErrorState({ message, onRetry }: { message?: string; onRetry?: () => void }) {
   return (
     <div className="flex flex-col items-center gap-3 py-12 text-center">
-      <p className="text-sm text-muted-foreground">{message ?? 'Could not load data. Is the mock server running?'}</p>
+      <p className="text-sm text-muted-foreground">{message ?? 'Could not load data. Please try again.'}</p>
       {onRetry ? (
         <Button variant="outline" onClick={onRetry}>
           <RotateCcw className="h-4 w-4" /> Retry
@@ -535,6 +535,34 @@ export function SortIcon({ order }: { order?: 'asc' | 'desc' }) {
   if (!order) return null;
   const Icon = order === 'asc' ? ArrowUp : ArrowDown;
   return <Icon className="h-3 w-3" />;
+}
+
+/** Turns a data: URL into a blob: URL synchronously, so it can open in a tab during the click. */
+function dataUrlToBlobUrl(dataUrl: string) {
+  const [head, body] = dataUrl.split(',');
+  const type = head.match(/data:([^;]+)/)?.[1] ?? 'application/octet-stream';
+  const bytes = head.includes(';base64') ? Uint8Array.from(atob(body), (c) => c.charCodeAt(0)) : new TextEncoder().encode(decodeURIComponent(body));
+  return URL.createObjectURL(new Blob([bytes], { type }));
+}
+
+/** Link to an uploaded file. Browsers refuse to open data: URLs (demo uploads) directly, so those go through a blob. */
+export function FileLink({ href, className, children, ...rest }: { href: string; className?: string; children: ReactNode; title?: string; 'aria-label'?: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className={className}
+      onClick={(e) => {
+        if (!href.startsWith('data:')) return;
+        e.preventDefault();
+        window.open(dataUrlToBlobUrl(href), '_blank', 'noopener');
+      }}
+      {...rest}
+    >
+      {children}
+    </a>
+  );
 }
 
 /** Uploads a file and returns its URL. `children` replaces the default drop box, e.g. a "Change Photo" button. */
@@ -578,9 +606,9 @@ export function FileUpload({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={value} alt="" className="h-12 w-12 rounded object-cover" />
           ) : null}
-          <a href={value} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-maroon underline">
-            {value.split('/').pop()}
-          </a>
+          <FileLink href={value} className="min-w-0 flex-1 truncate text-maroon underline">
+            {value.startsWith('data:') ? 'Uploaded file' : value.split('/').pop()}
+          </FileLink>
           <button type="button" aria-label="Remove file" onClick={() => onChange(null)}>
             <X className="h-4 w-4 text-muted-foreground" />
           </button>

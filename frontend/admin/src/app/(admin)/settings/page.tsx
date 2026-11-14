@@ -18,13 +18,14 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { Card, ErrorState, Field, FileUpload, PageHeader } from '@/components/common';
+import { Card, ConfirmDialog, ErrorState, Field, FileUpload, PageHeader } from '@/components/common';
 import { Button, Input, Skeleton, Switch, Textarea } from '@/components/ui/primitives';
 import { API_URL, DATA_MODE } from '@/config';
 import { useSettings, useUpdateSettings } from '@/hooks/useSettings';
 import { useUrlState } from '@/hooks/useUrlState';
 import { cn } from '@/lib/utils';
 import { backupService } from '@/services/backup';
+import { resetMockData } from '@/services/core/adapter';
 import type { AppSettings, NewRecord } from '@/types';
 
 type Draft = NewRecord<AppSettings>;
@@ -110,6 +111,7 @@ export default function SettingsPage() {
   const save = useUpdateSettings();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [backingUp, setBackingUp] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   useEffect(() => {
     if (data) setDraft(toDraft(data));
@@ -275,6 +277,29 @@ export default function SettingsPage() {
                   {backingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />} Download Backup
                 </Button>
                 <p className="mt-2 text-xs text-muted-foreground">Includes members, events, notices, donations, expenses, media records, reports and settings.</p>
+                {DATA_MODE === 'mock' ? (
+                  <div className="mt-6 border-t border-border pt-4">
+                    <h3 className="text-base font-bold">Demo Data</h3>
+                    <p className="mb-3 text-sm text-muted-foreground">
+                      This demo keeps its data in your browser only. Other people opening the link see their own copy.
+                    </p>
+                    <Button type="button" variant="outline" className="border-[#C62828] text-[#C62828]" onClick={() => setConfirmReset(true)}>
+                      Reset Demo Data
+                    </Button>
+                    <ConfirmDialog
+                      open={confirmReset}
+                      onOpenChange={setConfirmReset}
+                      title="Reset demo data?"
+                      description="Every change made in this browser is removed and the original sample data comes back."
+                      confirmLabel="Reset"
+                      destructive
+                      onConfirm={() => {
+                        resetMockData();
+                        window.location.reload();
+                      }}
+                    />
+                  </div>
+                ) : null}
               </>
             ) : null}
 
@@ -287,7 +312,7 @@ export default function SettingsPage() {
                   <dt className="text-muted-foreground">Version</dt>
                   <dd>1.0.0</dd>
                   <dt className="text-muted-foreground">Data source</dt>
-                  <dd>{DATA_MODE === 'local-server' ? `Mock server (${API_URL})` : DATA_MODE}</dd>
+                  <dd>{DATA_MODE === 'mock' ? 'Demo data stored in this browser' : DATA_MODE === 'local-server' ? `Mock server (${API_URL})` : DATA_MODE}</dd>
                   <dt className="text-muted-foreground">Support</dt>
                   <dd>{draft.contactEmail}</dd>
                 </dl>
