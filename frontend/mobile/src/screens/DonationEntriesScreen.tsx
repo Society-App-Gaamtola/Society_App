@@ -1,31 +1,42 @@
-import { memo, useCallback, useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { memo, useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Linking, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/types';
 import { common, surface } from '../styles/common';
-import { colors, fonts, tones, type Tone } from '../theme';
+import { colors, fonts, tones, type Tone, themedStyles } from '../theme';
 import { LIST_PERFORMANCE_PROPS } from '../config/list';
-import { useDonations } from '../context/DonationsContext';
+import {
+  deleteDonationEntry,
+  getDonationEntries,
+  MODE_FILTER,
+  setDonationEntryStatus,
+  toDonation,
+  type ApiEntryStatus,
+  type EntryFilters,
+  type EntrySummary,
+} from '../api/executive';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { usePagedList } from '../hooks/usePagedList';
 import { Ionicons, MaterialCommunityIcons, type McIconName } from '../icons';
 import type { DateRange, Donation, DonationStatus, PaymentMode } from '../types';
-import { formatDateTime, formatRange, isInRange } from '../utils/date';
+import { formatDate, formatRange, fromIsoDay, toIsoDay } from '../utils/date';
 import { formatINR } from '../utils/format';
+import { showToast } from '../utils/toast';
 import { ActionSheet, AppHeader, DateRangeButton, EmptyState, FilterChips, IconCircle, PermissionGate, Pill, SearchBar } from '../components';
 import DateRangeSheet from '../components/sheets/DateRangeSheet';
+import { useT } from '../i18n';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'DonationEntries'>;
 
-const FILTERS = ['All', 'Cash', 'UPI', 'Bank Transfer', 'Pending Verification'] as const;
+const FILTERS = ['All', 'Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Pending Verification'] as const;
 type Filter = (typeof FILTERS)[number];
 
-const DEFAULT_MONTH = '2026-10-10';
-
 const avatarColors: Tone[] = [
-  { bg: colors.tint, text: colors.primary },
+  { get bg() { return colors.tint; }, get text() { return colors.primary; } },
   tones.info,
   tones.success,
-  { bg: '#FDEFE3', text: '#B45309' },
+  { get bg() { return colors.peachTint; }, get text() { return colors.peachText; } },
 ];
 
 const modeIcon: Record<PaymentMode, McIconName> = {
@@ -38,7 +49,7 @@ const modeIcon: Record<PaymentMode, McIconName> = {
 const statusTone: Record<DonationStatus, Tone> = {
   Verified: tones.success,
   Pending: tones.warning,
-  Draft: tones.neutral,
+  Rejected: tones.danger,
 };
 
 const initials = (name: string) =>
@@ -57,6 +68,8 @@ const colorFor = (name: string) => {
 
 const Separator = () => <View style={styles.separator} />;
 
+// Donations recorded by the society (GET /admin/donations, the Donations section): members' app donations and
+// entries added here. Pending ones wait for verification; only verified ones count in totals and reports
 export default function DonationEntriesScreen() {
   return (
     <PermissionGate permission="donations">
@@ -66,34 +79,37 @@ export default function DonationEntriesScreen() {
 }
 
 function DonationEntries() {
+  const t = useT();
   const navigation = useNavigation<Nav>();
-  const { donations, removeDonation, reload } = useDonations();
   const [query, setQuery] = useState('');
+  const search = useDebouncedValue(query.trim());
   const [filter, setFilter] = useState<Filter>('All');
-  // Start with all dates so newly added entries are always visible.
   const [range, setRange] = useState<DateRange | null>(null);
   const [rangeOpen, setRangeOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<Donation | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const [summary, setSummary] = useState<EntrySummary | null>(null);
 
-  const data = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return donations
-      .filter((d) => !q || d.donorName.toLowerCase().includes(q) || d.memberId.toLowerCase().includes(q))
-      .filter((d) => {
-        if (filter === 'All') return true;
-        if (filter === 'Pending Verification') return d.status === 'Pending';
-        return d.mode === filter;
-      })
-      .filter((d) => !range || isInRange(d.date, range))
-      .sort((a, b) => b.date.localeCompare(a.date));
-  }, [donations, query, filter, range]);
+  const fetchPage = useCallback(
+    async (page: number) => {
+      const filters: EntryFilters = { search, from_date: range?.start, to_date: range?.end };
+      if (filter === 'Pending Verification') filters.status = 'pending';
+      else if (filter !== 'All') filters.mode = MODE_FILTER[filter];
+      const { data } = await getDonationEntries(page, filters);
+      if (page === 1) setSummary(data.summary);
+      return { items: data.donations.map(toDonation), pagination: data.pagination };
+    },
+    [search, filter, range],
+  );
+  const { items, loading, loadingMore, refreshing, error, loadMore, refresh } = usePagedList(fetchPage);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await reload();
-    setRefreshing(false);
-  }, [reload]);
+  // Back from Add / Edit: show the saved entry
+  const focusedBefore = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (focusedBefore.current) refresh();
+      focusedBefore.current = true;
+    }, [refresh]),
+  );
 
   const renderItem = useCallback(({ item }: { item: Donation }) => <DonationCard donation={item} onMenu={setMenuFor} />, []);
 
@@ -101,46 +117,75 @@ function DonationEntries() {
     Alert.alert(
       d.donorName,
       [
-        `Member ID: ${d.memberId}`,
-        `Amount: ${formatINR(d.amount)}`,
-        `Date: ${formatDateTime(new Date(d.date))}`,
-        `Mode: ${d.mode}`,
-        `Status: ${d.status}`,
-        d.reference ? `Reference: ${d.reference}` : null,
-        d.purpose ? `Purpose: ${d.purpose}` : null,
-        d.note ? `Notes: ${d.note}` : null,
+        `${t('Member ID')}: ${d.memberId}`,
+        `${t('Amount')}: ${formatINR(d.amount)}`,
+        `${t('Date')}: ${formatDate(fromIsoDay(d.date))}`,
+        `${t('Mode')}: ${t(d.mode)}`,
+        `${t('Status')}: ${t(d.status)}`,
+        d.reference ? `${t('Reference')}: ${d.reference}` : null,
+        d.purpose ? `${t('Purpose')}: ${d.purpose}` : null,
+        d.note ? `${t('Notes')}: ${d.note}` : null,
       ]
         .filter(Boolean)
         .join('\n'),
+      d.proofUrl
+        ? [
+            { text: t('Open proof'), onPress: () => Linking.openURL(d.proofUrl!).catch(() => {}) },
+            { text: t('Close'), style: 'cancel' },
+          ]
+        : undefined,
     );
 
+  const setStatus = (d: Donation, status: ApiEntryStatus) =>
+    setDonationEntryStatus(Number(d.id), status)
+      .then(({ message }) => {
+        showToast(message);
+        refresh();
+      })
+      .catch((e) => Alert.alert(t('Could not update'), e instanceof Error ? e.message : t('Please try again.')));
+
   const deleteDonation = (d: Donation) =>
-    Alert.alert('Delete Entry', `Delete the donation of ${formatINR(d.amount)} by ${d.donorName}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => removeDonation(d.id) },
+    Alert.alert(t('Delete Entry'), t('Delete the donation of {amount} by {name}?', { amount: formatINR(d.amount), name: d.donorName }), [
+      { text: t('Cancel'), style: 'cancel' },
+      {
+        text: t('Delete'),
+        style: 'destructive',
+        onPress: () =>
+          deleteDonationEntry(Number(d.id))
+            .then(({ message }) => {
+              showToast(message);
+              refresh();
+            })
+            .catch((e) => Alert.alert(t('Could not delete'), e instanceof Error ? e.message : t('Please try again.'))),
+      },
     ]);
 
   const header = (
     <View>
       <View style={styles.titleRow}>
         <View style={common.flex}>
-          <Text style={common.heading}>Donation Entries</Text>
-          <Text style={common.subtext}>View and manage donation transactions.</Text>
+          <Text style={common.heading}>{t('Donation Entries')}</Text>
+          <Text style={common.subtext}>{t('View and manage donation transactions.')}</Text>
         </View>
         <Pressable style={styles.addButton} onPress={() => navigation.navigate('AddDonation')} accessibilityRole="button">
-          <Text style={styles.addButtonText}>+ Add Entry</Text>
+          <Text style={styles.addButtonText}>{t('+ Add Entry')}</Text>
         </Pressable>
       </View>
 
-      <SearchBar
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Search by donor name, member ID..."
-        autoCapitalize="none"
-        actionIcon="options-outline"
-        actionLabel="Filters"
-        onActionPress={() => Alert.alert('Filters', 'More filters coming soon.')}
-      />
+      {summary ? (
+        <View style={styles.summary}>
+          <View style={common.flex}>
+            <Text style={styles.summaryValue}>{formatINR(summary.verified_total)}</Text>
+            <Text style={styles.summaryLabel}>{t('Verified total')}</Text>
+          </View>
+          <View style={common.flex}>
+            <Text style={styles.summaryValue}>{summary.count}</Text>
+            <Text style={styles.summaryLabel}>{t('Entries')}</Text>
+          </View>
+        </View>
+      ) : null}
+
+      <SearchBar value={query} onChangeText={setQuery} placeholder="Search by donor name, member ID..." autoCapitalize="none" />
 
       <DateRangeButton label={range ? formatRange(range) : 'All dates'} onPress={() => setRangeOpen(true)} style={styles.range} />
 
@@ -153,25 +198,33 @@ function DonationEntries() {
       <AppHeader leftType="menu" rightIcons={['bell', 'avatar']} />
       <FlatList
         {...LIST_PERFORMANCE_PROPS}
-        data={data}
+        data={items}
         keyExtractor={(d) => d.id}
         contentContainerStyle={styles.list}
         ListHeaderComponent={header}
         ItemSeparatorComponent={Separator}
         keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />
-        }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[colors.primary]} tintColor={colors.primary} />}
         ListEmptyComponent={
-          <EmptyState icon={<MaterialCommunityIcons name="hand-coin-outline" size={40} color={colors.lightGold} />} text="No donations found" />
+          loading ? (
+            <ActivityIndicator color={colors.primary} style={styles.loading} />
+          ) : (
+            <EmptyState
+              icon={<MaterialCommunityIcons name={error ? 'cloud-off-outline' : 'hand-coin-outline'} size={40} color={colors.lightGold} />}
+              text={error ? "Couldn't load donations. Pull down to try again." : 'No donations found'}
+            />
+          )
         }
+        ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : undefined}
         renderItem={renderItem}
       />
 
       <DateRangeSheet
         visible={rangeOpen}
         initial={range}
-        defaultMonth={DEFAULT_MONTH}
+        defaultMonth={toIsoDay(new Date())}
         onClose={() => setRangeOpen(false)}
         onApply={(r) => {
           setRange(r);
@@ -187,11 +240,13 @@ function DonationEntries() {
           menuFor
             ? [
                 { label: 'View', icon: 'eye-outline', onPress: () => viewDonation(menuFor) },
-                {
-                  label: 'Edit',
-                  icon: 'create-outline',
-                  onPress: () => navigation.navigate('AddDonation', { donationId: menuFor.id }),
-                },
+                ...(menuFor.status !== 'Verified'
+                  ? [{ label: 'Mark Verified', icon: 'checkmark-circle-outline' as const, onPress: () => setStatus(menuFor, 'success') }]
+                  : []),
+                ...(menuFor.status === 'Pending'
+                  ? [{ label: 'Reject', icon: 'close-circle-outline' as const, danger: true, onPress: () => setStatus(menuFor, 'rejected') }]
+                  : []),
+                { label: 'Edit', icon: 'create-outline', onPress: () => navigation.navigate('AddDonation', { donationId: Number(menuFor.id) }) },
                 { label: 'Delete', icon: 'trash-outline', danger: true, onPress: () => deleteDonation(menuFor) },
               ]
             : []
@@ -202,6 +257,7 @@ function DonationEntries() {
 }
 
 const DonationCard = memo(function DonationCard({ donation, onMenu }: { donation: Donation; onMenu: (d: Donation) => void }) {
+  const t = useT();
   const tone = colorFor(donation.donorName);
   return (
     <View style={styles.card}>
@@ -212,14 +268,14 @@ const DonationCard = memo(function DonationCard({ donation, onMenu }: { donation
         <Text style={styles.name} numberOfLines={1}>
           {donation.donorName}
         </Text>
-        <Text style={styles.meta}>Member ID: {donation.memberId}</Text>
+        <Text style={styles.meta}>{t('Member ID: {id}', { id: donation.memberId })}</Text>
         <View style={styles.metaRow}>
           <Ionicons name="calendar-outline" size={12} color={colors.mutedIcon} />
-          <Text style={styles.meta}>{formatDateTime(new Date(donation.date))}</Text>
+          <Text style={styles.meta}>{formatDate(fromIsoDay(donation.date))}</Text>
         </View>
         <View style={styles.metaRow}>
           <MaterialCommunityIcons name={modeIcon[donation.mode]} size={13} color={colors.mutedIcon} />
-          <Text style={styles.meta}>{donation.mode}</Text>
+          <Text style={styles.meta}>{`${t(donation.mode)}${donation.purpose ? ` · ${donation.purpose}` : ''}`}</Text>
         </View>
       </View>
       <View style={styles.right}>
@@ -235,8 +291,9 @@ const DonationCard = memo(function DonationCard({ donation, onMenu }: { donation
   );
 });
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   list: { padding: 16, paddingBottom: 32, flexGrow: 1 },
+  loading: { marginVertical: 24 },
 
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   addButton: {
@@ -247,6 +304,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addButtonText: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.white },
+
+  summary: { ...surface, flexDirection: 'row', gap: 12, padding: 12, marginTop: 12 },
+  summaryValue: { fontFamily: fonts.bold, fontSize: 17, color: colors.primary },
+  summaryLabel: { fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted },
 
   range: { marginTop: 10 },
   chips: { marginTop: 12, marginBottom: 14 },
@@ -261,4 +322,4 @@ const styles = StyleSheet.create({
   right: { alignItems: 'flex-end', justifyContent: 'space-between' },
   amountRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   amount: { fontFamily: fonts.bold, fontSize: 15, color: colors.textDark },
-});
+}));

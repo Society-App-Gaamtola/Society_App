@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '../../icons';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
+import { useT } from '../../i18n';
 
 type Props = {
   checked: boolean;
@@ -12,6 +13,7 @@ type Props = {
 };
 
 export default function Checkbox({ checked, onChange, label, style }: Props) {
+  const t = useT();
   return (
     <Pressable
       onPress={() => onChange(!checked)}
@@ -23,12 +25,12 @@ export default function Checkbox({ checked, onChange, label, style }: Props) {
       <View style={[styles.box, checked && styles.boxChecked]}>
         {checked ? <Ionicons name="checkmark" size={14} color={colors.white} /> : null}
       </View>
-      {typeof label === 'string' ? <Text style={styles.label}>{label}</Text> : label}
+      {typeof label === 'string' ? <Text style={styles.label}>{t(label)}</Text> : label}
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   box: {
     width: 18,
@@ -42,4 +44,4 @@ const styles = StyleSheet.create({
   },
   boxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
   label: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 13, color: colors.textDark },
-});
+}));

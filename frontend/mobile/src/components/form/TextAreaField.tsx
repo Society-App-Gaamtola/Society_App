@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, type TextInputProps } from 'react-native';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import InputField from './InputField';
 
 type Props = Omit<TextInputProps, 'value' | 'multiline' | 'maxLength' | 'style'> & {
@@ -30,6 +30,6 @@ export default function TextAreaField({ value, maxLength, minHeight, ...rest }: 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   counter: { position: 'absolute', right: 10, bottom: 6, fontFamily: fonts.regular, fontSize: 10, color: colors.textMuted },
-});
+}));

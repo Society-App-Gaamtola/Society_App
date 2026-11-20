@@ -1,7 +1,8 @@
 import { forwardRef, useState, type ComponentRef } from 'react';
 import { Pressable, StyleSheet, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import { Ionicons, type IoniconName } from '../../icons';
+import { useT } from '../../i18n';
 
 type Props = TextInputProps & {
   icon?: IoniconName;
@@ -14,6 +15,7 @@ const InputField = forwardRef<ComponentRef<typeof TextInput>, Props>(function In
   { icon, error, secureTextEntry, multiline, containerStyle, style, onFocus, onBlur, ...rest },
   ref,
 ) {
+  const t = useT();
   const [focused, setFocused] = useState(false);
   const [hidden, setHidden] = useState(true);
 
@@ -46,6 +48,7 @@ const InputField = forwardRef<ComponentRef<typeof TextInput>, Props>(function In
           onBlur?.(e);
         }}
         {...rest}
+        placeholder={rest.placeholder ? t(rest.placeholder) : undefined}
       />
       {secureTextEntry ? (
         <Pressable
@@ -63,7 +66,7 @@ const InputField = forwardRef<ComponentRef<typeof TextInput>, Props>(function In
 
 export default InputField;
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -88,4 +91,4 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   inputMultiline: { height: undefined, minHeight: 86 },
-});
+}));

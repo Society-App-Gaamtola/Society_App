@@ -4,7 +4,6 @@ import { Suspense, useEffect, useState, type FormEvent, type ReactNode } from 'r
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { toast } from 'sonner';
 import {
   BarChart3,
   Bell,
@@ -15,6 +14,7 @@ import {
   ImageIcon,
   KeyRound,
   LayoutDashboard,
+  Loader2,
   LogOut,
   Megaphone,
   Menu,
@@ -25,9 +25,15 @@ import {
   Users,
 } from 'lucide-react';
 import { useDashboardStats } from '@/hooks/useDashboard';
-import { useSettings } from '@/hooks/useSettings';
-import { clearSession, getSession } from '@/lib/session';
+import { useAppSettings } from '@/hooks/useFinance';
+import { endNavigation, startNavigation, useNavigate, usePendingPath } from '@/lib/navigation';
+import { getSession } from '@/lib/session';
+import { ChangePasswordDialog } from './forms/ChangePasswordDialog';
+import { useMyProfile } from '@/hooks/useAccount';
+import { useLogout } from '@/hooks/useLogout';
 import { cn } from '@/lib/utils';
+import { PageSkeleton } from './common';
+import { LoadingBar } from './LoadingBar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/primitives';
 
 const NAV = [
@@ -47,7 +53,7 @@ const GUJARATI_NAME = 'શ્રી ગામટોળા યુવક મિત
 const DEFAULT_NAME = 'Shri Gamtola Yuvak Mitra Mandal';
 
 function Notifications() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { data } = useDashboardStats();
   const items = data
     ? [
@@ -73,7 +79,7 @@ function Notifications() {
         <div className="px-3 py-2 text-xs font-semibold text-muted-foreground">Waiting for you</div>
         {items.length ? (
           items.map((i) => (
-            <DropdownMenuItem key={i.href} onSelect={() => router.push(i.href)}>
+            <DropdownMenuItem key={i.href} onSelect={() => navigate(i.href)}>
               <span className="font-semibold text-maroon">{i.count}</span> {i.label}
             </DropdownMenuItem>
           ))
@@ -87,9 +93,15 @@ function Notifications() {
 
 function TopBar({ onMenu }: { onMenu: () => void }) {
   const router = useRouter();
+  const navigate = useNavigate();
   const pathname = usePathname();
   const [query, setQuery] = useState('');
-  const { data: settings } = useSettings();
+  const [changingPassword, setChangingPassword] = useState(false);
+  const logout = useLogout();
+  // The admin's name comes from GET /auth/profile (cached), so an edit on the Profile page shows here at once
+  const { data: profile } = useMyProfile();
+  const { data } = useAppSettings();
+  const settings = data?.settings;
 
   const onSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -102,18 +114,19 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
       <button type="button" className="lg:hidden" onClick={onMenu} aria-label="Open menu">
         <Menu className="h-6 w-6" />
       </button>
-      <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 border-[#F5D58A] bg-white lg:h-[72px] lg:w-[72px] lg:translate-y-3">
-        {settings?.logo ? (
+      {/* Fits inside the 64px header (it used to hang below it into the sidebar) */}
+      <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full border-2 border-[#F5D58A] bg-white shadow-sm lg:h-[52px] lg:w-[52px]">
+        {settings?.logo_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={settings.logo} alt="Society logo" className="h-full w-full object-cover" />
+          <img src={settings.logo_url} alt="Society logo" className="h-full w-full object-cover" />
         ) : (
-          <Image src="/logo.png" alt="Society logo" fill sizes="72px" className="object-cover" priority />
+          <Image src="/logo.png" alt="Society logo" fill sizes="52px" className="object-cover" priority />
         )}
       </span>
       <div className="hidden min-w-0 leading-tight sm:block">
-        {settings?.showGujaratiName !== false ? <div className="truncate font-gujarati text-lg font-bold">{GUJARATI_NAME}</div> : null}
-        <div className={cn('truncate', settings?.showGujaratiName !== false ? 'text-sm text-white/90' : 'text-lg font-bold')}>
-          {settings?.societyName || DEFAULT_NAME}
+        {settings?.show_gujarati_name !== false ? <div className="truncate font-gujarati text-lg font-bold">{GUJARATI_NAME}</div> : null}
+        <div className={cn('truncate', settings?.show_gujarati_name !== false ? 'text-sm text-white/90' : 'text-lg font-bold')}>
+          {settings?.society_name || DEFAULT_NAME}
         </div>
       </div>
 
@@ -136,34 +149,33 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
             <User className="h-5 w-5" />
           </span>
           <span className="hidden text-left leading-tight sm:block">
-            <span className="block text-sm font-semibold">Admin</span>
+            <span className="block text-sm font-semibold">{profile?.username || getSession()?.name || 'Admin'}</span>
             <span className="block text-xs text-white/80">Super Admin</span>
           </span>
           <ChevronDown className="h-4 w-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => toast('Profile is coming soon.')}>
+          <DropdownMenuItem onSelect={() => navigate('/profile')}>
             <User className="h-4 w-4" /> Profile
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => toast('Change Password is coming soon.')}>
+          <DropdownMenuItem onSelect={() => setChangingPassword(true)}>
             <KeyRound className="h-4 w-4" /> Change Password
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() => {
-              clearSession();
-              router.replace('/login');
-            }}
-          >
+          <DropdownMenuItem onSelect={logout.run} disabled={logout.busy}>
             <LogOut className="h-4 w-4" /> Logout
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <ChangePasswordDialog open={changingPassword} onOpenChange={setChangingPassword} />
     </header>
   );
 }
 
 function SideBar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
+  // The clicked item lights up at once (with a spinner) while its page opens
+  const pendingPath = usePendingPath();
+  const current = pendingPath ?? pathname;
   return (
     <>
       {open ? <div className="fixed inset-0 z-20 bg-black/40 lg:hidden" onClick={onClose} /> : null}
@@ -175,7 +187,8 @@ function SideBar({ open, onClose }: { open: boolean; onClose: () => void }) {
         )}
       >
         {NAV.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(`${href}/`);
+          const active = current === href || current.startsWith(`${href}/`);
+          const opening = pendingPath !== null && active;
           return (
             <Link
               key={href}
@@ -189,6 +202,7 @@ function SideBar({ open, onClose }: { open: boolean; onClose: () => void }) {
             >
               <Icon className="h-[18px] w-[18px]" />
               {label}
+              {opening ? <Loader2 className="ml-auto h-4 w-4 animate-spin" aria-label="Opening" /> : null}
             </Link>
           );
         })}
@@ -201,6 +215,25 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const pathname = usePathname();
+  const pendingPath = usePendingPath();
+
+  // The new page is on screen: stop the loading state
+  useEffect(() => endNavigation(), [pathname]);
+
+  // Any click on a link to another admin page shows the loading state at once (sidebar, table rows, back links).
+  // Capture phase: runs before Next's <Link>, which cancels the click (preventDefault) to navigate itself
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = (event.target as HTMLElement).closest('a');
+      if (!link || link.target || link.hasAttribute('download')) return;
+      const url = new URL(link.href, window.location.href);
+      if (url.origin === window.location.origin && url.pathname !== window.location.pathname) startNavigation(url.pathname);
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, []);
 
   // UI-only protection: the session lives in localStorage until real auth exists.
   useEffect(() => {
@@ -213,9 +246,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-[#FAF6F0]">
       <TopBar onMenu={() => setMenuOpen(true)} />
+      <LoadingBar navigating={pendingPath !== null} />
       <SideBar open={menuOpen} onClose={() => setMenuOpen(false)} />
       <main className="p-4 pt-[84px] sm:p-6 sm:pt-[88px] lg:pl-[254px]">
-        <Suspense fallback={null}>{children}</Suspense>
+        {/* While a new page opens, its skeleton replaces the old page at once (the old page stays mounted, hidden) */}
+        {pendingPath !== null ? <PageSkeleton /> : null}
+        <div className={pendingPath !== null ? 'hidden' : undefined}>
+          <Suspense fallback={<PageSkeleton />}>{children}</Suspense>
+        </div>
       </main>
     </div>
   );

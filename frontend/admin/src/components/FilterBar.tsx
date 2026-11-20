@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { RotateCcw, Search } from 'lucide-react';
 import { useUrlState } from '@/hooks/useUrlState';
-import { DateRangePicker } from './common';
+import { PeriodFilter } from './PeriodFilter';
 import { Button, Input, NativeSelectTrigger, Select, SelectOptions } from './ui/primitives';
 
 const DEBOUNCE_MS = 400;
@@ -49,7 +49,8 @@ export function FilterBar({
           className="pl-9"
         />
       </div>
-      {dateRange ? <DateRangePicker /> : null}
+      {/* All time / Year / Month (with ‹ › to step months) / Custom: the same from / to in the URL */}
+      {dateRange ? <PeriodFilter /> : null}
       {selects.map((select) => (
         <Select
           key={select.name}

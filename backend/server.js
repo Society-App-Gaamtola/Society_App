@@ -2,19 +2,27 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import pool from "./config/db.js";
+import db from "./config/db.js";
 import Codes from "./config/status_codes.js";
 import middleware from "./middleware/middleware.js";
 import authRoutes from "./modules/v1/routes/authRoute.js";
 import userRoutes from "./modules/v1/routes/userRoute.js";
+import executiveRoutes from "./modules/v1/routes/executiveRoute.js";
+import adminRoutes from "./modules/v1/routes/adminRoute.js";
 import startCronJobs from "./config/cron.js";
 import constant from "./config/constant.js";
 
 const PORT = constant.PORT;
 const app = express();
 
+// Render puts a proxy in front: take the visitor's IP from X-Forwarded-For (activity log)
+app.set("trust proxy", 1);
+
+// Health check for Render / uptime monitors: no api-key, no database
+app.get("/health", (req, res) => res.json({ status: "ok" }));
+
 app.use(cors({
-  origin: constant.ADMIN_PANEL_URL,
+  origin: constant.ADMIN_PANEL_URL, 
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
@@ -35,6 +43,8 @@ app.use(middleware.tokenMiddleware);
 // API Routes
 app.use("/api/v1/auth/", authRoutes);
 app.use("/api/v1/user/", userRoutes);
+app.use("/api/v1/executive/", executiveRoutes);
+app.use("/api/v1/admin/", adminRoutes);
 
 // Bad JSON / rejected uploads / unexpected errors → JSON response instead of Express's HTML page
 app.use((err, req, res, next) => {
@@ -51,9 +61,7 @@ app.use((err, req, res, next) => {
 // Test database connection
 async function testDbConnection() {
   try {
-    const connection = await pool.getConnection();
-    await connection.ping();
-    connection.release();
+    await db.query("SELECT 1");
     console.log("✓ Database connection established successfully");
     return true;
   } catch (error) {
@@ -71,13 +79,27 @@ async function startServer() {
     }
 
     startCronJobs();
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`✓ Server is running on port ${PORT}`);
     });
+
+    // On a redeploy Render sends SIGTERM: stop taking new requests, let the open ones finish, then close the pool
+    const shutdown = (signal) => {
+      console.log(`${signal} received, shutting down`);
+      setTimeout(() => process.exit(0), constant.SHUTDOWN_TIMEOUT_MS).unref();
+      server.close(() => db.pool.end().finally(() => process.exit(0)));
+    };
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+    process.on("SIGINT", () => shutdown("SIGINT"));
   } catch (error) {
     console.error("Error starting server:", error);
     process.exit(1);
   }
 }
+
+// A forgotten await somewhere is logged instead of stopping the server for everyone
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection:", reason);
+});
 
 startServer();

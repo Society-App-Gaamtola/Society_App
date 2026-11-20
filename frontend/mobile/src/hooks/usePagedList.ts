@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Pagination } from '../api/user';
+import { useLanguage } from '../i18n';
 
 export type Page<T> = { items: T[]; pagination: Pagination };
 
@@ -50,9 +51,11 @@ export function usePagedList<T>(fetchPage: (page: number) => Promise<Page<T>>) {
     [fetchPage],
   );
 
+  // Reloaded when the app language changes too: category names and messages come from the server in that language
+  const language = useLanguage();
   useEffect(() => {
     load(1, 'first');
-  }, [load]);
+  }, [load, language]);
 
   const loadMore = useCallback(() => {
     if (hasMore && !loading && !loadingMore && !refreshing) load(page + 1, 'more');

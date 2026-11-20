@@ -3,23 +3,24 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as authApi from '../api/auth';
 import { common, surface } from '../styles/common';
-import { colors, fonts, tones } from '../theme';
+import { colors, fonts, tones, themedStyles } from '../theme';
 import { useFormErrors } from '../hooks/useFormErrors';
 import { Ionicons } from '../icons';
 import { showToast } from '../utils/toast';
 import { MIN_PASSWORD_LENGTH } from '../utils/validation';
 import { AppHeader, FormField, IconCircle, InputField, KeyboardAvoid, PrimaryButton } from '../components';
+import { useT } from '../i18n';
 
 type Field = 'current' | 'next' | 'confirm';
 
 const API_FIELDS: Record<string, Field> = { old_password: 'current', new_password: 'next', confirm_password: 'confirm' };
 
 const STRENGTH = [
-  { label: 'Too short', color: colors.danger },
-  { label: 'Weak', color: colors.danger },
-  { label: 'Fair', color: colors.warning },
-  { label: 'Good', color: tones.success.text },
-  { label: 'Strong', color: tones.success.text },
+  { label: 'Too short', get color() { return colors.danger; } },
+  { label: 'Weak', get color() { return colors.danger; } },
+  { label: 'Fair', get color() { return colors.warning; } },
+  { label: 'Good', get color() { return tones.success.text; } },
+  { label: 'Strong', get color() { return tones.success.text; } },
 ];
 
 /** 0 = too short, 4 = strong. Only the length is required; the rest is advice. */
@@ -30,6 +31,7 @@ const strengthOf = (password: string) => {
 };
 
 function Rule({ met, text }: { met: boolean; text: string }) {
+  const t = useT();
   return (
     <View style={styles.rule}>
       <Ionicons
@@ -37,12 +39,13 @@ function Rule({ met, text }: { met: boolean; text: string }) {
         size={16}
         color={met ? tones.success.text : colors.mutedIcon}
       />
-      <Text style={[styles.ruleText, met && styles.ruleMet]}>{text}</Text>
+      <Text style={[styles.ruleText, met && styles.ruleMet]}>{t(text)}</Text>
     </View>
   );
 }
 
 export default function ChangePasswordScreen() {
+  const t = useT();
   const navigation = useNavigation();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -61,7 +64,7 @@ export default function ChangePasswordScreen() {
   const onSave = async () => {
     const found: typeof errors = {};
     if (!current) found.current = 'Please enter your current password.';
-    if (next.length < MIN_PASSWORD_LENGTH) found.next = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+    if (next.length < MIN_PASSWORD_LENGTH) found.next = t('Password must be at least {n} characters.', { n: MIN_PASSWORD_LENGTH });
     else if (next === current) found.next = 'New password must be different from the current one.';
     if (confirm !== next) found.confirm = 'Passwords do not match.';
     setErrors(found);
@@ -89,8 +92,8 @@ export default function ChangePasswordScreen() {
               <Ionicons name="key-outline" size={26} color={tones.warning.text} />
             </IconCircle>
             <View style={common.flex}>
-              <Text style={common.heading}>Change Password</Text>
-              <Text style={common.subtextRelaxed}>Your other devices will be logged out. You stay logged in here.</Text>
+              <Text style={common.heading}>{t('Change Password')}</Text>
+              <Text style={common.subtextRelaxed}>{t('Your other devices will be logged out. You stay logged in here.')}</Text>
             </View>
           </View>
 
@@ -130,7 +133,7 @@ export default function ChangePasswordScreen() {
                       />
                     ))}
                   </View>
-                  <Text style={[styles.meterLabel, { color: STRENGTH[strength]!.color }]}>{STRENGTH[strength]!.label}</Text>
+                  <Text style={[styles.meterLabel, { color: STRENGTH[strength]!.color }]}>{t(STRENGTH[strength]!.label)}</Text>
                 </View>
               ) : null}
             </FormField>
@@ -150,11 +153,11 @@ export default function ChangePasswordScreen() {
           </View>
 
           <View style={styles.rules}>
-            <Text style={styles.rulesTitle}>Your new password</Text>
-            <Rule met={rules.length} text={`Has at least ${MIN_PASSWORD_LENGTH} characters`} />
+            <Text style={styles.rulesTitle}>{t('Your new password')}</Text>
+            <Rule met={rules.length} text={t('Has at least {n} characters', { n: MIN_PASSWORD_LENGTH })} />
             <Rule met={rules.different} text="Is different from your current password" />
             <Rule met={rules.match} text="Matches the confirmation" />
-            <Text style={styles.tip}>Tip: mix upper and lower case letters, numbers and symbols for a stronger password.</Text>
+            <Text style={styles.tip}>{t('Tip: mix upper and lower case letters, numbers and symbols for a stronger password.')}</Text>
           </View>
 
           <PrimaryButton
@@ -170,7 +173,7 @@ export default function ChangePasswordScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   scroll: { padding: 16, paddingBottom: 32 },
   intro: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 18 },
   card: { ...surface, borderRadius: 14, padding: 14 },
@@ -196,4 +199,4 @@ const styles = StyleSheet.create({
   tip: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, color: colors.textMuted, marginTop: 4 },
   button: { marginTop: 22 },
   faded: { opacity: 0.6 },
-});
+}));

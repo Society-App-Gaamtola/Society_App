@@ -4,21 +4,18 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { HomeStackParamList, RootStackParamList } from '../navigation/types';
 import { common } from '../styles/common';
-import { colors, fonts, tones, type Language } from '../theme';
+import { colors, fonts, tones, type Language, themedStyles } from '../theme';
 import { APP_VERSION, SOCIETY_NAME } from '../config';
 import { useAuth } from '../context/AuthContext';
-import { getAppLanguage, setAppLanguage } from '../i18n';
+import { setAppLanguage, useLanguage, useT } from '../i18n';
+import { languages as LANGUAGE_LIST } from '../i18n/strings';
 import { Ionicons } from '../icons';
 import { AppHeader, OutlineButton } from '../components';
 import MenuGroup, { type MenuItem } from '../components/profile/MenuGroup';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList & RootStackParamList>;
 
-const LANGUAGES: { code: Language; label: string }[] = [
-  { code: 'gu', label: 'ગુજરાતી' },
-  { code: 'hi', label: 'हिंदी' },
-  { code: 'en', label: 'English' },
-];
+const LANGUAGES: { code: Language; label: string }[] = LANGUAGE_LIST.map(({ code, native }) => ({ code, label: native }));
 
 type AlertKey = 'events' | 'notices' | 'payments';
 const ALERTS: { key: AlertKey; label: string; hint: string }[] = [
@@ -27,25 +24,25 @@ const ALERTS: { key: AlertKey; label: string; hint: string }[] = [
   { key: 'payments', label: 'Payment updates', hint: 'Donation receipts and status' },
 ];
 
-const switchColors = { trackColor: { true: colors.primary, false: colors.border }, thumbColor: colors.white };
+const switchColors = () => ({ trackColor: { true: colors.primary, false: colors.border }, thumbColor: colors.white });
 
 export default function SettingsScreen() {
+  const t = useT();
   const navigation = useNavigation<Nav>();
   const { signOut } = useAuth();
-  const [language, setLanguage] = useState<Language>(getAppLanguage());
+  const language = useLanguage();
   // Sample switches until notification preferences are saved on the server.
   const [alerts, setAlerts] = useState<Record<AlertKey, boolean>>({ events: true, notices: true, payments: true });
 
   const toggle = (key: AlertKey) => setAlerts((a) => ({ ...a, [key]: !a[key] }));
 
   const chooseLanguage = (code: Language) => {
-    setLanguage(code);
     setAppLanguage(code).catch(() => {});
   };
 
   const logout = () =>
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('Logout'), t('Are you sure you want to logout?'), [
+      { text: t('Cancel'), style: 'cancel' },
       {
         text: 'Logout',
         style: 'destructive',
@@ -76,7 +73,7 @@ export default function SettingsScreen() {
     hint,
     icon: 'notifications-outline',
     tone: tones.success,
-    trailing: <Switch value={alerts[key]} onValueChange={() => toggle(key)} {...switchColors} />,
+    trailing: <Switch value={alerts[key]} onValueChange={() => toggle(key)} {...switchColors()} />,
     onPress: () => toggle(key),
   }));
 
@@ -84,11 +81,11 @@ export default function SettingsScreen() {
     <View style={common.screen}>
       <AppHeader leftType="back" rightIcons={['bell', 'avatar']} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={common.heading}>Settings</Text>
+        <Text style={common.heading}>{t('Settings')}</Text>
 
         <MenuGroup title="Account" items={account} />
         <MenuGroup title="Language" items={languages} />
-        <Text style={styles.hint}>Used for event names, categories and messages from the server.</Text>
+        <Text style={styles.hint}>{t('The whole app, categories and messages from the server switch at once.')}</Text>
         <MenuGroup title="Notifications" items={notifications} />
 
         <View style={styles.about}>
@@ -102,10 +99,10 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   content: { padding: 16, paddingBottom: 32, gap: 4 },
   hint: { fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted, marginTop: -4, marginBottom: 4, marginLeft: 2 },
   about: { alignItems: 'center', paddingVertical: 20 },
   aboutName: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textDark },
   aboutVersion: { fontFamily: fonts.regular, fontSize: 12, color: colors.textMuted, marginTop: 2 },
-});
+}));

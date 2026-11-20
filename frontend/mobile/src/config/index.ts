@@ -33,20 +33,15 @@ export const CLOUDINARY = {
 /** Photos and videos (Cloudinary Free plan limits per file). */
 export const MEDIA = {
   maxBytes: { image: 10 * 1024 * 1024, video: 100 * 1024 * 1024 },
-  /** Photos are shrunk to this many pixels on the longest side before upload. */
-  maxImageSide: 2048,
-  imageQuality: 0.8,
+  /** Photos are shrunk to this many pixels on the longest side before upload: the full-screen viewer never shows more. */
+  maxImageSide: 1600,
+  /** JPEG quality after shrinking: a phone photo ends up around 300–600KB. */
+  imageQuality: 0.7,
   /** How many gallery files can be picked at once. */
   maxPick: 10,
 } as const;
 
 export const APP_VERSION = '1.0.0';
-
-/**
- * The society's UPI ID for donations. Left empty until the admin gives the real one:
- * paying to a made-up ID could send money to a stranger, so the Donate screen won't open UPI without it.
- */
-export const SOCIETY_UPI_ID: string = '';
 
 /** Amounts offered as one-tap choices on the Donate screen. */
 export const DONATION_PRESETS = [501, 1001, 2501, 5001, 11000];
@@ -57,11 +52,6 @@ export const MAX_PAGE_SIZE = 50;
 export const STORAGE_KEYS = {
   language: 'app_language',
   deviceId: 'device_id',
-  executiveRequestStatus: 'executive_request_status',
-  executiveEvents: 'executive_events',
-  donations: 'donations',
-  reports: 'reports',
-  myDonations: 'my_donations',
 } as const;
 
 export const REPORT_MIME_TYPES: Record<ReportFormat, string> = {

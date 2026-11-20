@@ -5,11 +5,12 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { LOGO, SOCIETY_NAME_GU_TWO_LINES } from '../config';
 import { common } from '../styles/common';
-import { colors, fonts, spacing } from '../theme';
+import { colors, fonts, spacing, themedStyles } from '../theme';
 import { useAuth } from '../context/AuthContext';
 import { resetAfterLogin } from '../navigation/navigationRef';
 import { sineLoop } from '../utils/animation';
 import { CornerOrnament, GoldDivider, Lotus, TopOrnament } from '../components/ui/Ornaments';
+import { useT } from '../i18n';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
 
@@ -32,6 +33,7 @@ const riseStyle = (value: Animated.Value) => ({
 });
 
 export default function SplashScreen({ navigation }: Props) {
+  const t = useT();
   const { user } = useAuth();
   const ornaments = useRef(new Animated.Value(0)).current;
   const logo = useRef(new Animated.Value(0)).current;
@@ -109,7 +111,7 @@ export default function SplashScreen({ navigation }: Props) {
           </View>
 
           <Animated.Text style={[styles.title, riseStyle(title)]}>{SOCIETY_NAME_GU_TWO_LINES}</Animated.Text>
-          <Animated.Text style={[styles.subtitle, riseStyle(subtitle)]}>Society Cultural Activity App</Animated.Text>
+          <Animated.Text style={[styles.subtitle, riseStyle(subtitle)]}>{t('Society Cultural Activity App')}</Animated.Text>
           <Animated.View style={[styles.divider, riseStyle(divider)]}>
             <GoldDivider />
           </Animated.View>
@@ -132,7 +134,7 @@ export default function SplashScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: { flex: 1, alignItems: 'center' },
   topOrnament: { marginTop: spacing.sm },
   content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg },
@@ -174,4 +176,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   lotus: { marginBottom: spacing.lg },
-});
+}));

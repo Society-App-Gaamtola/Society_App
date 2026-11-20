@@ -4,6 +4,7 @@ import {
   Animated,
   Easing,
   Image,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -18,8 +19,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LOGO, SOCIETY_NAME_GU } from '../../config';
 import { canViewExpenses, hasPermission, useAuth } from '../../context/AuthContext';
 import { Ionicons, type IoniconName } from '../../icons';
+import { getAppInfo, type ApiAppInfo, type SocialNetwork } from '../../api/user';
 import type { HomeStackParamList, RootStackParamList } from '../../navigation/types';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
+import { useT } from '../../i18n';
 
 type DrawerContextValue = { open: () => void };
 
@@ -80,7 +83,24 @@ export function SideDrawerProvider({ children }: { children: ReactNode }) {
   );
 }
 
+const SOCIAL_ICON: Record<SocialNetwork, IoniconName> = {
+  facebook: 'logo-facebook',
+  instagram: 'logo-instagram',
+  x: 'logo-x',
+  youtube: 'logo-youtube',
+};
+const SOCIAL_LABEL: Record<SocialNetwork, string> = { facebook: 'Facebook', instagram: 'Instagram', x: 'X', youtube: 'YouTube' };
+
 function DrawerPanel({ progress, onClose }: { progress: Animated.Value; onClose: (after?: () => void) => void }) {
+  const t = useT();
+  // The society's pages (admin panel → App Settings → Social Networking), read each time the menu opens,
+  // so a changed link is used at once
+  const [social, setSocial] = useState<ApiAppInfo['social_links']>([]);
+  useEffect(() => {
+    getAppInfo()
+      .then(({ data }) => setSocial(data.social_links))
+      .catch(() => {});
+  }, []);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -96,6 +116,8 @@ function DrawerPanel({ progress, onClose }: { progress: Animated.Value; onClose:
     { label: 'My Donations', icon: 'heart-outline', target: 'MyDonations' },
     { label: 'Member Directory', icon: 'people-outline', target: 'MemberDirectory' },
     { label: 'My Events', icon: 'calendar-number-outline', target: 'MyEvents', hidden: !hasPermission(user, 'events') },
+    { label: 'My Notices', icon: 'document-text-outline', target: 'MyNotices', hidden: !hasPermission(user, 'notices') },
+    { label: 'Media Approval', icon: 'images-outline', target: 'MediaApproval', hidden: !hasPermission(user, 'media') },
     // Executives already have the role
     { label: 'Executive Request', icon: 'ribbon-outline', target: 'ExecutiveRequest', hidden: isExecutive },
     { label: 'Donation Entries', icon: 'cash-outline', target: 'DonationEntries', hidden: !hasPermission(user, 'donations') },
@@ -114,10 +136,10 @@ function DrawerPanel({ progress, onClose }: { progress: Animated.Value; onClose:
     );
 
   const logout = () =>
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('Logout'), t('Are you sure you want to logout?'), [
+      { text: t('Cancel'), style: 'cancel' },
       {
-        text: 'Logout',
+        text: t('Logout'),
         style: 'destructive',
         onPress: () =>
           onClose(async () => {
@@ -146,8 +168,9 @@ function DrawerPanel({ progress, onClose }: { progress: Animated.Value; onClose:
           <View style={styles.logoCircle}>
             <Image source={LOGO} style={styles.logo} resizeMode="contain" />
           </View>
-          <Text style={styles.name}>{user?.name ?? 'Guest'}</Text>
-          {user?.memberId ? <Text style={styles.memberId}>Member ID: {user.memberId}</Text> : null}
+          <Text style={styles.name}>{user?.name ?? t('Guest')}</Text>
+          {user ? <Text style={styles.memberType}>{t(user.roleLabel)}</Text> : null}
+          {user?.memberId ? <Text style={styles.memberId}>{t('Member ID: {id}', { id: user.memberId })}</Text> : null}
         </View>
 
         <ScrollView contentContainerStyle={styles.links}>
@@ -161,9 +184,29 @@ function DrawerPanel({ progress, onClose }: { progress: Animated.Value; onClose:
                 accessibilityRole="button"
               >
                 <Ionicons name={link.icon} size={20} color={colors.primary} />
-                <Text style={styles.linkText}>{link.label}</Text>
+                <Text style={styles.linkText}>{t(link.label)}</Text>
               </Pressable>
             ))}
+
+          {social.length ? (
+            <View style={styles.social}>
+              <Text style={styles.socialTitle}>{t('Follow us')}</Text>
+              <View style={styles.socialRow}>
+                {social.map((link) => (
+                  <Pressable
+                    key={link.network}
+                    onPress={() => Linking.openURL(link.url).catch(() => {})}
+                    style={({ pressed }) => [styles.socialButton, pressed && styles.linkPressed]}
+                    accessibilityRole="link"
+                    accessibilityLabel={SOCIAL_LABEL[link.network]}
+                    hitSlop={6}
+                  >
+                    <Ionicons name={SOCIAL_ICON[link.network]} size={22} color={colors.primary} />
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
 
           <View style={styles.divider} />
 
@@ -173,7 +216,7 @@ function DrawerPanel({ progress, onClose }: { progress: Animated.Value; onClose:
             accessibilityRole="button"
           >
             <Ionicons name="log-out-outline" size={20} color={colors.danger} />
-            <Text style={[styles.linkText, styles.logoutText]}>Logout</Text>
+            <Text style={[styles.linkText, styles.logoutText]}>{t('Logout')}</Text>
           </Pressable>
         </ScrollView>
 
@@ -183,16 +226,16 @@ function DrawerPanel({ progress, onClose }: { progress: Animated.Value; onClose:
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   root: { flex: 1 },
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(43, 26, 18, 0.45)' },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: colors.backdropStrong },
   panel: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: colors.background },
   header: { backgroundColor: colors.primary, paddingHorizontal: 20, paddingBottom: 20 },
   logoCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.white,
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -200,8 +243,13 @@ const styles = StyleSheet.create({
   },
   logo: { width: 60, height: 60 },
   name: { fontFamily: fonts.bold, fontSize: 17, color: colors.white },
+  memberType: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.lightGold, marginTop: 2 },
   memberId: { fontFamily: fonts.regular, fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
   links: { paddingVertical: 8 },
+  social: { paddingHorizontal: 20, paddingTop: 10 },
+  socialTitle: { fontFamily: fonts.medium, fontSize: 12, color: colors.textMuted, marginBottom: 6 },
+  socialRow: { flexDirection: 'row', gap: 10 },
+  socialButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' },
   link: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingVertical: 13 },
   linkPressed: { backgroundColor: colors.tint },
   linkText: { fontFamily: fonts.medium, fontSize: 14, color: colors.textDark },
@@ -214,4 +262,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingTop: 8,
   },
-});
+}));

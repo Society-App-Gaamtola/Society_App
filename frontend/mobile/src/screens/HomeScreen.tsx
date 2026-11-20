@@ -6,12 +6,13 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { HomeStackParamList, MainTabParamList } from '../navigation/types';
 import { common, surface } from '../styles/common';
 import { useAuth } from '../context/AuthContext';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themedStyles } from '../theme';
 import { SOCIETY_NAME } from '../config';
 import { getHome, toNotice, toSocietyEvent } from '../api/user';
 import type { Notice, SocietyEvent } from '../types';
 import { Ionicons, MaterialCommunityIcons, type IoniconName } from '../icons';
 import { AppHeader, EmptyState, EventListCard, FeaturedCarousel, IconCircle, SectionHeader, StatusBadge } from '../components';
+import { useLanguage, useT } from '../i18n';
 
 type Nav = CompositeNavigationProp<
   NativeStackNavigationProp<HomeStackParamList, 'HomeMain'>,
@@ -23,6 +24,7 @@ type Home = { hero: SocietyEvent[]; upcoming: SocietyEvent[]; notices: Notice[] 
 const H_PADDING = 16;
 
 export default function HomeScreen() {
+  const t = useT();
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
   const firstName = user?.name.split(' ')[0];
@@ -31,6 +33,8 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   // Read inside openEvent, so the carousel's memoised slides don't re-render on every reload
   const homeRef = useRef<Home | null>(null);
+  // Reloaded in the new language when the user switches it (category names, dates and server messages)
+  const language = useLanguage();
 
   const load = useCallback(async () => {
     try {
@@ -47,7 +51,7 @@ export default function HomeScreen() {
       // What was loaded before stays on screen; the API client already handles expired logins.
       setError(e instanceof Error ? e.message : 'Could not load the home page.');
     }
-  }, []);
+  }, [language]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reload whenever the tab opens, so new events and notices show up without a manual refresh.
   useFocusEffect(
@@ -90,8 +94,8 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />
         }
       >
-        <Text style={styles.greeting}>{`Namaste${firstName ? `, ${firstName}` : ''} 👋`}</Text>
-        <Text style={styles.welcome}>{`Welcome to ${SOCIETY_NAME}`}</Text>
+        <Text style={styles.greeting}>{`${t('Namaste')}${firstName ? `, ${firstName}` : ''} 👋`}</Text>
+        <Text style={styles.welcome}>{t('Welcome to {name}', { name: SOCIETY_NAME })}</Text>
 
         {home && home.hero.length > 0 ? (
           <FeaturedCarousel items={home.hero} onOpen={openEvent} horizontalPadding={H_PADDING} />
@@ -103,7 +107,7 @@ export default function HomeScreen() {
               <IconCircle size={48} radius={12}>
                 <Ionicons name={s.icon} size={22} color={colors.primary} />
               </IconCircle>
-              <Text style={styles.shortcutLabel}>{s.label}</Text>
+              <Text style={styles.shortcutLabel}>{t(s.label)}</Text>
             </Pressable>
           ))}
         </View>
@@ -126,7 +130,7 @@ export default function HomeScreen() {
               {home.upcoming.map((event) => (
                 <EventListCard key={event.id} event={event} onPress={() => openEvent(event.id)} />
               ))}
-              {home.upcoming.length === 0 ? <Text style={styles.empty}>No upcoming events right now.</Text> : null}
+              {home.upcoming.length === 0 ? <Text style={styles.empty}>{t('No upcoming events right now.')}</Text> : null}
             </View>
 
             <SectionHeader title="Latest Notices" onViewAll={() => navigation.navigate('NoticeBoard')} />
@@ -150,7 +154,7 @@ export default function HomeScreen() {
                   <StatusBadge status={notice.tag} style={styles.noticeBadge} />
                 </Pressable>
               ))}
-              {home.notices.length === 0 ? <Text style={styles.empty}>No notices yet.</Text> : null}
+              {home.notices.length === 0 ? <Text style={styles.empty}>{t('No notices yet.')}</Text> : null}
             </View>
           </>
         ) : null}
@@ -158,11 +162,11 @@ export default function HomeScreen() {
         <View style={styles.donate}>
           <MaterialCommunityIcons name="hand-heart-outline" size={30} color={colors.primary} />
           <View style={styles.donateText}>
-            <Text style={styles.donateTitle}>Contribute to Society Activities</Text>
-            <Text style={styles.donateSub}>Your support helps us organize better events.</Text>
+            <Text style={styles.donateTitle}>{t('Contribute to Society Activities')}</Text>
+            <Text style={styles.donateSub}>{t('Your support helps us organize better events.')}</Text>
           </View>
           <Pressable style={styles.donateButton} onPress={() => navigation.navigate('Donate')}>
-            <Text style={styles.donateButtonText}>Donate Now</Text>
+            <Text style={styles.donateButtonText}>{t('Donate Now')}</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -170,7 +174,7 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   scroll: { paddingHorizontal: H_PADDING, paddingTop: 16, paddingBottom: 32 },
   greeting: { fontFamily: fonts.bold, fontSize: 20, color: colors.textDark },
   welcome: { fontFamily: fonts.regular, fontSize: 12, color: colors.textMuted, marginTop: 2 },
@@ -194,7 +198,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#FDEFE3',
+    backgroundColor: colors.peachTint,
     borderRadius: 12,
     padding: 12,
     marginTop: 20,
@@ -210,4 +214,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   donateButtonText: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.white },
-});
+}));

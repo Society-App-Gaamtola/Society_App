@@ -15,12 +15,10 @@ import { Poppins_600SemiBold } from '@expo-google-fonts/poppins/600SemiBold';
 import { Poppins_700Bold } from '@expo-google-fonts/poppins/700Bold';
 import RootNavigator from './src/navigation/RootNavigator';
 import { loadSavedLanguage } from './src/i18n';
+import { loadSavedTheme, useThemeMode } from './src/theme';
 import { restoreSession } from './src/services/session';
 import type { AuthUser } from './src/types';
 import { AuthProvider } from './src/context/AuthContext';
-import { EventsProvider } from './src/context/EventsContext';
-import { DonationsProvider } from './src/context/DonationsContext';
-import { ReportsProvider } from './src/context/ReportsContext';
 import { common } from './src/styles/common';
 
 ExpoSplashScreen.preventAutoHideAsync();
@@ -43,8 +41,8 @@ export default function App() {
   const [savedUser, setSavedUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
-    Promise.all([loadSavedLanguage(), restoreSession()])
-      .then(([, user]) => setSavedUser(user))
+    Promise.all([loadSavedLanguage(), loadSavedTheme(), restoreSession()])
+      .then(([, , user]) => setSavedUser(user))
       .finally(() => setSavedDataReady(true));
   }, []);
 
@@ -58,18 +56,21 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <View style={common.screen} onLayout={onLayout}>
-        <StatusBar style="dark" />
-        <AuthProvider initialUser={savedUser}>
-          <EventsProvider>
-            <DonationsProvider>
-              <ReportsProvider>
-                <RootNavigator />
-              </ReportsProvider>
-            </DonationsProvider>
-          </EventsProvider>
-        </AuthProvider>
-      </View>
+      <AuthProvider initialUser={savedUser}>
+        <ThemedApp onLayout={onLayout} />
+      </AuthProvider>
     </SafeAreaProvider>
+  );
+}
+
+// Everything that draws is below the theme key: switching the theme redraws the screens in the new colors.
+// The login (AuthProvider, above) stays, and RootNavigator returns to the same screen.
+function ThemedApp({ onLayout }: { onLayout: () => void }) {
+  const mode = useThemeMode();
+  return (
+    <View key={mode} style={common.screen} onLayout={onLayout}>
+      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
+      <RootNavigator />
+    </View>
   );
 }

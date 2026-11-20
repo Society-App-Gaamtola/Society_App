@@ -4,9 +4,8 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ProfileStackParamList, RootStackParamList } from '../navigation/types';
-import { colors, fonts, PRIMARY_GRADIENT, tones } from '../theme';
+import { colors, fonts, PRIMARY_GRADIENT, tones, themedStyles } from '../theme';
 import { canViewExpenses, useAuth } from '../context/AuthContext';
-import { MOCK_USERS } from '../data/seeds';
 import { SOCIETY_NAME_GU } from '../config';
 import { Ionicons, type IoniconName } from '../icons';
 import { surface } from '../styles/common';
@@ -14,12 +13,14 @@ import { MONTHS } from '../utils/date';
 import { AppHeader, IconCircle, Pill } from '../components';
 import ProfileAvatar from '../components/profile/ProfileAvatar';
 import MenuGroup, { type MenuItem } from '../components/profile/MenuGroup';
+import { setAppLanguage, t, useLanguage, useT } from '../i18n';
+import { languages } from '../i18n/strings';
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList & RootStackParamList>;
 
 const memberSinceLabel = (iso?: string | null) => {
   const date = iso ? new Date(iso) : null;
-  return date && !Number.isNaN(date.getTime()) ? `Member since ${MONTHS[date.getMonth()]} ${date.getFullYear()}` : null;
+  return date && !Number.isNaN(date.getTime()) ? t('Member since {date}', { date: `${t(MONTHS[date.getMonth()])} ${date.getFullYear()}` }) : null;
 };
 
 type InfoRowProps = {
@@ -33,6 +34,7 @@ type InfoRowProps = {
 };
 
 function InfoRow({ icon, label, value, badge, locked, onPress }: InfoRowProps) {
+  const t = useT();
   return (
     <Pressable
       onPress={onPress}
@@ -46,11 +48,11 @@ function InfoRow({ icon, label, value, badge, locked, onPress }: InfoRowProps) {
       </IconCircle>
       <View style={styles.infoText}>
         <View style={styles.infoLabelRow}>
-          <Text style={styles.infoLabel}>{label}</Text>
+          <Text style={styles.infoLabel}>{t(label)}</Text>
           {badge}
         </View>
         <Text style={[styles.infoValue, !value && styles.infoEmpty]} numberOfLines={2}>
-          {value || 'Not added'}
+          {value || t('Not added')}
         </Text>
       </View>
       {locked ? (
@@ -63,21 +65,20 @@ function InfoRow({ icon, label, value, badge, locked, onPress }: InfoRowProps) {
 }
 
 export default function ProfileScreen() {
+  const t = useT();
   const navigation = useNavigation<Nav>();
-  const { user, signOut, switchMockUser, refreshUser } = useAuth();
+  const { user, signOut, refreshUser } = useAuth();
+  const language = useLanguage();
   const [refreshing, setRefreshing] = useState(false);
-  // DEV test users aren't on the server, so reloading would swap them back to the real login.
-  const isMockUser = MOCK_USERS.some((u) => u.id === user?.id);
 
   // Pick up changes made elsewhere (another device, the admin panel) whenever the tab opens.
   useFocusEffect(
     useCallback(() => {
-      if (!isMockUser) refreshUser().catch(() => {});
-    }, [isMockUser, refreshUser]),
+      refreshUser().catch(() => {});
+    }, [refreshUser]),
   );
 
   const onRefresh = async () => {
-    if (isMockUser) return;
     setRefreshing(true);
     try {
       await refreshUser();
@@ -104,7 +105,7 @@ export default function ProfileScreen() {
     {
       key: 'email',
       label: 'Change Email',
-      hint: user?.email ? `Verified by OTP · ${user.email}` : 'Verified with a one-time code',
+      hint: user?.email ? `${t('Verified by OTP')} · ${user.email}` : 'Verified with a one-time code',
       icon: 'mail-outline',
       tone: tones.info,
       onPress: () => navigation.navigate('ChangeEmail'),
@@ -118,6 +119,17 @@ export default function ProfileScreen() {
       onPress: () => navigation.navigate('ChangePassword'),
     },
   ];
+
+  // Changing it here switches the whole app at once (and the language of messages from the server)
+  const languageItems: MenuItem[] = languages.map(({ code, native, label }) => ({
+    key: `lang-${code}`,
+    label: native,
+    hint: code === 'en' ? undefined : label,
+    icon: 'language-outline',
+    tone: tones.info,
+    trailing: language === code ? <Ionicons name="checkmark-circle" size={20} color={colors.primary} /> : null,
+    onPress: () => setAppLanguage(code).catch(() => {}),
+  }));
 
   const societyItems: MenuItem[] = [
     {
@@ -155,8 +167,8 @@ export default function ProfileScreen() {
   ];
 
   const logout = () =>
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('Logout'), t('Are you sure you want to logout?'), [
+      { text: t('Cancel'), style: 'cancel' },
       {
         text: 'Logout',
         style: 'destructive',
@@ -191,12 +203,12 @@ export default function ProfileScreen() {
 
           <View style={styles.heroText}>
             <Text style={styles.name} numberOfLines={2}>
-              {user?.name || 'Guest'}
+              {user?.name || t('Guest')}
             </Text>
             <View style={styles.roleRow}>
               <View style={styles.rolePill}>
                 <Ionicons name={isExecutive ? 'ribbon' : 'person'} size={11} color={colors.lightGold} />
-                <Text style={styles.roleText}>{isExecutive ? 'Executive' : 'Member'}</Text>
+                <Text style={styles.roleText}>{t(user?.roleLabel ?? 'Normal Member')}</Text>
               </View>
               {user?.memberId ? <Text style={styles.memberId}>{user.memberId}</Text> : null}
             </View>
@@ -213,8 +225,8 @@ export default function ProfileScreen() {
           >
             <Ionicons name="alert-circle-outline" size={22} color={colors.warning} />
             <View style={styles.flex}>
-              <Text style={styles.bannerTitle}>Complete your profile</Text>
-              <Text style={styles.bannerText}>Add your residential address so the committee can reach you.</Text>
+              <Text style={styles.bannerTitle}>{t('Complete your profile')}</Text>
+              <Text style={styles.bannerText}>{t('Add your residential address so the committee can reach you.')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.warning} />
           </Pressable>
@@ -222,9 +234,9 @@ export default function ProfileScreen() {
 
         {/* Personal information */}
         <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
+          <Text style={styles.sectionTitle}>{t('Personal Information')}</Text>
           <Pressable onPress={() => navigation.navigate('EditProfile')} hitSlop={8} accessibilityRole="button">
-            <Text style={styles.sectionAction}>Edit</Text>
+            <Text style={styles.sectionAction}>{t('Edit')}</Text>
           </Pressable>
         </View>
         <View style={styles.card}>
@@ -255,6 +267,7 @@ export default function ProfileScreen() {
 
         <MenuGroup title="Account & Security" items={accountItems} />
         <MenuGroup title="Society" items={societyItems} />
+        <MenuGroup title="Language" items={languageItems} />
 
         <Pressable
           onPress={logout}
@@ -262,39 +275,17 @@ export default function ProfileScreen() {
           accessibilityRole="button"
         >
           <Ionicons name="log-out-outline" size={20} color={colors.danger} />
-          <Text style={styles.logoutText}>Logout</Text>
+          <Text style={styles.logoutText}>{t('Logout')}</Text>
         </Pressable>
 
         <Text style={styles.footer}>{SOCIETY_NAME_GU}</Text>
 
-        {__DEV__ ? (
-          <View style={styles.dev}>
-            <Text style={styles.devTitle}>DEV · Switch test user</Text>
-            <View style={styles.devRow}>
-              {MOCK_USERS.map((u) => {
-                const active = user?.id === u.id;
-                return (
-                  <Pressable
-                    key={u.id}
-                    onPress={() => switchMockUser(u.id)}
-                    style={[styles.devOption, active && styles.devOptionActive]}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: active }}
-                  >
-                    <Text style={[styles.devName, active && styles.devTextActive]}>{u.name}</Text>
-                    <Text style={[styles.devRole, active && styles.devTextActive]}>{u.role}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-        ) : null}
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   screen: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: 16, paddingBottom: 32 },
   flex: { flex: 1 },
@@ -324,7 +315,7 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: colors.white,
+    backgroundColor: colors.card,
     borderWidth: 2,
     borderColor: colors.lightGold,
     alignItems: 'center',
@@ -357,7 +348,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: tones.warning.bg,
     borderWidth: 1,
-    borderColor: '#F6D3AE',
+    borderColor: colors.orangeBorder,
   },
   bannerTitle: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textDark },
   bannerText: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, color: colors.textMuted, marginTop: 1 },
@@ -383,33 +374,10 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F3C7C7',
+    borderColor: colors.dangerBorder,
     backgroundColor: tones.danger.bg,
   },
   logoutText: { fontFamily: fonts.semiBold, fontSize: 15, color: colors.danger },
   footer: { fontFamily: fonts.gujaratiRegular, fontSize: 12, color: colors.textMuted, textAlign: 'center', marginTop: 16 },
 
-  dev: {
-    marginTop: 24,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.gold,
-  },
-  devTitle: { fontFamily: fonts.semiBold, fontSize: 11, color: colors.textMuted, marginBottom: 8 },
-  devRow: { flexDirection: 'row', gap: 8 },
-  devOption: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-  },
-  devOptionActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  devName: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textDark },
-  devRole: { fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted, textTransform: 'capitalize' },
-  devTextActive: { color: colors.white },
-});
+}));

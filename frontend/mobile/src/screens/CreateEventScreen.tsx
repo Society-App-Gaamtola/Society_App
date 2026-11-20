@@ -1,18 +1,19 @@
-import { useState } from 'react';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/types';
 import { common } from '../styles/common';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themedStyles } from '../theme';
 import { MAX_UPLOAD_BYTES } from '../config';
-import { useExecEvents } from '../context/EventsContext';
+import { getEventCategories, type ApiCategory } from '../api/user';
+import { submitEvent } from '../services/eventSubmit';
 import { useFormErrors } from '../hooks/useFormErrors';
 import { Ionicons } from '../icons';
-import type { EventCategory, NewExecEvent } from '../types';
-import { formatDate, formatTime, startOfDay } from '../utils/date';
+import type { EventDraft } from '../types';
+import { formatDate, formatTime, fromIsoDay, startOfDay, toIsoDay } from '../utils/date';
 import { showToast } from '../utils/toast';
 import { digitsOnly } from '../utils/validation';
 import {
@@ -32,8 +33,16 @@ type Nav = NativeStackNavigationProp<HomeStackParamList, 'CreateEvent'>;
 type PickerMode = 'date' | 'time';
 type Field = 'title' | 'category' | 'date' | 'endDate' | 'time' | 'venue' | 'organizer' | 'contact' | 'description' | 'image';
 
-const CATEGORIES: EventCategory[] = ['Festival', 'Aarti', 'Cultural', 'Meeting'];
 const MAX_DESCRIPTION = 500;
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+/** "18:30" → a Date today at that time (for the time picker) */
+const timeToDate = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return d;
+};
 
 export default function CreateEventScreen() {
   return (
@@ -45,19 +54,32 @@ export default function CreateEventScreen() {
 
 function CreateEventForm() {
   const navigation = useNavigation<Nav>();
-  const { addEvent } = useExecEvents();
+  // A copy to start from (Duplicate in My Events) or the event being edited (editId)
+  const { params } = useRoute<RouteProp<HomeStackParamList, 'CreateEvent'>>();
+  const start = params?.draft;
+  const editId = params?.editId;
 
-  const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<EventCategory | null>(null);
-  const [date, setDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [showEndDate, setShowEndDate] = useState(false);
-  const [time, setTime] = useState<Date | null>(null);
-  const [venue, setVenue] = useState('');
-  const [organizer, setOrganizer] = useState('');
-  const [contact, setContact] = useState('');
-  const [description, setDescription] = useState('');
-  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [title, setTitle] = useState(start?.title ?? '');
+  // A draft from an Event Planning plan has no category and maybe no date yet
+  const [category, setCategory] = useState<{ id: number; name: string } | null>(start?.categoryId ? { id: start.categoryId, name: start.categoryName } : null);
+  const [date, setDate] = useState<Date | null>(start?.day ? fromIsoDay(start.day) : null);
+  const [endDate, setEndDate] = useState<Date | null>(start?.endDay ? fromIsoDay(start.endDay) : null);
+  const [showEndDate, setShowEndDate] = useState(!!start?.endDay);
+  const [time, setTime] = useState<Date | null>(start?.time ? timeToDate(start.time) : null);
+  const [venue, setVenue] = useState(start?.venue ?? '');
+  const [organizer, setOrganizer] = useState(start?.organizer ?? '');
+  const [contact, setContact] = useState(start?.contact ?? '');
+  const [description, setDescription] = useState(start?.description ?? '');
+  const [imageUri, setImageUri] = useState<string | null>(start?.imageUri ?? null);
+  const [saving, setSaving] = useState(false);
+
+  // The society's event categories (App Settings), named in the app's language
+  useEffect(() => {
+    getEventCategories()
+      .then(({ data }) => setCategories(data.categories))
+      .catch(() => {});
+  }, []);
   const { errors, setErrors, clearError, setError, fieldProps } = useFormErrors<Field>();
   // iOS shows the picker in a sheet; Android uses the native dialog.
   const [iosPicker, setIosPicker] = useState<{ mode: PickerMode; value: Date; onPick: (d: Date) => void } | null>(null);
@@ -96,18 +118,19 @@ function CreateEventForm() {
     setImageUri(asset.uri);
   };
 
-  const buildEvent = (status: NewExecEvent['status']): NewExecEvent => ({
+  const buildDraft = (): EventDraft => ({
     title: title.trim(),
-    category: category ?? 'Festival',
-    date: date ? formatDate(date) : '',
-    endDate: endDate ? formatDate(endDate) : undefined,
-    time: time ? formatTime(time) : undefined,
+    categoryId: category?.id ?? 0,
+    categoryName: category?.name ?? '',
+    day: date ? toIsoDay(date) : '',
+    endDay: endDate ? toIsoDay(endDate) : undefined,
+    time: time ? `${pad2(time.getHours())}:${pad2(time.getMinutes())}` : '',
     venue: venue.trim(),
     organizer: organizer.trim(),
     contact: contact.trim(),
     description: description.trim(),
     imageUri: imageUri ?? undefined,
-    status,
+    planId: editId ? undefined : start?.planId,
   });
 
   const validate = () => {
@@ -122,18 +145,33 @@ function CreateEventForm() {
     if (!contact.trim()) next.contact = 'Please enter a contact number.';
     else if (digitsOnly(contact).length < 10) next.contact = 'Enter a valid contact number.';
     if (!description.trim()) next.description = 'Please enter a description.';
-    if (!imageUri) next.image = 'Please upload an event banner.';
     setErrors(next);
     return Object.keys(next).length === 0;
   };
 
-  const onSaveDraft = () => {
-    if (!title.trim()) {
-      setError('title', 'Add a title to save the draft.');
+  // A draft is saved on the server too, so it needs the basics: title, category, date, time and venue
+  const onSaveDraft = async () => {
+    const next: typeof errors = {};
+    if (!title.trim()) next.title = 'Please enter the event title.';
+    if (!category) next.category = 'Please select a category.';
+    if (!date) next.date = 'Select a date.';
+    if (!time) next.time = 'Select a time.';
+    if (!venue.trim()) next.venue = 'Please enter the venue.';
+    setErrors(next);
+    if (Object.keys(next).length) {
+      showToast('Add the title, category, date, time and venue to save a draft');
       return;
     }
-    addEvent(buildEvent('Draft'));
-    showToast('Draft saved');
+    setSaving(true);
+    try {
+      const { message } = await submitEvent(buildDraft(), 'draft', { editId });
+      showToast(message);
+      navigation.navigate('MyEvents');
+    } catch (e) {
+      Alert.alert('Could not save the draft', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const onNext = () => {
@@ -141,7 +179,7 @@ function CreateEventForm() {
       showToast('Please fill all required fields');
       return;
     }
-    navigation.navigate('EventPreview', { event: buildEvent('Draft') });
+    navigation.navigate('EventPreview', { event: buildDraft(), editId });
   };
 
   return (
@@ -149,7 +187,7 @@ function CreateEventForm() {
       <AppHeader leftType="back" rightIcons={['bell', 'avatar']} />
       <KeyboardAvoid>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Text style={common.heading}>Create New Event</Text>
+          <Text style={common.heading}>{editId ? 'Edit Event' : 'Create New Event'}</Text>
           <Text style={styles.subtext}>Fill in the event details. Event will be visible to members after publishing.</Text>
 
           <FormField label="Event Title" error={errors.title}>
@@ -158,20 +196,20 @@ function CreateEventForm() {
 
           <FormField label="Event Category" error={errors.category}>
             <View style={styles.chips}>
-              {CATEGORIES.map((c) => {
-                const active = c === category;
+              {categories.map((c) => {
+                const active = c.id === category?.id;
                 return (
                   <Pressable
-                    key={c}
+                    key={c.id}
                     onPress={() => {
-                      setCategory(c);
+                      setCategory({ id: c.id, name: c.name });
                       clearError('category');
                     }}
                     style={[styles.chip, active && styles.chipActive]}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: active }}
                   >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{c}</Text>
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{c.name}</Text>
                   </Pressable>
                 );
               })}
@@ -286,7 +324,7 @@ function CreateEventForm() {
             />
           </FormField>
 
-          <FormField label="Event Banner / Image" error={errors.image}>
+          <FormField label="Event Banner / Image" required={false} error={errors.image}>
             {imageUri ? (
               <View style={styles.preview}>
                 <Image source={{ uri: imageUri }} style={styles.previewImage} />
@@ -300,7 +338,7 @@ function CreateEventForm() {
           </FormField>
         </ScrollView>
 
-        <FormActionBar onSaveDraft={onSaveDraft} primaryTitle="Next →" onPrimary={onNext} />
+        <FormActionBar onSaveDraft={onSaveDraft} primaryTitle="Next →" onPrimary={onNext} busy={saving} />
       </KeyboardAvoid>
 
       {iosPicker ? (
@@ -319,14 +357,14 @@ function CreateEventForm() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   scroll: { padding: 16, paddingBottom: 24 },
   subtext: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, color: colors.textMuted, marginTop: 2, marginBottom: 16 },
   row: { flexDirection: 'row', gap: 10 },
 
-  chips: { flexDirection: 'row', gap: 8 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
-    flex: 1,
+    paddingHorizontal: 14,
     height: 36,
     borderRadius: 8,
     borderWidth: 1,
@@ -365,4 +403,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

@@ -1,5 +1,5 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
-import type { AppNotification, NewExecEvent, Notice, SocietyEvent } from '../types';
+import type { AppNotification, EventDraft, Notice, SocietyEvent } from '../types';
 
 /** Screens pushed inside a tab so the bottom tab bar stays visible. */
 export type SharedStackParams = {
@@ -11,20 +11,28 @@ export type SharedStackParams = {
   EditProfile: undefined;
   ChangePassword: undefined;
   ChangeEmail: undefined;
-  CreateEvent: undefined;
+  /** draft: a copy to start from (duplicate) or the event being edited (editId) */
+  CreateEvent: { draft?: EventDraft; editId?: number } | undefined;
   MyEvents: undefined;
-  EventPreview: { event: NewExecEvent };
+  EventPreview: { event: EventDraft; editId?: number };
+  /** noticeId: edit that notice (own, any status) */
+  PostNotice: { noticeId?: number } | undefined;
+  MyNotices: undefined;
+  EventPlanning: undefined;
+  /** expenseId: edit that expense. categories: the society's list, passed by Society Expenses */
+  AddExpense: { expenseId?: number; categories?: string[] } | undefined;
+  MediaApproval: undefined;
   DonationEntries: undefined;
-  AddDonation: { donationId?: string } | undefined;
+  AddDonation: { donationId?: number } | undefined;
   FinancialReports: undefined;
   ExportReports: undefined;
-  /** `notice` is the notice already loaded from the API, until there is a notice details API. */
+  /** `notice` is the copy the list already has, shown at once; the screen then loads the full notice from the API. */
   NoticeDetails: { noticeId: string; notice?: Notice };
   Notifications: undefined;
   NotificationDetails: { notification: AppNotification };
   MyDonations: undefined;
   MemberDirectory: undefined;
-  /** `event` is the event already loaded from the API, until there is an event details API. */
+  /** `event` is the copy the list already has, shown at once; the screen then loads the full event from the API. */
   EventDetails: { eventId: string; event?: SocietyEvent };
 };
 

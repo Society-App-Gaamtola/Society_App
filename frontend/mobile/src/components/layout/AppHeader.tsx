@@ -5,7 +5,7 @@ import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/types';
 import { LOGO, SOCIETY_NAME_GU_TWO_LINES } from '../../config';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, setThemeMode, themedStyles, useThemeMode } from '../../theme';
 import { Ionicons } from '../../icons';
 import { useSideDrawer } from './SideDrawer';
 
@@ -31,6 +31,8 @@ export default function AppHeader({ leftType = 'menu', rightIcons = [], onRightP
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const isFocused = useIsFocused();
   const drawer = useSideDrawer();
+  const mode = useThemeMode();
+  const dark = mode === 'dark';
 
   const handleLeft = leftType === 'back' ? () => navigation.canGoBack() && navigation.goBack() : drawer?.open;
 
@@ -45,7 +47,8 @@ export default function AppHeader({ leftType = 'menu', rightIcons = [], onRightP
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {isFocused ? <StatusBar style="light" /> : null}
       <View style={styles.bar}>
-        <View style={styles.side}>
+        {/* Left: menu / back, then the logo and the society name */}
+        <View style={styles.left}>
           <Pressable
             onPress={handleLeft}
             hitSlop={10}
@@ -54,9 +57,6 @@ export default function AppHeader({ leftType = 'menu', rightIcons = [], onRightP
           >
             <Ionicons name={leftType === 'back' ? 'arrow-back' : 'menu'} size={24} color={colors.white} />
           </Pressable>
-        </View>
-
-        <View style={styles.brand}>
           <View style={styles.logoCircle}>
             <Image source={LOGO} style={styles.logo} resizeMode="contain" />
           </View>
@@ -65,7 +65,18 @@ export default function AppHeader({ leftType = 'menu', rightIcons = [], onRightP
           </Text>
         </View>
 
-        <View style={[styles.side, styles.right]}>
+        <View style={styles.right}>
+          {/* Light / dark theme, saved on the phone; the whole app redraws in the new colors */}
+          <Pressable
+            onPress={() => setThemeMode(dark ? 'light' : 'dark').catch(() => {})}
+            hitSlop={8}
+            style={styles.themeButton}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: dark }}
+            accessibilityLabel={dark ? 'Switch to light theme' : 'Switch to dark theme'}
+          >
+            <Ionicons name={dark ? 'sunny-outline' : 'moon-outline'} size={16} color={colors.white} />
+          </Pressable>
           {rightIcons.map((icon) => (
             <Pressable
               key={icon}
@@ -89,23 +100,32 @@ export default function AppHeader({ leftType = 'menu', rightIcons = [], onRightP
   );
 }
 
-const styles = StyleSheet.create({
-  container: { backgroundColor: colors.primary },
-  bar: { height: HEADER_HEIGHT, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
-  side: { width: 96, flexDirection: 'row', alignItems: 'center' },
-  right: { justifyContent: 'flex-end', gap: 14 },
-  brand: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+const styles = themedStyles(() => ({
+  container: { backgroundColor: colors.header },
+  bar: { height: HEADER_HEIGHT, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 12 },
+  left: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  right: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   logoCircle: {
     width: 36,
     height: 36,
     borderRadius: 18,
+    // The logo needs a white circle in both themes
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   logo: { width: 34, height: 34 },
-  title: { fontFamily: fonts.gujaratiHeading, fontSize: 14, lineHeight: 20, color: colors.white },
+  themeButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: { flexShrink: 1, fontFamily: fonts.gujaratiHeading, fontSize: 14, lineHeight: 20, color: colors.white },
   avatar: {
     width: 30,
     height: 30,
@@ -117,4 +137,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-});
+}));

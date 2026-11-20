@@ -165,7 +165,8 @@ export type AppSettings = BaseRecord & {
 
 export type DateRange = { from?: string; to?: string };
 
-export type MonthTotals = { month: string; donations: number; expenses: number };
+/** key = "YYYY-MM"; month = the short axis label ("Nov", or "Nov '26" across years) */
+export type MonthTotals = { key: string; month: string; donations: number; expenses: number };
 
 export type Transaction = {
   key: string;
@@ -202,4 +203,125 @@ export type DashboardStats = FinanceSummary & {
   pendingRequests: number;
   pendingMedia: number;
   activities: AuditLog[];
+};
+
+// ---------- Backend (connected screens) ----------
+
+export type MemberRole = 'super_admin' | 'executive' | 'member';
+
+/** A member as GET /admin/members returns it */
+export type AdminMember = {
+  id: number;
+  member_code: string | null;
+  name: string | null;
+  email: string;
+  country_code: string;
+  mobile: string;
+  role: MemberRole;
+  status: 'active' | 'suspended';
+  signup: 'otp_pending' | 'profile_pending' | 'completed';
+  is_verified: 0 | 1;
+  address: string | null;
+  photo_url: string | null;
+  joined_on: string;
+  last_login_at: string | null;
+};
+
+export type MemberDonation = {
+  id: number;
+  amount: number;
+  purpose: string | null;
+  method: string;
+  status: string;
+  reference_no: string | null;
+  created_at: string;
+  confirmed_at: string | null;
+};
+
+/** GET /admin/members/:id */
+export type AdminMemberDetails = {
+  member: AdminMember;
+  donations: { confirmed_count: number; confirmed_total: number; recent: MemberDonation[] };
+};
+
+export type EventStatusCode = 'draft' | 'scheduled' | 'posted' | 'cancelled';
+
+/** An event as GET /user/events?manage=true returns it (management view) */
+export type BackendEvent = {
+  id: number;
+  title: string;
+  description: string | null;
+  event_date: string;
+  end_date: string | null;
+  start_time: string;
+  end_time: string | null;
+  venue_name: string;
+  venue_address: string | null;
+  map_link: string | null;
+  poster_url: string | null;
+  images: string[];
+  organizer_name: string | null;
+  contact_number: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  is_featured: 0 | 1;
+  event_status: 'upcoming' | 'ongoing' | 'completed';
+  category: { id: number; code: string; name: string; color: string };
+  status: EventStatusCode;
+  publish_at: string | null;
+  posted_at: string | null;
+  created_by: number;
+  created_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EventCategory = { id: number; code: string; name: string; color: string };
+
+export type NoticeStatusCode = 'draft' | 'published';
+export type NoticeTag = 'important' | 'general' | 'event';
+
+/** A notice as GET /user/notices?manage=true returns it */
+export type BackendNotice = {
+  id: number;
+  title: string;
+  body: string;
+  tag: NoticeTag;
+  event_id: number | null;
+  status: NoticeStatusCode;
+  audience: 'all' | 'selected';
+  published_at: string | null;
+  recipient_count: number;
+  recipient_ids?: number[];
+  created_by: number;
+  created_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export const PERMISSION_SECTIONS = ['events', 'notices', 'donations', 'expenses', 'reports', 'media', 'settings'] as const;
+export type PermissionSection = (typeof PERMISSION_SECTIONS)[number];
+export type ExecutivePermissions = { sections: PermissionSection[] };
+
+/** GET /admin/executives: a member with the executive role, plus their permissions */
+export type AdminExecutive = AdminMember & { permissions: ExecutivePermissions };
+
+/** GET /executive/executive-requests */
+export type BackendExecutiveRequest = {
+  id: number;
+  status: 'pending' | 'approved' | 'rejected' | 'suspended';
+  donation_amount: number;
+  reference_no: string;
+  reason: string;
+  payment_proof_url: string | null;
+  review_note: string | null;
+  donation_id: number | null;
+  donation_status: string | null;
+  user_id: number;
+  full_name: string | null;
+  email: string;
+  mobile: string;
+  role: MemberRole;
+  created_at: string;
+  reviewed_at: string | null;
 };

@@ -1,12 +1,13 @@
 import { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
 import { ApiError } from '../api/client';
+import { t } from '../i18n';
 
 /** Shows an API failure in an alert, including any per-field messages. */
 export const showApiError = (error: unknown, title = 'Something went wrong') => {
   const fieldMessages = error instanceof ApiError ? Object.values(error.fieldErrors) : [];
   const message = error instanceof Error ? error.message : 'Please try again.';
-  Alert.alert(title, fieldMessages.length ? fieldMessages.join('\n') : message);
+  Alert.alert(t(title), fieldMessages.length ? fieldMessages.join('\n') : t(message));
 };
 
 /** Per-field error messages for a form. */

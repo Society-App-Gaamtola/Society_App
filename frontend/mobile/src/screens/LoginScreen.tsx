@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as authApi from '../api/auth';
 import { ApiError } from '../api/client';
 import type { RootStackParamList } from '../navigation/types';
 import { resetAfterLogin } from '../navigation/navigationRef';
-import { colors, fonts, spacing } from '../theme';
-import { useAuth, type LoginAs } from '../context/AuthContext';
+import { colors, fonts, spacing, themedStyles } from '../theme';
+import { useAuth } from '../context/AuthContext';
 import { useFormErrors } from '../hooks/useFormErrors';
 import { INDIA_DIAL_CODE, isEmail, isIndianMobile, localIndianNumber, MIN_PASSWORD_LENGTH } from '../utils/validation';
 import {
@@ -21,31 +21,25 @@ import {
   PrimaryButton,
   SegmentedTabs,
 } from '../components';
+import { useLanguage, useT } from '../i18n';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 type Tab = 'password' | 'otp';
 type Field = 'identifier' | 'password' | 'otpEmail';
-
-const ROLE_TABS = [
-  ['member', 'Member', 'person-outline'],
-  ['executive', 'Executive', 'ribbon-outline'],
-] as const;
 
 const TABS = [
   ['password', 'With Password'],
   ['otp', 'Login with OTP'],
 ] as const;
 
-const ROLE_TEXT: Record<LoginAs, { heading: string; subtext: string }> = {
-  member: { heading: 'Member Login', subtext: 'Enter your registered email or mobile number to continue.' },
-  executive: { heading: 'Executive Login', subtext: 'Use the login details given to you by the Society admin.' },
-};
-
 const API_FIELDS: Record<string, Field> = { email: 'identifier', mobile_number: 'identifier', password: 'password' };
 
+// One login for everyone. Members, executives and the Super Admin use the same screen; the role on the account
+// (set by the admin) decides which screens open after login
 export default function LoginScreen({ navigation }: Props) {
-  const { completeLogin, setLoginAs } = useAuth();
-  const [loginAs, setLoginAsTab] = useState<LoginAs>('member');
+  const t = useT();
+  const { completeLogin } = useAuth();
+  const language = useLanguage();
   const [tab, setTab] = useState<Tab>('password');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -55,9 +49,6 @@ export default function LoginScreen({ navigation }: Props) {
   const [sendingOtp, setSendingOtp] = useState(false);
   const { errors, setErrors, fieldProps, handleApiError } = useFormErrors<Field>();
 
-  // Password login, OTP login and sign-up all check the account's role against this tab.
-  useEffect(() => setLoginAs(loginAs), [loginAs, setLoginAs]);
-
   // One field takes either an email or an Indian mobile number (with or without +91).
   const onLogin = async () => {
     const next: typeof errors = {};
@@ -65,7 +56,7 @@ export default function LoginScreen({ navigation }: Props) {
     if (!id) next.identifier = 'Please enter your email or mobile number.';
     else if (!isEmail(id) && !isIndianMobile(id)) next.identifier = 'Enter a valid email or 10-digit mobile number.';
     if (!password) next.password = 'Please enter your password.';
-    else if (password.length < MIN_PASSWORD_LENGTH) next.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+    else if (password.length < MIN_PASSWORD_LENGTH) next.password = t('Password must be at least {n} characters.', { n: MIN_PASSWORD_LENGTH });
     setErrors(next);
     if (Object.keys(next).length) return;
 
@@ -112,21 +103,14 @@ export default function LoginScreen({ navigation }: Props) {
     setErrors({});
   };
 
-  const switchRole = (next: LoginAs) => {
-    setLoginAsTab(next);
-    setErrors({});
-  };
-
   return (
-    <AuthScreenLayout overlay={<Loader visible={loading} message="Logging in..." language="en" />}>
+    <AuthScreenLayout overlay={<Loader visible={loading} message="Logging in..." language={language} />}>
       <BackButton onPress={() => navigation.replace('LanguageSelect')} />
 
       <BrandBlock logoSize={120} fontSize={26} lineHeight={40} />
 
-      <SegmentedTabs tabs={ROLE_TABS} selected={loginAs} onSelect={switchRole} style={styles.roleTabs} />
-
-      <Text style={styles.heading}>{ROLE_TEXT[loginAs].heading}</Text>
-      <Text style={styles.subtext}>{ROLE_TEXT[loginAs].subtext}</Text>
+      <Text style={styles.heading}>{t('Login')}</Text>
+      <Text style={styles.subtext}>{t('Enter your registered email or mobile number to continue.')}</Text>
 
       <SegmentedTabs tabs={TABS} selected={tab} onSelect={switchTab} style={styles.tabs} />
 
@@ -144,9 +128,9 @@ export default function LoginScreen({ navigation }: Props) {
               textContentType="username"
             />
             {errors.identifier ? (
-              <Text style={styles.error}>{errors.identifier}</Text>
+              <Text style={styles.error}>{t(errors.identifier)}</Text>
             ) : (
-              <Text style={styles.helper}>example@domain.com or 98765 43210</Text>
+              <Text style={styles.helper}>{t('example@domain.com or 98765 43210')}</Text>
             )}
           </View>
 
@@ -160,13 +144,13 @@ export default function LoginScreen({ navigation }: Props) {
               autoCapitalize="none"
               textContentType="password"
             />
-            {errors.password ? <Text style={styles.error}>{errors.password}</Text> : null}
+            {errors.password ? <Text style={styles.error}>{t(errors.password)}</Text> : null}
           </View>
 
           <View style={styles.rowBetween}>
             <Checkbox checked={remember} onChange={setRemember} label="Remember me" />
-            <Pressable hitSlop={8} onPress={() => Alert.alert('Forgot Password', 'Password reset is coming soon.')}>
-              <Text style={styles.forgot}>Forgot Password?</Text>
+            <Pressable hitSlop={8} onPress={() => Alert.alert(t('Forgot Password'), t('Password reset is coming soon.'))}>
+              <Text style={styles.forgot}>{t('Forgot Password?')}</Text>
             </Pressable>
           </View>
 
@@ -186,9 +170,9 @@ export default function LoginScreen({ navigation }: Props) {
               textContentType="emailAddress"
             />
             {errors.otpEmail ? (
-              <Text style={styles.error}>{errors.otpEmail}</Text>
+              <Text style={styles.error}>{t(errors.otpEmail)}</Text>
             ) : (
-              <Text style={styles.helper}>We'll email you a 6-digit code to log in.</Text>
+              <Text style={styles.helper}>{t('We\'ll email you a 6-digit code to log in.')}</Text>
             )}
           </View>
 
@@ -196,38 +180,21 @@ export default function LoginScreen({ navigation }: Props) {
         </View>
       )}
 
-      {/* Executive accounts are created by the Super Admin, so there is no sign-up for them */}
-      {loginAs === 'member' ? (
-        <>
-          <OrDivider style={styles.or} />
-          <OutlineButton title="New member? Register here" onPress={() => navigation.navigate('Register')} />
-        </>
-      ) : (
-        <Text style={styles.adminNote}>
-          Executive accounts are created by the Society admin. Contact the admin if you can't log in.
-        </Text>
-      )}
+      {/* Everyone registers as a member; the admin makes a member an executive later */}
+      <OrDivider style={styles.or} />
+      <OutlineButton title="New member? Register here" onPress={() => navigation.navigate('Register')} />
     </AuthScreenLayout>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   heading: { fontFamily: fonts.bold, fontSize: 20, color: colors.primary },
   subtext: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 20, color: colors.textMuted, marginTop: 2 },
-  roleTabs: { marginBottom: spacing.md },
   tabs: { marginTop: spacing.md, marginBottom: spacing.md },
-  adminNote: {
-    fontFamily: fonts.regular,
-    fontSize: 12,
-    lineHeight: 18,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: spacing.lg,
-  },
   form: { gap: 14 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   helper: { fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted, marginTop: 4, marginLeft: 2 },
   error: { fontFamily: fonts.regular, fontSize: 11, color: colors.danger, marginTop: 4, marginLeft: 2 },
   forgot: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.primary },
   or: { marginVertical: spacing.md },
-});
+}));

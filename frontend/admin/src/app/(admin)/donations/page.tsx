@@ -7,6 +7,7 @@ import {
   DetailList,
   ExportButton,
   Field,
+  FileLink,
   FileUpload,
   FormDialog,
   PageHeader,
@@ -15,73 +16,99 @@ import {
   StatCardsSkeleton,
   StatusBadge,
   ViewDialog,
-  FileLink,
 } from '@/components/common';
 import { DataTable, type Column } from '@/components/DataTable';
 import { FilterBar } from '@/components/FilterBar';
-import { Button, Input, NativeSelect } from '@/components/ui/primitives';
-import { donationsHooks, useSetDonationStatus } from '@/hooks/useDonations';
-import { membersHooks } from '@/hooks/useMembers';
-import { useSettings } from '@/hooks/useSettings';
+import { MemberPicker } from '@/components/MemberPicker';
+import { Button, Input, NativeSelect, Textarea } from '@/components/ui/primitives';
+import { DEFAULT_PAGE_SIZE } from '@/config';
+import { useAppSettings, useDeleteDonation, useDonationsPage, useDonationStatus, useSaveDonation } from '@/hooks/useFinance';
 import { useUrlState } from '@/hooks/useUrlState';
-import { exportDonationReceipt, exportExcel } from '@/lib/exporters';
-import { formatDate, formatINR, formatNumber, periodLabel, recordNo, todayISO } from '@/lib/utils';
-import { PAYMENT_MODES, REVIEW_STATUSES, type Donation, type NewRecord } from '@/types';
+import { exportDonationReceipt, exportTable, type ExportFormat } from '@/lib/exporters';
+import { formatDate, formatDateTime, formatINR, formatNumber, periodLabel, recordNo, todayISO } from '@/lib/utils';
+import { uploadFinanceFile } from '@/services/cloudinary';
+import {
+  donationsApi,
+  donationStatusLabel,
+  DONATION_STATUS_OPTIONS,
+  methodLabel,
+  PAYMENT_MODE_OPTIONS,
+  type Donation,
+  type DonationBody,
+  type DonationQuery,
+  type PaymentMode,
+} from '@/services/finance';
 
-type Draft = NewRecord<Donation>;
-const NON_MEMBER = '';
+/** What the panel can enter: UPI made outside the app is "upi_app" */
+const METHODS = [
+  { value: 'upi_app', label: 'UPI' },
+  { value: 'cash', label: 'Cash' },
+  { value: 'bank', label: 'Bank Transfer' },
+  { value: 'cheque', label: 'Cheque' },
+];
+
+type Draft = Omit<DonationBody, 'amount'> & { amount: string; donor_name: string };
 
 const emptyDraft = (purpose: string): Draft => ({
-  donorName: '',
-  memberId: NON_MEMBER,
-  amount: 0,
-  mode: 'UPI',
+  donor_user_id: null,
+  donor_name: '',
+  amount: '',
   purpose,
-  reference: '',
-  date: todayISO(),
-  status: 'Verified',
-  receipt: null,
+  method: 'upi_app',
+  reference_no: '',
+  donated_on: todayISO(),
+  status: 'success',
+  proof_url: null,
+  note: '',
+});
+
+const toDraft = (d: Donation): Draft => ({
+  donor_user_id: d.donor_user_id,
+  donor_name: d.donor_name,
+  amount: String(d.amount),
+  purpose: d.purpose ?? '',
+  method: d.method,
+  reference_no: d.reference_no ?? '',
+  donated_on: d.donated_on,
+  status: d.status === 'success' || d.status === 'pending' ? d.status : 'rejected',
+  proof_url: d.proof_url,
+  note: d.note ?? '',
 });
 
 function DonationForm({ open, onOpenChange, donation }: { open: boolean; onOpenChange: (open: boolean) => void; donation?: Donation }) {
-  const { data: settings } = useSettings();
-  const purposes = settings?.donationPurposes ?? [];
-  const members = membersHooks.useList({ sort: { field: 'name', order: 'asc' } });
-  const create = donationsHooks.useCreate();
-  const update = donationsHooks.useUpdate();
+  const { data: settings } = useAppSettings();
+  const purposes = settings?.settings.donation_purposes ?? [];
+  const save = useSaveDonation();
   const [draft, setDraft] = useState<Draft>(emptyDraft(''));
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open) return;
     setErrors({});
-    if (donation) {
-      const { id: _id, created_at: _c, updated_at: _u, ...rest } = donation;
-      setDraft({ ...rest, date: rest.date.slice(0, 10) });
-    } else setDraft(emptyDraft(purposes[0] ?? 'General Fund'));
+    setDraft(donation ? toDraft(donation) : emptyDraft(purposes[0] ?? ''));
+    // purposes only matter for a new donation's default
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, donation]);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => ({ ...d, [key]: value }));
 
-  const pickMember = (memberId: string) => {
-    const member = members.data?.data.find((m) => m.memberId === memberId);
-    setDraft((d) => ({ ...d, memberId, donorName: member ? member.name : d.donorName }));
-  };
-
   const submit = () => {
     const found: Record<string, string> = {};
-    if (!draft.donorName.trim()) found.donorName = 'Donor name is required.';
-    if (!(draft.amount > 0)) found.amount = 'Enter an amount above zero.';
-    if (!draft.date) found.date = 'Date is required.';
+    if (!draft.donor_user_id && !draft.donor_name.trim()) found.donor_name = 'Choose a member or type the donor name.';
+    if (!(Number(draft.amount) > 0)) found.amount = 'Enter an amount above zero.';
+    if (!draft.purpose) found.purpose = 'Choose a purpose.';
+    if (!draft.donated_on) found.donated_on = 'Date is required.';
+    else if (draft.donated_on > todayISO()) found.donated_on = "The date can't be in the future.";
     setErrors(found);
     if (Object.keys(found).length) return;
-    // Keep the original time of day when only the date was edited.
-    const time = donation?.date.slice(10) || 'T00:00:00';
-    const body = { ...draft, donorName: draft.donorName.trim(), date: `${draft.date}${time}` };
-    const done = { onSuccess: () => onOpenChange(false) };
-    if (donation) update.mutate({ id: donation.id, changes: body }, done);
-    else create.mutate(body, done);
+    const body: DonationBody = {
+      ...draft,
+      amount: Number(draft.amount),
+      donor_name: draft.donor_user_id ? undefined : draft.donor_name.trim(),
+      reference_no: draft.reference_no.trim(),
+      note: draft.note.trim(),
+    };
+    save.mutate({ id: donation?.id, body }, { onSuccess: () => onOpenChange(false) });
   };
 
   return (
@@ -90,108 +117,122 @@ function DonationForm({ open, onOpenChange, donation }: { open: boolean; onOpenC
       onOpenChange={onOpenChange}
       title={donation ? `Edit ${recordNo('DON', donation.id)}` : 'Add Donation'}
       submitLabel={donation ? 'Save Changes' : 'Add Donation'}
-      pending={create.isPending || update.isPending}
+      pending={save.isPending}
       onSubmit={submit}
       className="max-w-2xl"
     >
+      <Field label="Member">
+        <MemberPicker
+          value={draft.donor_user_id}
+          emptyLabel="Not a member (type the name below)"
+          onChange={(id, name) => setDraft((d) => ({ ...d, donor_user_id: id, donor_name: id ? name : d.donor_name }))}
+        />
+      </Field>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Member">
-          <NativeSelect value={draft.memberId} onChange={(e) => pickMember(e.target.value)}>
-            <option value={NON_MEMBER}>Not a member</option>
-            {members.data?.data.map((m) => (
-              <option key={m.id} value={m.memberId}>
-                {m.name} ({m.memberId})
+        <Field label="Donor Name" error={errors.donor_name}>
+          <Input value={draft.donor_name} onChange={(e) => set('donor_name', e.target.value)} disabled={!!draft.donor_user_id} />
+        </Field>
+        <Field label="Amount (₹)" error={errors.amount}>
+          <Input type="number" min={1} value={draft.amount} onChange={(e) => set('amount', e.target.value)} />
+        </Field>
+        <Field label="Date" error={errors.donated_on}>
+          <Input type="date" value={draft.donated_on} max={todayISO()} onChange={(e) => set('donated_on', e.target.value)} />
+        </Field>
+        <Field label="Payment Mode">
+          <NativeSelect value={draft.method} onChange={(e) => set('method', e.target.value)}>
+            {[...METHODS, ...(METHODS.some((m) => m.value === draft.method) ? [] : [{ value: draft.method, label: methodLabel(draft.method) }])].map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
               </option>
             ))}
           </NativeSelect>
         </Field>
-        <Field label="Donor Name" error={errors.donorName}>
-          <Input value={draft.donorName} onChange={(e) => set('donorName', e.target.value)} disabled={draft.memberId !== NON_MEMBER} />
-        </Field>
-        <Field label="Amount (₹)" error={errors.amount}>
-          <Input type="number" min={1} value={draft.amount || ''} onChange={(e) => set('amount', Number(e.target.value))} />
-        </Field>
-        <Field label="Date" error={errors.date}>
-          <Input type="date" value={draft.date.slice(0, 10)} onChange={(e) => set('date', e.target.value)} />
-        </Field>
-        <Field label="Payment Mode">
-          <NativeSelect value={draft.mode} onChange={(e) => set('mode', e.target.value as Draft['mode'])}>
-            {PAYMENT_MODES.map((m) => (
-              <option key={m}>{m}</option>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field label="Purpose">
+        <Field label="Purpose" error={errors.purpose}>
           <NativeSelect value={draft.purpose} onChange={(e) => set('purpose', e.target.value)}>
+            <option value="">Choose…</option>
             {[...new Set([...purposes, draft.purpose])].filter(Boolean).map((p) => (
               <option key={p}>{p}</option>
             ))}
           </NativeSelect>
         </Field>
         <Field label="Reference / UTR No.">
-          <Input value={draft.reference} onChange={(e) => set('reference', e.target.value)} />
+          <Input value={draft.reference_no} onChange={(e) => set('reference_no', e.target.value)} />
         </Field>
         <Field label="Status">
-          <NativeSelect value={draft.status} onChange={(e) => set('status', e.target.value as Draft['status'])}>
-            {REVIEW_STATUSES.map((s) => (
-              <option key={s}>{s}</option>
+          <NativeSelect value={draft.status} onChange={(e) => set('status', e.target.value)}>
+            {DONATION_STATUS_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
             ))}
           </NativeSelect>
         </Field>
       </div>
+      <Field label="Note (optional)">
+        <Textarea rows={2} value={draft.note} onChange={(e) => set('note', e.target.value)} />
+      </Field>
       <Field label="Payment Proof (optional)">
-        <FileUpload value={draft.receipt} onChange={(url) => set('receipt', url)} label="Upload screenshot or slip" />
+        <FileUpload value={draft.proof_url} onChange={(url) => set('proof_url', url)} label="Upload screenshot or slip" maxMb={10} upload={uploadFinanceFile} />
       </Field>
     </FormDialog>
   );
 }
 
-const FILTERS = ['mode', 'status', 'purpose'];
+/** The URL (page, search, filters, dates, sort) → the GET /admin/donations query. Same URL = same cached page */
+function useDonationQuery(): DonationQuery {
+  const url = useUrlState();
+  return {
+    page: url.page,
+    limit: DEFAULT_PAGE_SIZE,
+    search: url.search || undefined,
+    status: url.get('status') || undefined,
+    mode: (url.get('mode') || undefined) as PaymentMode | undefined,
+    purpose: url.get('purpose') || undefined,
+    from_date: url.range.from,
+    to_date: url.range.to,
+    sort: (url.sort?.field as DonationQuery['sort']) ?? 'date',
+    order: url.sort?.order ?? 'desc',
+  };
+}
 
 export default function DonationsPage() {
   const url = useUrlState();
-  const { data: settings } = useSettings();
-  const params = url.toListParams(FILTERS, 'date');
-  const list = donationsHooks.useList({ ...params, sort: url.sort ?? { field: 'date', order: 'desc' } });
-  // Every matching row (no paging) for the totals and exports.
-  const all = donationsHooks.useList({ search: params.search, filters: params.filters });
-  const setStatus = useSetDonationStatus();
-  const remove = donationsHooks.useRemove();
+  const { data: settings } = useAppSettings();
+  const societyName = settings?.settings.society_name;
+  const query = useDonationQuery();
+  const list = useDonationsPage(query);
+  const setStatus = useDonationStatus();
+  const remove = useDeleteDonation();
   const [form, setForm] = useState<{ open: boolean; donation?: Donation }>({ open: false });
   const [viewing, setViewing] = useState<Donation | null>(null);
   const [deleting, setDeleting] = useState<Donation | null>(null);
+  const summary = list.data?.summary;
 
-  const stats = useMemo(() => {
-    const verified = (all.data?.data ?? []).filter((d) => d.status === 'Verified');
-    const total = verified.reduce((sum, d) => sum + d.amount, 0);
-    return {
-      total,
-      count: all.data?.total ?? 0,
-      highest: Math.max(0, ...verified.map((d) => d.amount)),
-      average: verified.length ? Math.round(total / verified.length) : 0,
-    };
-  }, [all.data]);
+  const receipt = (d: Donation) => exportDonationReceipt(d, { societyName, modeLabel: methodLabel, statusLabel: donationStatusLabel });
 
   const columns = useMemo<Column<Donation>[]>(
     () => [
-      { key: 'id', header: 'Receipt No', sortable: true, render: (d) => recordNo('DON', d.id) },
-      { key: 'donorName', header: 'Donor Name', sortable: true, className: 'px-4 py-3 font-medium' },
+      { key: 'id', header: 'Receipt No', render: (d) => recordNo('DON', d.id) },
+      {
+        key: 'donor',
+        header: 'Donor Name',
+        render: (d) => (
+          <span>
+            <span className="block font-medium">{d.donor_name}</span>
+            <span className="block text-xs text-muted-foreground">{d.member_code ?? (d.donor_user_id ? 'Member' : 'Not a member')}</span>
+          </span>
+        ),
+      },
       { key: 'amount', header: 'Amount (₹)', sortable: true, className: 'px-4 py-3 text-right font-medium', render: (d) => formatNumber(d.amount) },
-      { key: 'date', header: 'Date', sortable: true, className: 'whitespace-nowrap px-4 py-3', render: (d) => formatDate(d.date) },
-      { key: 'mode', header: 'Payment Mode', className: 'whitespace-nowrap px-4 py-3' },
-      { key: 'purpose', header: 'Purpose' },
-      { key: 'status', header: 'Status', sortable: true, render: (d) => <StatusBadge status={d.status} /> },
+      { key: 'date', header: 'Date', sortable: true, className: 'whitespace-nowrap px-4 py-3', render: (d) => formatDate(d.donated_on) },
+      { key: 'mode', header: 'Payment Mode', className: 'whitespace-nowrap px-4 py-3', render: (d) => methodLabel(d.method) },
+      { key: 'purpose', header: 'Purpose', render: (d) => d.purpose ?? '—' },
+      { key: 'status', header: 'Status', render: (d) => <StatusBadge status={donationStatusLabel(d.status)} /> },
       {
         key: 'receipt',
         header: 'Receipt',
         render: (d) => (
-          <button
-            type="button"
-            onClick={() => exportDonationReceipt(d, settings?.societyName)}
-            className="rounded-md p-1.5 text-[#C62828] hover:bg-accent"
-            aria-label={`Download receipt ${recordNo('DON', d.id)}`}
-            title="Download receipt (PDF)"
-          >
+          <button type="button" onClick={() => receipt(d)} className="rounded-md p-1.5 text-[#C62828] hover:bg-accent" aria-label={`Download receipt ${recordNo('DON', d.id)}`} title="Download receipt (PDF)">
             <FileText className="h-4 w-4" />
           </button>
         ),
@@ -206,29 +247,31 @@ export default function DonationsPage() {
             onView={() => setViewing(d)}
             onDelete={() => setDeleting(d)}
             more={[
-              { label: 'Mark Verified', icon: BadgeCheck, hidden: d.status === 'Verified', onSelect: () => setStatus.mutate({ id: d.id, status: 'Verified' }) },
-              { label: 'Mark Pending', icon: Clock, hidden: d.status === 'Pending', onSelect: () => setStatus.mutate({ id: d.id, status: 'Pending' }) },
-              { label: 'Reject', icon: XCircle, destructive: true, hidden: d.status === 'Rejected', onSelect: () => setStatus.mutate({ id: d.id, status: 'Rejected' }) },
+              { label: 'Mark Verified', icon: BadgeCheck, hidden: d.status === 'success', onSelect: () => setStatus.mutate({ id: d.id, status: 'success' }) },
+              { label: 'Mark Pending', icon: Clock, hidden: d.status === 'pending', onSelect: () => setStatus.mutate({ id: d.id, status: 'pending' }) },
+              { label: 'Reject', icon: XCircle, destructive: true, hidden: d.status === 'rejected', onSelect: () => setStatus.mutate({ id: d.id, status: 'rejected' }) },
             ]}
           />
         ),
       },
     ],
-    [setStatus, settings?.societyName],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [setStatus, societyName],
   );
 
-  const onExport = async () => {
-    const rows = all.data?.data ?? [];
-    await exportExcel(
+  /** Every donation matching the filters, read page by page */
+  const onExport = async (format: ExportFormat) => {
+    const { page, limit, ...filters } = query;
+    const rows = await donationsApi.listAll(filters);
+    await exportTable(
       {
         title: 'Donations',
-        subtitle: `${periodLabel(url.get('from'), url.get('to'))} · ${rows.length} entries`,
-        columns: ['Receipt No', 'Donor', 'Amount', 'Date', 'Mode', 'Purpose', 'Reference', 'Status'],
-        rows: [...rows]
-          .sort((a, b) => b.date.localeCompare(a.date))
-          .map((d) => [recordNo('DON', d.id), d.donorName, formatNumber(d.amount), formatDate(d.date), d.mode, d.purpose, d.reference, d.status]),
+        subtitle: `${periodLabel(query.from_date, query.to_date)} · ${rows.length} entries`,
+        columns: ['Receipt No', 'Donor', 'Member Code', 'Amount', 'Date', 'Mode', 'Purpose', 'Reference', 'Status'],
+        rows: rows.map((d) => [recordNo('DON', d.id), d.donor_name, d.member_code ?? '', formatNumber(d.amount), formatDate(d.donated_on), methodLabel(d.method), d.purpose ?? '', d.reference_no ?? '', donationStatusLabel(d.status)]),
       },
       'donations',
+      format,
     );
   };
 
@@ -236,47 +279,51 @@ export default function DonationsPage() {
     <>
       <PageHeader
         title="Donation Management"
-        subtitle="View, add and verify donation entries"
+        subtitle="Members' donations from the app and entries added here. Verify them to count them in the totals"
         actions={
           <>
             <Button onClick={() => setForm({ open: true })}>
               <Plus className="h-4 w-4" /> Add Donation
             </Button>
-            <ExportButton onExport={onExport} disabled={!all.data} />
+            <ExportButton onExport={onExport} disabled={!list.data?.pagination.total} />
           </>
         }
       />
-      {all.isLoading ? (
+      {!summary ? (
         <StatCardsSkeleton />
       ) : (
         <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard icon={HandCoins} value={formatINR(stats.total)} label="Total Donations (verified)" tone="red" />
-          <StatCard icon={ReceiptText} value={stats.count} label="Total Transactions" tone="blue" />
-          <StatCard icon={Star} value={formatINR(stats.highest)} label="Highest Donation" tone="amber" />
-          <StatCard icon={BarChart3} value={formatINR(stats.average)} label="Average Donation" tone="blue" />
+          <StatCard icon={HandCoins} value={formatINR(summary.verified_total)} label="Total Donations (verified)" tone="red" />
+          <StatCard icon={ReceiptText} value={summary.count} label="Total Entries" tone="blue" />
+          <StatCard icon={Star} value={formatINR(summary.highest)} label="Highest Donation" tone="amber" />
+          <StatCard icon={BarChart3} value={formatINR(summary.average)} label="Average Donation" tone="blue" />
         </div>
       )}
       <FilterBar
-        searchPlaceholder="Search by donor name or reference..."
+        searchPlaceholder="Search by donor, member code or reference..."
         dateRange
         selects={[
-          { name: 'mode', label: 'Payment Modes', options: PAYMENT_MODES },
-          { name: 'status', label: 'Status', options: REVIEW_STATUSES },
-          { name: 'purpose', label: 'Purposes', options: settings?.donationPurposes ?? [] },
+          { name: 'mode', label: 'Payment Modes', options: PAYMENT_MODE_OPTIONS },
+          { name: 'status', label: 'Status', options: DONATION_STATUS_OPTIONS },
+          { name: 'purpose', label: 'Purposes', options: settings?.settings.donation_purposes ?? [] },
         ]}
       />
       <DataTable
         columns={columns}
-        rows={list.data?.data}
-        total={list.data?.total ?? 0}
+        rows={list.data?.donations}
+        total={list.data?.pagination.total ?? 0}
         page={url.page}
+        pageSize={DEFAULT_PAGE_SIZE}
         isLoading={list.isLoading}
+        isFetching={list.isFetching}
         isError={list.isError}
+        errorMessage={list.error?.message}
         onRetry={() => list.refetch()}
-        sort={url.sort ?? { field: 'date', order: 'desc' }}
+        sort={{ field: query.sort ?? 'date', order: query.order ?? 'desc' }}
         onSortChange={({ field, order }) => url.setParams({ sort: field, order })}
         onPageChange={(page) => url.setParams({ page })}
         itemLabel="entries"
+        emptyMessage="No donations found."
       />
       <DonationForm open={form.open} donation={form.donation} onOpenChange={(open) => setForm((f) => ({ ...f, open }))} />
       <ViewDialog
@@ -286,14 +333,11 @@ export default function DonationsPage() {
         footer={
           viewing ? (
             <>
-              <Button variant="outline" onClick={() => exportDonationReceipt(viewing, settings?.societyName)}>
+              <Button variant="outline" onClick={() => receipt(viewing)}>
                 <FileText className="h-4 w-4" /> Download Receipt
               </Button>
-              {viewing.status !== 'Verified' ? (
-                <Button
-                  className="bg-[#1E8E4E] hover:bg-[#187540]"
-                  onClick={() => setStatus.mutate({ id: viewing.id, status: 'Verified' }, { onSuccess: () => setViewing(null) })}
-                >
+              {viewing.status !== 'success' ? (
+                <Button className="bg-[#1E8E4E] hover:bg-[#187540]" onClick={() => setStatus.mutate({ id: viewing.id, status: 'success' }, { onSuccess: () => setViewing(null) })}>
                   Verify
                 </Button>
               ) : null}
@@ -304,18 +348,22 @@ export default function DonationsPage() {
         {viewing ? (
           <DetailList
             items={[
-              ['Donor', viewing.donorName],
-              ['Member ID', viewing.memberId || 'Not a member'],
+              ['Donor', viewing.donor_name],
+              ['Member Code', viewing.member_code ?? (viewing.donor_user_id ? 'Member' : 'Not a member')],
               ['Amount', formatINR(viewing.amount)],
-              ['Date', formatDate(viewing.date)],
-              ['Payment Mode', viewing.mode],
-              ['Reference', viewing.reference],
-              ['Purpose', viewing.purpose],
-              ['Status', <StatusBadge key="s" status={viewing.status} />],
+              ['Date', formatDate(viewing.donated_on)],
+              ['Payment Mode', methodLabel(viewing.method)],
+              ['Reference', viewing.reference_no || '—'],
+              ['Purpose', viewing.purpose || '—'],
+              ['Status', <StatusBadge key="s" status={donationStatusLabel(viewing.status)} />],
+              ['Entered By', viewing.entered_by_name ?? 'The member (app)'],
+              ...(viewing.verified_by_name ? [['Reviewed By', viewing.verified_by_name] as [string, string]] : []),
+              ...(viewing.confirmed_at ? [['Verified On', formatDateTime(viewing.confirmed_at)] as [string, string]] : []),
+              ...(viewing.note ? [['Note', viewing.note] as [string, string]] : []),
               [
                 'Payment Proof',
-                viewing.receipt ? (
-                  <FileLink key="p" href={viewing.receipt} className="text-maroon underline">
+                viewing.proof_url ? (
+                  <FileLink key="p" href={viewing.proof_url} className="text-maroon underline">
                     Open file
                   </FileLink>
                 ) : (
@@ -330,7 +378,7 @@ export default function DonationsPage() {
         open={!!deleting}
         onOpenChange={(open) => !open && setDeleting(null)}
         title={`Delete ${deleting ? recordNo('DON', deleting.id) : ''}?`}
-        description={deleting ? `${deleting.donorName}, ${formatINR(deleting.amount)}. This cannot be undone.` : ''}
+        description={deleting ? `${deleting.donor_name}, ${formatINR(deleting.amount)}.` : ''}
         confirmLabel="Delete"
         destructive
         onConfirm={() => deleting && remove.mutate(deleting.id)}

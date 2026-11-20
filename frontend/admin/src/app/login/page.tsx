@@ -3,22 +3,38 @@
 import { useState, type FormEvent } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 import { Button, Input } from '@/components/ui/primitives';
-import { setSession } from '@/lib/session';
+import { deviceId, setSession } from '@/lib/session';
+import { api } from '@/services/core/backend';
+
+type LoginData = { token: string; userData: { id: number; username: string | null; email: string } };
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  // UI only for now: any email and password log in until the panel is connected to the backend.
-  const submit = (e: FormEvent) => {
+  // POST /admin/login: only the Super Admin gets a token. The backend's message is shown as it is
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!/^\S+@\S+\.\S+$/.test(email)) return setError('Enter a valid email address.');
     if (!password) return setError('Enter your password.');
-    setSession(email);
-    router.replace('/dashboard');
+    setBusy(true);
+    setError('');
+    try {
+      const { data } = await api<LoginData>('POST', '/admin/login', {
+        body: { email: email.trim(), password, uuid: deviceId(), device_type: 'web', device_name: navigator.userAgent.slice(0, 100) },
+      });
+      setSession({ id: data.userData.id, email: data.userData.email, name: data.userData.username || 'Admin', token: data.token });
+      router.replace('/dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not log in. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -34,7 +50,9 @@ export default function LoginPage() {
           <Input type="email" placeholder="Email" aria-label="Email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
           <Input type="password" placeholder="Password" aria-label="Password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
           {error ? <p role="alert" className="text-xs text-[#C62828]">{error}</p> : null}
-          <Button type="submit" className="w-full">Login</Button>
+          <Button type="submit" className="w-full" disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Login
+          </Button>
         </form>
       </div>
     </main>

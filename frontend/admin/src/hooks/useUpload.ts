@@ -1,9 +1,9 @@
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { uploadService } from '@/services/upload';
 
-export const useUpload = () =>
+/** Uploads one file with the given uploader (e.g. uploadToCloudinary) and shows its error as a toast */
+export const useUpload = (upload: (file: File) => Promise<{ url: string }>) =>
   useMutation({
-    mutationFn: uploadService.uploadFile,
+    mutationFn: upload,
     onError: (error: Error) => toast.error(error.message),
   });

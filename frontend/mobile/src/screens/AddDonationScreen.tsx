@@ -1,18 +1,21 @@
-import { useState } from 'react';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/types';
 import { common } from '../styles/common';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themedStyles } from '../theme';
 import { MAX_UPLOAD_BYTES } from '../config';
-import { useDonations } from '../context/DonationsContext';
+import { getDonationEntry, METHOD_OF, saveDonationEntry, toDonation, type ApiEntryStatus } from '../api/executive';
+import { useAuth } from '../context/AuthContext';
+import { useDonationSettings } from '../hooks/useDonationSettings';
+import { mediaFolder, uploadMedia } from '../services/media';
 import { useFormErrors } from '../hooks/useFormErrors';
 import { Ionicons } from '../icons';
-import type { Donation, DonationPurpose, NewDonation, PaymentMode } from '../types';
-import { formatDate } from '../utils/date';
+import type { PaymentMode } from '../types';
+import { formatDate, fromIsoDay, toIsoDay } from '../utils/date';
 import { showToast } from '../utils/toast';
 import {
   AppHeader,
@@ -31,19 +34,13 @@ import DatePickerSheet from '../components/sheets/DatePickerSheet';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'AddDonation'>;
 type Field = 'donorName' | 'memberId' | 'amount' | 'mode' | 'reference' | 'date' | 'purpose' | 'receipt';
-type Receipt = NonNullable<Donation['receipt']>;
+/** A file picked on the phone (uploaded when saved) or the proof already saved (a link) */
+type Receipt = { name: string; uri: string; mimeType?: string; size?: number };
 
 const PAYMENT_METHODS: PaymentMode[] = ['Cash', 'UPI', 'Bank Transfer', 'Cheque'];
-const PURPOSES: DonationPurpose[] = ['Festival', 'Aarti', 'Cultural', 'General Fund', 'Other'];
-const MAX_NOTES = 300;
-
-/** Keeps the chosen day but uses the current time, so entries sort sensibly. */
-const withCurrentTime = (day: Date) => {
-  const now = new Date();
-  const d = new Date(day);
-  d.setHours(now.getHours(), now.getMinutes(), 0, 0);
-  return d;
-};
+// Until the society's list loads (App Settings → Donation Categories)
+const FALLBACK_PURPOSES = ['General Fund', 'Festival', 'Aarti', 'Other'];
+const MAX_NOTES = 256;
 
 export default function AddDonationScreen() {
   return (
@@ -56,18 +53,43 @@ export default function AddDonationScreen() {
 function AddDonationForm() {
   const navigation = useNavigation<Nav>();
   const { params } = useRoute<RouteProp<HomeStackParamList, 'AddDonation'>>();
-  const { donations, addDonation, updateDonation } = useDonations();
-  const existing = params?.donationId ? donations.find((d) => d.id === params.donationId) : undefined;
+  const { user } = useAuth();
+  const editId = params?.donationId;
+  const purposes = useDonationSettings()?.purposes ?? FALLBACK_PURPOSES;
 
-  const [donorName, setDonorName] = useState(existing?.donorName ?? '');
-  const [memberId, setMemberId] = useState(existing?.memberId ?? '');
-  const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
-  const [mode, setMode] = useState<PaymentMode | null>(existing?.mode ?? null);
-  const [reference, setReference] = useState(existing?.reference ?? '');
-  const [date, setDate] = useState<Date>(existing ? new Date(existing.date) : new Date());
-  const [purpose, setPurpose] = useState<DonationPurpose | null>(existing?.purpose ?? null);
-  const [notes, setNotes] = useState(existing?.note ?? '');
-  const [receipt, setReceipt] = useState<Receipt | null>(existing?.receipt ?? null);
+  const [donorName, setDonorName] = useState('');
+  const [memberId, setMemberId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [mode, setMode] = useState<PaymentMode | null>(null);
+  const [reference, setReference] = useState('');
+  const [date, setDate] = useState<Date>(new Date());
+  const [purpose, setPurpose] = useState<string | null>(null);
+  const [notes, setNotes] = useState('');
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [status, setStatus] = useState<ApiEntryStatus>('pending');
+  const [loadingEntry, setLoadingEntry] = useState(!!editId);
+  const [saving, setSaving] = useState(false);
+
+  // Editing: the saved entry fills the form
+  useEffect(() => {
+    if (!editId) return;
+    getDonationEntry(editId)
+      .then(({ data }) => {
+        const d = toDonation(data.donation);
+        setDonorName(d.donorName);
+        setMemberId(d.memberId === '-' ? '' : d.memberId);
+        setAmount(String(d.amount));
+        setMode(d.mode);
+        setReference(d.reference ?? '');
+        setDate(fromIsoDay(d.date));
+        setPurpose(d.purpose ?? null);
+        setNotes(d.note ?? '');
+        setReceipt(d.proofUrl ? { name: 'Saved proof', uri: d.proofUrl } : null);
+        setStatus(data.donation.status);
+      })
+      .catch((e) => Alert.alert('Could not load the entry', e instanceof Error ? e.message : 'Please try again.'))
+      .finally(() => setLoadingEntry(false));
+  }, [editId]);
   const { errors, setErrors, clearError, setError, fieldProps } = useFormErrors<Field>();
   const [sheet, setSheet] = useState<'mode' | 'purpose' | null>(null);
   const [iosDate, setIosDate] = useState<Date | null>(null);
@@ -81,7 +103,7 @@ function AddDonationForm() {
         maximumDate: new Date(),
         onChange: (e, picked) => {
           if (e.type === 'set' && picked) {
-            setDate(withCurrentTime(picked));
+            setDate(picked);
             clearError('date');
           }
         },
@@ -103,74 +125,80 @@ function AddDonationForm() {
       return;
     }
     clearError('receipt');
-    setReceipt({ name: asset.name, uri: asset.uri, mimeType: asset.mimeType });
+    setReceipt({ name: asset.name, uri: asset.uri, mimeType: asset.mimeType, size: asset.size });
   };
 
   const parsedAmount = Number(amount.replace(/,/g, ''));
 
-  const build = (status: NewDonation['status']): NewDonation => ({
-    donorName: donorName.trim(),
-    memberId: memberId.trim().toUpperCase(),
-    amount: Number.isFinite(parsedAmount) ? parsedAmount : 0,
-    mode: mode ?? 'Cash',
-    reference: reference.trim(),
-    date: date.toISOString(),
-    purpose: purpose ?? undefined,
-    note: notes.trim() || undefined,
-    receipt: receipt ?? undefined,
-    status,
-  });
-
-  const save = (status: NewDonation['status']) => {
-    const entry = build(status);
-    if (existing) updateDonation(existing.id, entry);
-    else addDonation(entry);
-  };
-
   const validate = () => {
     const next: typeof errors = {};
-    if (!donorName.trim()) next.donorName = 'Please enter the donor name.';
-    if (!memberId.trim()) next.memberId = 'Please enter the member ID.';
+    // A member is found by their code; anyone else is saved by name
+    if (!donorName.trim() && !memberId.trim()) next.donorName = 'Enter the donor name or a member ID.';
     if (!amount.trim()) next.amount = 'Please enter the amount.';
     else if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) next.amount = 'Amount must be greater than 0.';
     if (!mode) next.mode = 'Please select a payment method.';
-    if (!reference.trim()) next.reference = 'Please enter the transaction ID or receipt number.';
+    if (mode && mode !== 'Cash' && !reference.trim()) next.reference = 'Please enter the transaction ID or receipt number.';
     if (!purpose) next.purpose = 'Select a purpose.';
-    if (!receipt) next.receipt = 'Please upload the receipt.';
     setErrors(next);
     return Object.keys(next).length === 0;
   };
 
-  const onSaveDraft = () => {
-    if (!donorName.trim()) {
-      setError('donorName', 'Add the donor name to save a draft.');
-      return;
-    }
-    save('Draft');
-    showToast('Draft saved');
-    navigation.goBack();
-  };
-
-  const onSubmit = () => {
+  // New entries wait for verification; "Save & Verify" counts them at once (only verified entries count in totals)
+  const save = async (nextStatus: ApiEntryStatus) => {
     if (!validate()) {
       showToast('Please fill all required fields');
       return;
     }
-    // Every submitted entry waits for verification (cash and bank entries are checked by the treasurer).
-    save('Pending');
-    showToast('Donation entry submitted');
-    navigation.goBack();
+    setSaving(true);
+    try {
+      let proofUrl: string | null = null;
+      if (receipt) {
+        proofUrl = /^https?:\/\//.test(receipt.uri)
+          ? receipt.uri
+          : (await uploadMedia({ uri: receipt.uri, kind: 'image', mimeType: receipt.mimeType, fileSize: receipt.size }, mediaFolder('finance', user?.id))).url;
+      }
+      const code = memberId.trim().toUpperCase();
+      const { message } = await saveDonationEntry(
+        {
+          ...(code ? { member_code: code } : { donor_name: donorName.trim() }),
+          amount: parsedAmount,
+          purpose: purpose!,
+          method: METHOD_OF[mode!],
+          reference_no: reference.trim() || undefined,
+          donated_on: toIsoDay(date),
+          status: nextStatus,
+          proof_url: proofUrl,
+          note: notes.trim() || undefined,
+        },
+        editId,
+      );
+      showToast(message);
+      navigation.goBack();
+    } catch (e) {
+      Alert.alert('Could not save the entry', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loadingEntry) {
+    return (
+      <View style={common.screen}>
+        <AppHeader leftType="back" rightIcons={['bell', 'avatar']} />
+        <ActivityIndicator color={colors.primary} style={styles.loading} />
+      </View>
+    );
+  }
 
   return (
     <View style={common.screen}>
       <AppHeader leftType="back" rightIcons={['bell', 'avatar']} />
       <KeyboardAvoid>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Text style={common.heading}>{existing ? 'Edit Donation Entry' : 'Add Donation Entry'}</Text>
+          <Text style={common.heading}>{editId ? 'Edit Donation Entry' : 'Add Donation Entry'}</Text>
           <Text style={styles.subtext}>Fill in the donation details below.</Text>
 
-          <FormField label="Donor Name" error={errors.donorName}>
+          <FormField label="Donor Name" required={!memberId.trim()} error={errors.donorName}>
             <InputField
               placeholder="e.g. Dhaval Patel"
               value={donorName}
@@ -179,9 +207,9 @@ function AddDonationForm() {
             />
           </FormField>
 
-          <FormField label="Member ID" error={errors.memberId}>
+          <FormField label="Member ID (if member)" required={false} error={errors.memberId}>
             <InputField
-              placeholder="e.g. GM001 (if member)"
+              placeholder="e.g. GM0012"
               value={memberId}
               {...fieldProps('memberId', setMemberId)}
               autoCapitalize="characters"
@@ -217,7 +245,7 @@ function AddDonationForm() {
             />
           </FormField>
 
-          <FormField label="Transaction ID / Receipt No." error={errors.reference}>
+          <FormField label="Transaction ID / Receipt No." required={mode !== 'Cash'} error={errors.reference}>
             <InputField
               placeholder="e.g. UTR number / Receipt No."
               value={reference}
@@ -251,7 +279,7 @@ function AddDonationForm() {
             />
           </FormField>
 
-          <FormField label="Upload Receipt" error={errors.receipt}>
+          <FormField label="Upload Receipt / Proof" required={false} error={errors.receipt}>
             {receipt ? (
               <View style={styles.fileRow}>
                 {receipt.mimeType?.startsWith('image/') ? (
@@ -274,7 +302,14 @@ function AddDonationForm() {
           </FormField>
         </ScrollView>
 
-        <FormActionBar onSaveDraft={onSaveDraft} primaryTitle="Submit Entry" onPrimary={onSubmit} />
+        <FormActionBar
+          draftTitle="Save & Verify"
+          draftIcon="checkmark-circle-outline"
+          onSaveDraft={() => save('success')}
+          primaryTitle={editId ? 'Save Entry' : 'Submit Entry'}
+          onPrimary={() => save(editId ? status : 'pending')}
+          busy={saving}
+        />
       </KeyboardAvoid>
 
       <SelectSheet
@@ -291,7 +326,7 @@ function AddDonationForm() {
       <SelectSheet
         visible={sheet === 'purpose'}
         title="Purpose"
-        options={PURPOSES}
+        options={purposes}
         selected={purpose}
         onSelect={(p) => {
           setPurpose(p);
@@ -308,7 +343,7 @@ function AddDonationForm() {
           onChange={setIosDate}
           onCancel={() => setIosDate(null)}
           onDone={() => {
-            setDate(withCurrentTime(iosDate));
+            setDate(iosDate);
             setIosDate(null);
           }}
         />
@@ -317,8 +352,9 @@ function AddDonationForm() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   scroll: { padding: 16, paddingBottom: 24 },
+  loading: { marginTop: 40 },
   subtext: { fontFamily: fonts.regular, fontSize: 12, color: colors.textMuted, marginTop: 2, marginBottom: 16 },
   row: { flexDirection: 'row', gap: 10 },
 
@@ -350,4 +386,4 @@ const styles = StyleSheet.create({
   },
   thumb: { width: 40, height: 40, borderRadius: 8 },
   fileName: { flex: 1, fontFamily: fonts.medium, fontSize: 13, color: colors.textDark },
-});
+}));

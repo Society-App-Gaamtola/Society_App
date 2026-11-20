@@ -8,7 +8,7 @@ import db from "../../../config/db.js";
 import query from "../../../config/dbHelper.js";
 import { createOtpWmailTemplate } from "../../../config/mail.js";
 
-const { OTP_EXPIRY_MINUTES, OTP_RESEND_SECONDS, BCRYPT_ROUNDS, MAX_OTP_ATTEMPTS, OTP_PURPOSE, LOGGED_OUT_DEVICE, OTP_MAIL_FAILED } = constant;
+const { OTP_EXPIRY_MINUTES, OTP_RESEND_SECONDS, BCRYPT_ROUNDS, MAX_OTP_ATTEMPTS, OTP_PURPOSE, LOGGED_OUT_DEVICE, OTP_MAIL_FAILED, DB_ERROR } = constant;
 
 // Outside production the OTP is always DEV_OTP so the flow can be tested without a real mailbox
 const generateOtp = () => {
@@ -112,7 +112,7 @@ const saveProfile = async (user_id, address, photo) => {
         return;
     }
 
-    await db.query("INSERT INTO user_profiles SET ? ON DUPLICATE KEY UPDATE ?", [{ user_id, ...profileData }, profileData]);
+    await query.upsertQuery("user_profiles", { user_id, ...profileData }, ["user_id"]);
 
     if (oldPhoto && oldPhoto !== photo && !/^https?:\/\//.test(oldPhoto)) {
         await common.deleteUpload(oldPhoto);
@@ -121,8 +121,8 @@ const saveProfile = async (user_id, address, photo) => {
 
 // A deleted account still holds its email / mobile, and two requests can both pass the unique checks
 const sendSaveError = (res, where, error) => {
-    if (error.code === "ER_DUP_ENTRY") {
-        const msgKey = error.message.includes("uq_users_email") ? "rest_email_already_exists" : "rest_user_mobile_already_exists";
+    if (error.code === DB_ERROR.UNIQUE_VIOLATION) {
+        const msgKey = error.constraint === "uq_users_email" ? "rest_email_already_exists" : "rest_user_mobile_already_exists";
         return middleware.sendError(res, msgKey);
     }
     return middleware.sendServerError(res, where, error);
@@ -134,7 +134,7 @@ const authModule = {
     // Returns { sent, resend_after_seconds }
     async issueOtp({ user_id = null, email, otp_purpose }) {
         const [lastOtp] = await db.query(
-            `SELECT TIMESTAMPDIFF(SECOND, created_at, NOW()) AS age FROM otp_codes
+            `SELECT FLOOR(EXTRACT(EPOCH FROM NOW() - created_at))::int AS age FROM otp_codes
              WHERE destination = ? AND purpose = ?
              ORDER BY id DESC LIMIT 1`,
             [email, otp_purpose],
@@ -164,10 +164,10 @@ const authModule = {
             }
         }
 
-        // Expiry is calculated by MySQL so it matches NOW() used when verifying
+        // Expiry is calculated by the database so it matches NOW() used when verifying
         await db.query(
             `INSERT INTO otp_codes (user_id, destination, channel, purpose, otp_code, expires_at)
-             VALUES (?, ?, 'email', ?, ?, DATE_ADD(NOW(), INTERVAL ? MINUTE))`,
+             VALUES (?, ?, 'email', ?, ?, NOW() + make_interval(mins => ?::int))`,
             [user_id, email, otp_purpose, otp, OTP_EXPIRY_MINUTES],
         );
 
@@ -176,14 +176,14 @@ const authModule = {
 
     // Shared by password login and OTP verification
     // Profile not finished yet → code PROFILE_SETUP_PENDING so the app opens the Profile & Address screen
-    sendLoginResponse(res, user, token) {
+    async sendLoginResponse(res, user, token) {
         const profileDone = user.signup_step === "completed";
         return middleware.sendApiResponse(
             res,
             Codes.SUCCESS,
             profileDone ? Codes.RESPONSE_SUCCESS : Codes.PROFILE_SETUP_PENDING,
             profileDone ? "rest_login_successful" : "rest_profile_setup_pending",
-            { userData: common.sanitizeUser(user), token },
+            { userData: await common.userWithPermissions(user), token },
         );
     },
 
@@ -192,6 +192,10 @@ const authModule = {
     async signUp(request, res) {
         try {
             const { email, country_code, mobile_number } = request;
+
+            if (!(await common.getSettings()).allow_registration) {
+                return middleware.sendError(res, "rest_registration_closed");
+            }
 
             const conflictKey = await findSignupConflict(request);
             if (conflictKey) {
@@ -229,7 +233,7 @@ const authModule = {
             }
 
             const token = await common.generateToken(user, request);
-            return this.sendLoginResponse(res, user, token);
+            return await this.sendLoginResponse(res, user, token);
         } catch (error) {
             return middleware.sendServerError(res, "login", error);
         }
@@ -283,6 +287,9 @@ const authModule = {
                     return middleware.sendError(res, otpError);
                 }
 
+                if (!(await common.getSettings()).allow_registration) {
+                    return middleware.sendError(res, "rest_registration_closed");
+                }
                 // Normal Members join without manual approval (role_id defaults to member)
                 // full_name is collected on the Profile & Address screen
                 const [result] = await query.insertQuery("users", {
@@ -310,7 +317,7 @@ const authModule = {
             }
 
             const token = await common.generateToken(user, request);
-            return this.sendLoginResponse(res, user, token);
+            return await this.sendLoginResponse(res, user, token);
         } catch (error) {
             return sendSaveError(res, "verifyOtp", error);
         }
@@ -329,15 +336,19 @@ const authModule = {
 
             await saveProfile(user_id, address, photo);
 
-            // accept_terms is enforced by completeProfileSchema; IGNORE keeps the first acceptance of this version
-            await db.query("INSERT IGNORE INTO declaration_acceptances SET ?", [{
+            // accept_terms is enforced by completeProfileSchema; DO NOTHING keeps the first acceptance of this version
+            await query.insertQuery("declaration_acceptances", {
                 user_id,
                 declaration_version: constant.DECLARATION_VERSION,
                 ip_address: request.ip,
-            }]);
+            }, "ON CONFLICT (user_id, declaration_version) DO NOTHING");
 
             // Last, so a failure above leaves the user on the Profile & Address screen to retry
             await query.updateQuery("users", { full_name: username, signup_step: "completed" }, "id = ?", [user_id]);
+            // Sign-up done: the member gets their member code (GM0001…)
+            await common.assignMemberCode(user_id);
+            common.logActivity(request, constant.ACTIVITY.MEMBER_JOINED, "users", user_id);
+            common.notifyAdmins("notify_new_member", "notify_admin_new_member", username, "member", user_id);
 
             const userData = await common.getUserDetails({ id: user_id });
             if (!userData) {
@@ -359,7 +370,7 @@ const authModule = {
             if (!user) {
                 return middleware.sendError(res, "rest_user_not_found");
             }
-            return middleware.sendSuccess(res, "rest_keywords_success", { userData: common.sanitizeUser(user) });
+            return middleware.sendSuccess(res, "rest_keywords_success", { userData: await common.userWithPermissions(user) });
         } catch (error) {
             return middleware.sendServerError(res, "getProfile", error);
         }

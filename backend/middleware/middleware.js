@@ -78,6 +78,11 @@ const sendError = (res, msgKey, resData = null) => {
     return sendApiResponse(res, Codes.SUCCESS, Codes.RESPONSE_ERROR, msgKey, resData);
 };
 
+// Logged in, but not allowed to do this (HTTP 403, code 0)
+const sendForbidden = (res) => {
+    return sendApiResponse(res, Codes.FORBIDDEN, Codes.RESPONSE_ERROR, "rest_keywords_forbidden", null);
+};
+
 const sendServerError = (res, where, error) => {
     // The OTP email couldn't be sent: tell the user that, not "An error occurred"
     if (error?.code === constant.OTP_MAIL_FAILED) {
@@ -179,26 +184,41 @@ async function tokenMiddleware(req, res, next) {
     }
 
     try {
-        // All roles (Super Admin included) live in users / user_devices
-        const [devices] = await db.query(
-            `SELECT id FROM user_devices
-             WHERE user_id = ? AND refresh_token_hash = ? AND status = 'active' AND is_active = 1 AND is_deleted = 0 LIMIT 1`,
-            [decoded.id, common.hashToken(bearerToken)]
+        // One query on every request: the session (this token on an active device; all roles, Super Admin included,
+        // live in user_devices), the user's current status and role, and an executive's permission sections
+        const [sessions] = await db.query(
+            `SELECT d.role AS session_role, u.id AS user_id, u.is_active, u.status, r.code AS role,
+                    CASE WHEN r.code = ? THEN ARRAY(
+                        SELECT m.code FROM executive_permissions p JOIN modules m ON m.id = p.module_id
+                        WHERE p.user_id = u.id AND p.is_active = 1 AND m.is_active = 1 AND m.is_deleted = 0
+                    ) END AS sections
+             FROM user_devices d
+             LEFT JOIN users u ON u.id = d.user_id AND u.is_deleted = 0
+             LEFT JOIN roles r ON r.id = u.role_id
+             WHERE d.user_id = ? AND d.refresh_token_hash = ? AND d.status = 'active' AND d.is_active = 1 AND d.is_deleted = 0
+             LIMIT 1`,
+            [constant.ROLES.EXECUTIVE, decoded.id, common.hashToken(bearerToken)]
         );
-        if (!devices.length) {
+        const session = sessions[0];
+        if (!session) {
             return sendApiResponse(res, Codes.UNAUTHORIZED, Codes.INVALID_TOKEN, "You_Are_Not_Logged_In", null);
         }
-
-        const account = await common.getUserDetails({ id: decoded.id });
-        if (!account || common.isAccountInactive(account)) {
+        if (!session.user_id || common.isAccountInactive(session)) {
             return sendApiResponse(res, Codes.UNAUTHORIZED, Codes.INVALID_TOKEN, "rest_keywords_unauthorized", null);
         }
 
-        // Role is re-read from the DB so a promotion / demotion applies without re-login
-        req.loginUser = {
-            ...decoded,
-            role: account.role,
-        };
+        // The token was issued for one role (generateToken). It works only while the user still has that role:
+        // after a promotion / demotion the user logs in again and gets a token for the new role
+        if (session.session_role !== session.role || decoded.role !== session.role) {
+            return sendApiResponse(res, Codes.UNAUTHORIZED, Codes.INVALID_TOKEN, "rest_role_changed_login_again", null);
+        }
+
+        // allowedRoles (in each route) then checks this role, and requirePermission an executive's sections,
+        // with no further query
+        req.loginUser = { ...decoded, role: session.role };
+        if (session.role === constant.ROLES.EXECUTIVE) {
+            req.loginUser.permissions = { sections: session.sections };
+        }
         return next();
     } catch (error) {
         console.error("Error in token verification: ", error);
@@ -207,6 +227,15 @@ async function tokenMiddleware(req, res, next) {
 }
 
 // Usage: router.post("/event/add", middleware.allowedRoles("super_admin", "executive"), controller.addEvent)
+// After allowedRoles, for executive actions on one panel section (constant.PERMISSION_SECTIONS):
+//   router.post("/events", executives, middleware.requirePermission("events"), validateJoi(eventSchema), controller.createEvent)
+// The Super Admin always passes; an executive needs the section (else HTTP 403). No query: tokenMiddleware loaded it
+const requirePermission = (section) => {
+    return (req, res, next) => (common.hasPermission(req.loginUser, section) ? next() : sendApiResponse(
+        res, Codes.FORBIDDEN, Codes.RESPONSE_ERROR, "rest_permission_denied", null,
+    ));
+};
+
 // Must run after tokenMiddleware (i.e. not on a bypassed route)
 const allowedRoles = (...roles) => {
     return (req, res, next) => {
@@ -216,7 +245,7 @@ const allowedRoles = (...roles) => {
         }
 
         if (!roles.includes(role)) {
-            return sendApiResponse(res, Codes.FORBIDDEN, Codes.RESPONSE_ERROR, "rest_keywords_forbidden", null);
+            return sendForbidden(res);
         }
 
         return next();
@@ -244,11 +273,13 @@ export default {
     sendSuccess,
     sendError,
     sendServerError,
+    sendForbidden,
     validateJoi,
     encryption,
     decryption,
     getBearerToken,
     tokenMiddleware,
     allowedRoles,
+    requirePermission,
     checkApi,
 };

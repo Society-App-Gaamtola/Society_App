@@ -1,5 +1,5 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, spacing } from '../../theme';
+import { colors, spacing, themedStyles } from '../../theme';
 import { Lotus } from './Ornaments';
 
 type Props = { style?: StyleProp<ViewStyle> };
@@ -15,7 +15,7 @@ export default function LotusFooter({ style }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -30,4 +30,4 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     marginBottom: 4,
   },
-});
+}));

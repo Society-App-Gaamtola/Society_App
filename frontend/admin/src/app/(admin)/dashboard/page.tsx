@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import {
   ArrowRight,
   CalendarDays,
@@ -9,6 +10,8 @@ import {
   Crown,
   FileText,
   HandCoins,
+  ImageIcon,
+  Megaphone,
   ReceiptText,
   ShieldCheck,
   UserPlus,
@@ -16,9 +19,11 @@ import {
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
-import { Card, DateRangePicker, EmptyState, ErrorState, PageHeader, StatCard, StatCardsSkeleton, ViewDialog } from '@/components/common';
+import { Card, EmptyState, ErrorState, PageHeader, StatCard, StatCardsSkeleton, ViewDialog } from '@/components/common';
+import { PeriodFilter, usePeriodLabel } from '@/components/PeriodFilter';
 import { Pagination } from '@/components/Pagination';
 import { Skeleton } from '@/components/ui/primitives';
+import { DEFAULT_PAGE_SIZE } from '@/config';
 import { useActivities, useDashboardStats } from '@/hooks/useDashboard';
 import { useUrlState } from '@/hooks/useUrlState';
 import { formatDate, formatDateTime, formatINR } from '@/lib/utils';
@@ -29,7 +34,7 @@ const IncomeExpenseChart = dynamic(() => import('@/components/IncomeExpenseChart
   loading: () => <Skeleton className="h-72" />,
 });
 
-const ACTIVITY_PAGE_SIZE = 10;
+const ACTIVITY_PAGE_SIZE = DEFAULT_PAGE_SIZE;
 
 /** Picks an icon from the wording of the audit entry. */
 function activityIcon(action: string): LucideIcon {
@@ -38,6 +43,8 @@ function activityIcon(action: string): LucideIcon {
   if (a.includes('donation')) return HandCoins;
   if (a.includes('expense')) return ReceiptText;
   if (a.includes('event')) return CalendarDays;
+  if (a.includes('notice')) return Megaphone;
+  if (a.includes('photo')) return ImageIcon;
   if (a.includes('executive') || a.includes('permission')) return ShieldCheck;
   return FileText;
 }
@@ -83,30 +90,72 @@ function AllActivitiesDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   );
 }
 
+/** The dashboard's period as list filters (from / to), so a money card opens the same dates */
+function withRange(path: string, params: Record<string, string>, range: { from?: string; to?: string }) {
+  const query = new URLSearchParams(params);
+  if (range.from) query.set('from', range.from);
+  if (range.to) query.set('to', range.to);
+  const text = query.toString();
+  return text ? `${path}?${text}` : path;
+}
+
+type PendingCounts = { donations: number; requests: number; media: number };
+
+/** "Pending Approvals" card: what is waiting, each row opening its approval queue */
+function PendingDialog({ open, onOpenChange, counts }: { open: boolean; onOpenChange: (open: boolean) => void; counts: PendingCounts }) {
+  const rows: { label: string; count: number; href: string; icon: LucideIcon }[] = [
+    { label: 'Donations to verify', count: counts.donations, href: '/donations?status=pending', icon: HandCoins },
+    { label: 'Executive requests', count: counts.requests, href: '/executives?status=pending', icon: Crown },
+    { label: 'Photos / videos to approve', count: counts.media, href: '/media?tab=pending', icon: ImageIcon },
+  ];
+  return (
+    <ViewDialog open={open} onOpenChange={onOpenChange} title="Pending Approvals" className="max-w-md">
+      <ul className="divide-y divide-border">
+        {rows.map(({ label, count, href, icon: Icon }) => (
+          <li key={href}>
+            <Link href={href} onClick={() => onOpenChange(false)} className="flex items-center gap-3 rounded-lg px-2 py-3 text-sm hover:bg-muted">
+              <Icon className="h-5 w-5 shrink-0 text-maroon" />
+              <span className="flex-1 font-medium">{label}</span>
+              <span className="rounded-full bg-[#FFF1E0] px-2.5 py-0.5 text-xs font-bold text-[#E0700B]">{count}</span>
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </ViewDialog>
+  );
+}
+
 export default function DashboardPage() {
   const { range } = useUrlState();
   const { data, isLoading, isError, refetch } = useDashboardStats(range);
   const [showAll, setShowAll] = useState(false);
+  const [showPending, setShowPending] = useState(false);
+  const periodLabel = usePeriodLabel();
 
   return (
     <>
-      <PageHeader title="Dashboard" subtitle="Manage, support and grow our society" actions={<DateRangePicker />} />
+      <PageHeader title="Dashboard" subtitle="Manage, support and grow our society" actions={<PeriodFilter />} />
       {isError ? <ErrorState onRetry={() => refetch()} /> : null}
       {isLoading ? <StatCardsSkeleton count={8} /> : null}
       {data ? (
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard icon={Users} value={data.totalMembers} label="Total Members" tone="red" />
-            <StatCard icon={Crown} value={data.executives} label="Executive Members" tone="amber" />
-            <StatCard icon={CalendarDays} value={data.activeEvents} label="Active Events" tone="blue" />
-            <StatCard icon={FileText} value={data.totalNotices} label="Total Notices" tone="red" />
-            <StatCard icon={HandCoins} value={formatINR(data.totalDonations)} label="Total Donations" trend={data.donationTrend} tone="green" />
-            <StatCard icon={ReceiptText} value={formatINR(data.totalExpenses)} label="Total Expenses" trend={data.expenseTrend} trendGoodWhenUp={false} tone="red" />
-            <StatCard icon={Wallet} value={formatINR(data.balance)} label="Current Balance" tone="blue" />
-            <StatCard icon={Clock} value={data.pendingApprovals} label="Pending Approvals" tone="orange" />
+            <StatCard icon={Users} value={data.totalMembers} label="Total Members" tone="red" href="/members?status=active&signup=completed" />
+            <StatCard icon={Crown} value={data.executives} label="Executive Members" tone="amber" href="/executives?tab=permissions" />
+            <StatCard icon={CalendarDays} value={data.activeEvents} label="Active Events" tone="blue" href="/events?status=posted" />
+            <StatCard icon={FileText} value={data.totalNotices} label="Total Notices" tone="red" href="/notices?status=published" />
+            <StatCard icon={HandCoins} value={formatINR(data.totalDonations)} label="Total Donations" trend={data.donationTrend} tone="green" href={withRange('/donations', { status: 'success' }, range)} />
+            <StatCard icon={ReceiptText} value={formatINR(data.totalExpenses)} label="Total Expenses" trend={data.expenseTrend} trendGoodWhenUp={false} tone="red" href={withRange('/expenses', { status: 'verified' }, range)} />
+            <StatCard icon={Wallet} value={formatINR(data.balance)} label="Current Balance" tone="blue" href={withRange('/reports', {}, range)} />
+            <StatCard icon={Clock} value={data.pendingApprovals} label="Pending Approvals" tone="orange" onClick={() => setShowPending(true)} />
           </div>
           <div className="mt-4 grid gap-4 lg:grid-cols-5">
-            <Card title="Donation vs Expense Overview" className="lg:col-span-3">
+            <Card
+              title="Donation vs Expense Overview"
+              className="min-w-0 lg:col-span-3"
+              action={<span className="rounded-full bg-[#FDECEC] px-3 py-1 text-xs font-semibold text-maroon">{periodLabel}</span>}
+            >
               <IncomeExpenseChart data={data.monthly} />
             </Card>
             <Card
@@ -130,6 +179,11 @@ export default function DashboardPage() {
             </Card>
           </div>
           <AllActivitiesDialog open={showAll} onOpenChange={setShowAll} />
+          <PendingDialog
+            open={showPending}
+            onOpenChange={setShowPending}
+            counts={{ donations: data.pendingDonations, requests: data.pendingRequests, media: data.pendingMedia }}
+          />
         </>
       ) : null}
     </>

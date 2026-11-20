@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import { Ionicons, type IoniconName } from '../../icons';
 
 type Props = {
@@ -26,7 +26,7 @@ export default function PickerField({ icon, trailingIcon, placeholder, value, er
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   picker: {
     height: 50,
     flexDirection: 'row',
@@ -41,4 +41,4 @@ const styles = StyleSheet.create({
   error: { borderColor: colors.danger },
   text: { flex: 1, fontFamily: fonts.regular, fontSize: 13, color: colors.textDark },
   placeholder: { color: colors.placeholder },
-});
+}));

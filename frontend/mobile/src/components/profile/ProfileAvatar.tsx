@@ -1,5 +1,5 @@
 import { Image, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 
 type Props = { name?: string; uri?: string | null; size?: number; style?: StyleProp<ViewStyle> };
 
@@ -29,8 +29,8 @@ export default function ProfileAvatar({ name, uri, size = 88, style }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   ring: { padding: 3, backgroundColor: colors.lightGold },
   avatar: { backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   initials: { fontFamily: fonts.bold, color: colors.primary },
-});
+}));

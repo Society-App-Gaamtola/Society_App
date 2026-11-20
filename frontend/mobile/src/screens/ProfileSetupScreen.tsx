@@ -4,7 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as authApi from '../api/auth';
 import type { ImageFile } from '../api/auth';
 import type { RootStackParamList } from '../navigation/types';
-import { colors, fonts, spacing } from '../theme';
+import { colors, fonts, spacing, themedStyles } from '../theme';
 import { useAuth } from '../context/AuthContext';
 import { showApiError } from '../hooks/useFormErrors';
 import { pickProfilePhoto } from '../services/profilePhoto';
@@ -19,10 +19,12 @@ import {
   REGISTER_STEPS,
   StepIndicator,
 } from '../components';
+import { useT } from '../i18n';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProfileSetup'>;
 
 export default function ProfileSetupScreen({ navigation, route }: Props) {
+  const t = useT();
   const { user, updateUser, signOut } = useAuth();
   const [photo, setPhoto] = useState<ImageFile | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -50,8 +52,8 @@ export default function ProfileSetupScreen({ navigation, route }: Props) {
     try {
       const { data, message } = await authApi.completeProfile({ username: name.trim(), address: address.trim() }, photo, user?.id);
       await updateUser(data.userData);
-      Alert.alert('Account Created', message, [
-        { text: 'OK', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Main' }] }) },
+      Alert.alert(t('Account Created'), message, [
+        { text: t('OK'), onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Main' }] }) },
       ]);
     } catch (error) {
       showApiError(error, 'Could not save your profile');
@@ -72,8 +74,8 @@ export default function ProfileSetupScreen({ navigation, route }: Props) {
 
       <StepIndicator steps={REGISTER_STEPS} current={3} />
 
-      <Text style={styles.heading}>Profile & Address</Text>
-      <Text style={styles.subtext}>Complete your profile to get the best experience.</Text>
+      <Text style={styles.heading}>{t('Profile & Address')}</Text>
+      <Text style={styles.subtext}>{t('Complete your profile to get the best experience.')}</Text>
 
       <AvatarPicker uri={photo?.uri} error={photoError} onPress={pickPhoto} />
 
@@ -113,8 +115,8 @@ export default function ProfileSetupScreen({ navigation, route }: Props) {
         style={styles.terms}
         label={
           <Text style={styles.termsText}>
-            I agree to the <Text style={styles.termsBold}>Terms of Use</Text> and{' '}
-            <Text style={styles.termsBold}>Privacy Policy</Text>.
+            I agree to the <Text style={styles.termsBold}>{t('Terms of Use')}</Text> and{' '}
+            <Text style={styles.termsBold}>{t('Privacy Policy')}</Text>.
           </Text>
         }
       />
@@ -122,7 +124,7 @@ export default function ProfileSetupScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   heading: { fontFamily: fonts.bold, fontSize: 22, color: colors.primary, marginTop: spacing.lg },
   subtext: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 20, color: colors.textMuted, marginTop: 2 },
   field: { marginBottom: spacing.md },
@@ -133,4 +135,4 @@ const styles = StyleSheet.create({
   terms: { marginTop: spacing.md, alignItems: 'flex-start' },
   termsText: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, color: colors.textDark },
   termsBold: { fontFamily: fonts.semiBold },
-});
+}));

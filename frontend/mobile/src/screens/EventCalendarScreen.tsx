@@ -6,21 +6,23 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/types';
 import { common, surface } from '../styles/common';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themedStyles } from '../theme';
 import { MAX_PAGE_SIZE } from '../config';
 import { getEventCategories, getEvents, toSocietyEvent, type ApiCategory } from '../api/user';
 import { Ionicons, MaterialCommunityIcons } from '../icons';
 import type { SocietyEvent } from '../types';
 import { formatDate, fromIsoDay, MONTHS, MONTH_NAMES, toIsoDay } from '../utils/date';
 import { AppHeader, MetaRow, Pill, SectionHeader } from '../components';
+import { useLanguage, useT } from '../i18n';
 
-const CALENDAR_THEME = {
+// A function, so the calendar gets the current theme's colors
+const calendarTheme = () => ({
   calendarBackground: colors.card,
   textSectionTitleColor: colors.textMuted,
   textDayHeaderFontFamily: fonts.regular,
   textDayHeaderFontSize: 11,
   arrowColor: colors.primary,
-};
+});
 
 /** First and last day (yyyy-mm-dd) of the month that `day` is in. */
 const monthRange = (day: string) => {
@@ -95,6 +97,9 @@ function Day({ date, state, onPress }: DayProps) {
 }
 
 export default function EventCalendarScreen() {
+  // Reloaded in the new language when the user switches it (category names, dates and server messages)
+  const language = useLanguage();
+  const t = useT();
   const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const [today] = useState(() => toIsoDay(new Date()));
   const [month, setMonth] = useState(() => monthRange(today));
@@ -108,7 +113,7 @@ export default function EventCalendarScreen() {
     getEventCategories()
       .then(({ data }) => setCategories(data.categories))
       .catch(() => {});
-  }, []);
+  }, [language]);
 
   // Every event that runs on any day of the shown month
   useEffect(() => {
@@ -125,7 +130,7 @@ export default function EventCalendarScreen() {
     return () => {
       active = false;
     };
-  }, [month]);
+  }, [month, language]);
 
   const dayContext = useMemo(() => ({ selectedDate, eventDates: eventDays(events) }), [selectedDate, events]);
 
@@ -145,21 +150,19 @@ export default function EventCalendarScreen() {
 
   const shownMonth = fromIsoDay(month.start);
   const listTitle = selectedDate
-    ? `Events on ${formatDate(fromIsoDay(selectedDate))}`
-    : `Events in ${MONTH_NAMES[shownMonth.getMonth()]} ${shownMonth.getFullYear()}`;
+    ? t('Events on {date}', { date: formatDate(fromIsoDay(selectedDate)) })
+    : t('Events in {month}', { month: `${t(MONTH_NAMES[shownMonth.getMonth()])} ${shownMonth.getFullYear()}` });
 
   const enableNotifications = async () => {
     try {
       const current = await Notifications.getPermissionsAsync();
       const result = current.granted ? current : await Notifications.requestPermissionsAsync();
       Alert.alert(
-        result.granted ? 'Notifications Enabled' : 'Permission Denied',
-        result.granted
-          ? 'You will now receive event reminders.'
-          : 'You can enable notifications later from your phone settings.',
+        t(result.granted ? 'Notifications Enabled' : 'Permission Denied'),
+        t(result.granted ? 'You will now receive event reminders.' : 'You can enable notifications later from your phone settings.'),
       );
     } catch {
-      Alert.alert('Notifications', 'Could not request notification permission on this device.');
+      Alert.alert(t('Notifications'), t('Could not request notification permission on this device.'));
     }
   };
 
@@ -167,8 +170,8 @@ export default function EventCalendarScreen() {
     <View style={common.screen}>
       <AppHeader leftType="menu" rightIcons={['bell', 'avatar']} />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={common.heading}>Event Calendar</Text>
-        <Text style={common.subtextRelaxed}>View all upcoming events and cultural activities of our society.</Text>
+        <Text style={common.heading}>{t('Event Calendar')}</Text>
+        <Text style={common.subtextRelaxed}>{t('View all upcoming events and cultural activities of our society.')}</Text>
 
         <View style={styles.calendarCard}>
           <DayContext.Provider value={dayContext}>
@@ -181,7 +184,7 @@ export default function EventCalendarScreen() {
               renderArrow={renderArrow}
               renderHeader={renderMonthTitle}
               dayComponent={Day}
-              theme={CALENDAR_THEME}
+              theme={calendarTheme()}
             />
           </DayContext.Provider>
         </View>
@@ -218,11 +221,11 @@ export default function EventCalendarScreen() {
         <View style={styles.notify}>
           <MaterialCommunityIcons name="shield-check-outline" size={28} color={colors.gold} />
           <View style={styles.notifyText}>
-            <Text style={styles.notifyTitle}>Stay Updated</Text>
-            <Text style={styles.notifySub}>Enable notifications to never miss important events and reminders.</Text>
+            <Text style={styles.notifyTitle}>{t('Stay Updated')}</Text>
+            <Text style={styles.notifySub}>{t('Enable notifications to never miss important events and reminders.')}</Text>
           </View>
           <Pressable style={styles.notifyButton} onPress={enableNotifications}>
-            <Text style={styles.notifyButtonText}>Enable Now</Text>
+            <Text style={styles.notifyButtonText}>{t('Enable Now')}</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -252,7 +255,7 @@ function EventRow({ event, onPress }: { event: SocietyEvent; onPress: () => void
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   scroll: { padding: 16, paddingBottom: 32 },
 
   calendarCard: { ...surface, marginTop: 14, borderRadius: 14, padding: 12 },
@@ -262,7 +265,7 @@ const styles = StyleSheet.create({
   dayEvent: { backgroundColor: colors.primary },
   daySelected: { borderWidth: 2, borderColor: colors.gold },
   dayText: { fontFamily: fonts.medium, fontSize: 13, color: colors.textDark },
-  dayTextOther: { color: '#CFC6BC' },
+  dayTextOther: { color: colors.disabledText },
   dayTextEvent: { color: colors.white, fontFamily: fonts.semiBold },
 
   legend: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 16, marginTop: 12 },
@@ -304,4 +307,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   notifyButtonText: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.white },
-});
+}));

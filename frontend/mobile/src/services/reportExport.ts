@@ -1,8 +1,9 @@
 import { Asset } from 'expo-asset';
 import { File, Paths } from 'expo-file-system';
 import { LOGO, SOCIETY_NAME } from '../config';
+import { getReportDonations, toDonation } from '../api/executive';
 import type { DateRange, Donation, ReportFormat, ReportType } from '../types';
-import { MONTHS, formatDateTime, formatRange, isInRange } from '../utils/date';
+import { MONTHS, formatDate, formatDateTime, formatRange, fromIsoDay, isInRange } from '../utils/date';
 import { formatINR } from '../utils/format';
 
 type Group = { label: string; count: number; amount: number };
@@ -33,9 +34,9 @@ const groupBy = (items: Donation[], key: (d: Donation) => string): Group[] => {
 };
 
 export function buildReportData(donations: Donation[], type: ReportType, range: DateRange): ReportData {
-  // Drafts are not real donations yet.
+  // Rejected entries were never received
   const items = donations
-    .filter((d) => d.status !== 'Draft')
+    .filter((d) => d.status !== 'Rejected')
     .filter((d) => isInRange(d.date, range))
     .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -90,7 +91,7 @@ const trendBars = (rows: Group[]) => {
     : '';
 };
 
-async function logoDataUri() {
+export async function logoDataUri() {
   try {
     const asset = Asset.fromModule(LOGO);
     await asset.downloadAsync();
@@ -113,7 +114,7 @@ ${data.byMember.map((m) => `<tr><td>${escapeHtml(m.memberId)}</td><td>${escapeHt
   } else {
     body = `<h3>Transactions</h3>
 <table><tr><th>Date</th><th>Donor</th><th>Member ID</th><th>Mode</th><th>Status</th><th class="num">Amount</th></tr>
-${data.transactions.map((d) => `<tr><td>${formatDateTime(new Date(d.date))}</td><td>${escapeHtml(d.donorName)}</td><td>${escapeHtml(d.memberId)}</td><td>${d.mode}</td><td>${d.status}</td><td class="num">${formatINR(d.amount)}</td></tr>`).join('')}
+${data.transactions.map((d) => `<tr><td>${formatDate(fromIsoDay(d.date))}</td><td>${escapeHtml(d.donorName)}</td><td>${escapeHtml(d.memberId)}</td><td>${d.mode}</td><td>${d.status}</td><td class="num">${formatINR(d.amount)}</td></tr>`).join('')}
 </table>`;
   }
 
@@ -180,7 +181,7 @@ async function toWorkbookBase64(data: ReportData) {
 
   const transactions = XLSX.utils.json_to_sheet(
     data.transactions.map((d) => ({
-      Date: formatDateTime(new Date(d.date)),
+      Date: formatDate(fromIsoDay(d.date)),
       Donor: d.donorName,
       'Member ID': d.memberId,
       Mode: d.mode,
@@ -220,4 +221,29 @@ export async function generateReportFile(data: ReportData, format: ReportFormat)
   const target = new File(Paths.document, `${baseName}.xlsx`);
   await target.write(await toWorkbookBase64(data), { encoding: 'base64' });
   return target.uri;
+}
+
+/** The app's report types as the saved-report history (generated_reports.report_type) names them */
+export const REPORT_API_TYPE: Record<ReportType, string> = {
+  'Donation Summary': 'category',
+  'Transaction History': 'donation',
+  'Member-wise Report': 'custom',
+};
+/** A saved report's type in the app (reports the panel made, e.g. expense or monthly, open as a Donation Summary) */
+export const reportTypeOf = (apiType: string): ReportType =>
+  (Object.keys(REPORT_API_TYPE) as ReportType[]).find((type) => REPORT_API_TYPE[type] === apiType) ?? 'Donation Summary';
+
+/**
+ * Builds a donation report for the period from the server's rows (GET /admin/reports/data/donation, page by page:
+ * verified and pending entries; rejected ones are left out) and saves the file on the phone. Returns its URI.
+ */
+export async function makeDonationReport(type: ReportType, range: DateRange, format: ReportFormat) {
+  const donations: Donation[] = [];
+  for (let page = 1; ; page += 1) {
+    const { data } = await getReportDonations(page, { from_date: range.start, to_date: range.end });
+    donations.push(...data.rows.map(toDonation));
+    if (!data.pagination.has_more) break;
+  }
+  const data = buildReportData(donations, type, range);
+  return { uri: await generateReportFile(data, format), period: data.period };
 }

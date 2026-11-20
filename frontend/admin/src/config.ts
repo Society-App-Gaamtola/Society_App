@@ -1,23 +1,31 @@
-export type DataMode = 'mock' | 'local-server' | 'supabase';
+/** The backend. Every screen calls it with the Super Admin's token. */
+export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5020/api/v1';
+export const BACKEND_API_KEY = process.env.NEXT_PUBLIC_BACKEND_API_KEY ?? '';
+/** A backend call that takes longer than this fails with a "try again" message instead of loading forever */
+export const BACKEND_TIMEOUT_MS = 20_000;
 
 /**
- * Where data comes from. Default `mock`: the demo data in src/services/seed.json is copied into each
- * browser, so the deployed panel needs no server. Set NEXT_PUBLIC_DATA_MODE=local-server to use ../mock-server.
+ * How long a loaded page of an admin list stays fresh in the browser. Coming back to a page within this time shows
+ * it from memory with no API call; saving a change refreshes it at once.
  */
-export const DATA_MODE = (process.env.NEXT_PUBLIC_DATA_MODE ?? 'mock') as DataMode;
+export const LIST_CACHE_MS = 5 * 60_000;
 
-/** Change this whenever seed.json changes, so browsers drop their old copy of the demo data. */
-export const SEED_VERSION = '2026-11-14';
-
-/** Demo uploads are stored inside the browser, which only holds a few MB in total. */
-export const MOCK_UPLOAD_MAX_MB = 1;
-
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+/** Exports read the list page by page with this page size (the backend's MAX_PAGE_SIZE). */
+export const EXPORT_PAGE_SIZE = 50;
 
 export const DEFAULT_PAGE_SIZE = 10;
+
+/**
+ * Cloudinary, for files the backend keeps (event posters): the same unsigned preset as the mobile app, so no secret
+ * is needed here. ENV_FOLDER must match the backend (production on the live server, development locally).
+ */
+export const CLOUDINARY = {
+  cloudName: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? '',
+  uploadPreset: process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET ?? '',
+  rootFolder: 'society_app',
+  envFolder: process.env.NEXT_PUBLIC_CLOUDINARY_ENV_FOLDER ?? 'development',
+};
 
 /** Map pin for new events until a venue picker exists (society premises, Vadodara). */
 export const DEFAULT_LOCATION = { latitude: 22.3072, longitude: 73.1812 };
 
-/** Cards per page on Media Approval. */
-export const MEDIA_PAGE_SIZE = 12;

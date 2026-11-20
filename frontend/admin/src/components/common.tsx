@@ -1,12 +1,15 @@
 'use client';
 
 import { memo, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import Link from 'next/link';
 import {
   ArrowDown,
   ArrowUp,
   CalendarDays,
   Eye,
+  ChevronDown,
   FileSpreadsheet,
+  FileText,
   Loader2,
   MoreVertical,
   Pencil,
@@ -18,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useUpload } from '@/hooks/useUpload';
 import { useUrlState } from '@/hooks/useUrlState';
+import type { ExportFormat } from '@/lib/exporters';
 import { cn, initials, isImageUrl } from '@/lib/utils';
 import {
   AlertDialog,
@@ -92,10 +96,16 @@ export const StatCard = memo(function StatCard({
   trend,
   trendGoodWhenUp = true,
   tone = 'red',
+  href,
+  onClick,
 }: {
   icon: LucideIcon;
   value: string | number;
   label: string;
+  /** Opens this page (with its filters) when the card is clicked */
+  href?: string;
+  /** Or runs this (e.g. opens a dialog) */
+  onClick?: () => void;
   /** Percent change; shown as "↑ 12%" or "↓ 3%". */
   trend?: number | null;
   /** For expenses a rise is shown in red. */
@@ -103,8 +113,9 @@ export const StatCard = memo(function StatCard({
   tone?: Tone;
 }) {
   const good = trend != null && (trend >= 0) === trendGoodWhenUp;
-  return (
-    <div className={cn('flex items-center gap-3 rounded-xl p-4', TONES[tone].card)}>
+  const clickable = href || onClick;
+  const body = (
+    <>
       <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-xl', TONES[tone].icon)}>
         <Icon className="h-6 w-6" />
       </div>
@@ -117,8 +128,16 @@ export const StatCard = memo(function StatCard({
           </div>
         ) : null}
       </div>
-    </div>
+    </>
   );
+  const className = cn(
+    'flex items-center gap-3 rounded-xl p-4 text-left',
+    TONES[tone].card,
+    clickable && 'cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-maroon',
+  );
+  if (href) return <Link href={href} className={className} aria-label={`${label}: ${value}`}>{body}</Link>;
+  if (onClick) return <button type="button" onClick={onClick} className={className} aria-label={`${label}: ${value}`}>{body}</button>;
+  return <div className={className}>{body}</div>;
 });
 
 const GREEN = 'bg-[#E6F6EC] text-[#1E8E4E]';
@@ -135,6 +154,17 @@ const statusClasses: Record<string, string> = {
   Allowed: GREEN,
   Confirmed: GREEN,
   Normal: BLUE,
+  Member: BLUE,
+  'Super Admin': 'bg-[#FDECEC] text-[#7A1020]',
+  'Sign-up pending': ORANGE,
+  // Events / notices from the backend
+  Posted: GREEN,
+  Scheduled: BLUE,
+  'Needs approval': ORANGE,
+  Cancelled: GREY,
+  Important: RED,
+  General: BLUE,
+  Event: ORANGE,
   Draft: BLUE,
   Assigned: BLUE,
   Pending: ORANGE,
@@ -273,20 +303,37 @@ export function RowActions({
 }
 
 /** Downloads the current list as an Excel file. */
-export function ExportButton({ onExport, disabled }: { onExport: () => Promise<void> | void; disabled?: boolean }) {
+/**
+ * "Export ▾" menu with Excel and PDF, the same on every screen. `onExport(format)` builds the rows
+ * (usually one ExportTable) and calls exportTable(table, fileName, format) from lib/exporters.
+ */
+export function ExportButton({ onExport, disabled }: { onExport: (format: ExportFormat) => Promise<void> | void; disabled?: boolean }) {
   const [busy, setBusy] = useState(false);
-  const run = async () => {
+  const run = async (format: ExportFormat) => {
     setBusy(true);
     try {
-      await onExport();
+      await onExport(format);
     } finally {
       setBusy(false);
     }
   };
   return (
-    <Button variant="outline" className="border-maroon text-maroon" onClick={run} disabled={disabled || busy}>
-      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />} Export to Excel
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild disabled={disabled || busy}>
+        <Button variant="outline" className="border-maroon text-maroon">
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />} Export
+          <ChevronDown className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuItem onSelect={() => run('excel')}>
+          <FileSpreadsheet className="h-4 w-4 text-[#1E8E4E]" /> Excel (.xlsx)
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => run('pdf')}>
+          <FileText className="h-4 w-4 text-[#C62828]" /> PDF
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -521,12 +568,48 @@ export function StatCardsSkeleton({ count = 4 }: { count?: number }) {
   );
 }
 
+/** Placeholder rows shaped like table rows (header strip, then avatar + two text lines + cells) */
 export function TableRowsSkeleton({ rows = 6 }: { rows?: number }) {
   return (
-    <div className="space-y-3 p-4">
+    <div aria-label="Loading" role="status">
+      <div className="h-11 bg-[#FBF5EC]" />
       {Array.from({ length: rows }, (_, i) => (
-        <Skeleton key={i} className="h-8" />
+        <div key={i} className="flex items-center gap-4 border-t border-border px-4 py-3">
+          <Skeleton className="h-4 w-4 rounded" />
+          <Skeleton className="h-4 w-14" />
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <div className="flex-1 space-y-1.5">
+            <Skeleton className="h-3.5 w-40 max-w-full" />
+            <Skeleton className="h-3 w-28 max-w-full" />
+          </div>
+          <Skeleton className="hidden h-4 w-28 md:block" />
+          <Skeleton className="hidden h-5 w-16 rounded-md lg:block" />
+          <Skeleton className="hidden h-4 w-20 lg:block" />
+        </div>
       ))}
+    </div>
+  );
+}
+
+/** Shown the moment a page is opened, until it is ready: title, filter row and table placeholders */
+export function PageSkeleton() {
+  return (
+    <div role="status" aria-label="Loading page">
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-52" />
+          <Skeleton className="h-4 w-72 max-w-full" />
+        </div>
+        <Skeleton className="h-10 w-28 rounded-lg" />
+      </div>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Skeleton className="h-10 min-w-52 flex-1 rounded-lg" />
+        <Skeleton className="h-10 w-36 rounded-lg" />
+        <Skeleton className="h-10 w-36 rounded-lg" />
+      </div>
+      <div className="overflow-hidden rounded-xl border border-border bg-white">
+        <TableRowsSkeleton rows={8} />
+      </div>
     </div>
   );
 }
@@ -572,6 +655,7 @@ export function FileUpload({
   accept = 'image/*,application/pdf',
   maxMb = 5,
   label = 'Choose file',
+  upload: uploadFile,
   children,
 }: {
   value?: string | null;
@@ -579,10 +663,12 @@ export function FileUpload({
   accept?: string;
   maxMb?: number;
   label?: string;
+  /** Where the file goes (e.g. uploadToCloudinary for files the backend keeps) */
+  upload: (file: File) => Promise<{ url: string }>;
   children?: (open: () => void, uploading: boolean) => ReactNode;
 }) {
   const input = useRef<HTMLInputElement>(null);
-  const upload = useUpload();
+  const upload = useUpload(uploadFile);
   const [error, setError] = useState<string | null>(null);
 
   const onFile = (file?: File) => {

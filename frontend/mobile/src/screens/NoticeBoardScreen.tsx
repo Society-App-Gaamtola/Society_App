@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/types';
 import { common, surface } from '../styles/common';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themedStyles } from '../theme';
 import { LIST_PERFORMANCE_PROPS } from '../config/list';
 import { getNotices, toNotice, type ApiNotice } from '../api/user';
 import { usePagedList } from '../hooks/usePagedList';
@@ -12,8 +12,10 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { Ionicons } from '../icons';
 import type { DateRange, Notice } from '../types';
 import { formatRange, toIsoDay } from '../utils/date';
+import { MAX_PAGE_SIZE } from '../config';
 import { AppHeader, DateRangeButton, EmptyState, FilterChips, IconCircle, SearchBar, StatusBadge } from '../components';
 import DateRangeSheet from '../components/sheets/DateRangeSheet';
+import { useT } from '../i18n';
 
 // Chip → the notice tag the API filters on
 const FILTERS = ['All', 'Important', 'General', 'Event'] as const;
@@ -28,6 +30,7 @@ const FILTER_TAG: Record<Filter, ApiNotice['tag'] | undefined> = {
 const Separator = () => <View style={styles.separator} />;
 
 export default function NoticeBoardScreen() {
+  const t = useT();
   const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const [filter, setFilter] = useState<Filter>('All');
   const [query, setQuery] = useState('');
@@ -48,6 +51,15 @@ export default function NoticeBoardScreen() {
     [search, filter, range],
   );
   const { items, loading, loadingMore, refreshing, error, loadMore, refresh } = usePagedList(fetchPage);
+
+  // Calendar dots: the days of the shown month that have a notice (same tag filter as the list)
+  const noticeDays = useCallback(
+    async (month: { start: string; end: string }) => {
+      const { data } = await getNotices(1, { tag: FILTER_TAG[filter], from_date: month.start, to_date: month.end, limit: MAX_PAGE_SIZE });
+      return [...new Set(data.notices.map((n) => toIsoDay(new Date(n.published_at))))];
+    },
+    [filter],
+  );
 
   const openNotice = useCallback(
     (notice: Notice) => navigation.navigate('NoticeDetails', { noticeId: notice.id, notice }),
@@ -75,8 +87,8 @@ export default function NoticeBoardScreen() {
         onEndReachedThreshold={0.4}
         ListHeaderComponent={
           <View>
-            <Text style={common.heading}>Notice Board</Text>
-            <Text style={common.subtextRelaxed}>Stay informed with important notices, updates and announcements.</Text>
+            <Text style={common.heading}>{t('Notice Board')}</Text>
+            <Text style={common.subtextRelaxed}>{t('Stay informed with important notices, updates and announcements.')}</Text>
             <SearchBar value={query} onChangeText={setQuery} placeholder="Search notices..." />
             <DateRangeButton
               label={range ? formatRange(range) : 'All dates'}
@@ -100,7 +112,7 @@ export default function NoticeBoardScreen() {
           loadingMore ? (
             <ActivityIndicator color={colors.primary} style={styles.footer} />
           ) : error && items.length > 0 ? (
-            <Text style={styles.footerError}>Couldn't load more notices. Scroll down to try again.</Text>
+            <Text style={styles.footerError}>{t('Couldn\'t load more notices. Scroll down to try again.')}</Text>
           ) : undefined
         }
         renderItem={renderItem}
@@ -110,6 +122,7 @@ export default function NoticeBoardScreen() {
         visible={rangeOpen}
         initial={range}
         defaultMonth={toIsoDay(new Date())}
+        loadMarkedDays={noticeDays}
         onClose={() => setRangeOpen(false)}
         onApply={(r) => {
           setRange(r);
@@ -142,7 +155,7 @@ const NoticeCard = memo(function NoticeCard({ notice, onOpen }: { notice: Notice
   );
 });
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   list: { padding: 16, paddingBottom: 32, flexGrow: 1 },
   range: { marginTop: 10 },
   chips: { marginTop: 12, marginBottom: 14 },
@@ -157,4 +170,4 @@ const styles = StyleSheet.create({
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   date: { fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted },
   desc: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, color: colors.textMuted },
-});
+}));

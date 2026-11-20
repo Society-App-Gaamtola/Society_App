@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { LIST_CACHE_MS } from '@/config';
 import { dashboardService } from '@/services/dashboard';
-import { financeService } from '@/services/finance';
 import type { DateRange } from '@/types';
 
 export const useDashboardStats = (range: DateRange = {}) =>
@@ -8,6 +8,8 @@ export const useDashboardStats = (range: DateRange = {}) =>
     queryKey: ['dashboard', range],
     queryFn: () => dashboardService.getDashboardStats(range),
     placeholderData: keepPreviousData,
+    staleTime: LIST_CACHE_MS,
+    gcTime: LIST_CACHE_MS * 2,
   });
 
 export const useActivities = (page: number, pageSize: number, enabled = true) =>
@@ -15,12 +17,7 @@ export const useActivities = (page: number, pageSize: number, enabled = true) =>
     queryKey: ['auditLogs', 'activities', page, pageSize],
     queryFn: () => dashboardService.listActivities(page, pageSize),
     placeholderData: keepPreviousData,
+    staleTime: LIST_CACHE_MS, // same page cache as every other list (see useBackendList)
+    gcTime: LIST_CACHE_MS * 2,
     enabled,
-  });
-
-export const useFinanceSummary = (range: DateRange) =>
-  useQuery({
-    queryKey: ['finance', range],
-    queryFn: () => financeService.getSummary(range),
-    placeholderData: keepPreviousData,
   });

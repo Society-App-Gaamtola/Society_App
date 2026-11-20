@@ -5,3 +5,15 @@
 * {
   border-color: #eadfcf;
 }
+
+/* Top loading bar (components/LoadingBar.tsx): a gold stripe sliding across while the backend is busy */
+@keyframes loading-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+.loading-bar-stripe {
+  animation: loading-slide 1.1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading-bar-stripe { animation-duration: 3s; }
+}

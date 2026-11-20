@@ -1,6 +1,6 @@
 # Gaamtoda Mitra Mandal – Backend API
 
-Node.js + Express + MySQL backend for the Society Android app and the Super Admin web panel.
+Node.js + Express + PostgreSQL backend for the Society Android app and the Super Admin web panel.
 
 ## Run
 
@@ -17,7 +17,8 @@ npm run dev        # nodemon server.js, default port 5020
 | `API_KEY` | Value every client must send in the `api-key` header |
 | `JWT_WEB_TOKEN` | JWT signing secret |
 | `KEY`, `IV` | 16-character AES key and IV for encrypted request bodies |
-| `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | MySQL connection |
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | PostgreSQL connection (local) |
+| `DATABASE_URL` | Optional: hosted PostgreSQL connection string, used instead of the `DB_*` values |
 | `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_HOST` | Email OTP |
 | `APP_NAME`, `BASE_URL` | Optional: name used in OTP emails, public URL for `/uploads` |
 
@@ -71,7 +72,27 @@ Add the key to all three files in `languages/` (`en.js`, `hn.js`, `guj.js`) and 
 
 ## Database
 
-The code runs against the existing `society_app` schema. API field names differ from some column names:
+PostgreSQL 18 (any version from 13 works). The files in `database/`:
+
+| File | Purpose |
+| --- | --- |
+| `schema.sql` | All 24 tables, indexes, foreign keys and the `updated_at` triggers |
+| `seed.sql` | Rows the app needs: roles, modules, event categories, app settings |
+| `sample_events_notices.sql` | Optional sample events and notices for development |
+| `copy_mysql_to_postgres.js` | One-time copy of all rows from the old MySQL database (`node database/copy_mysql_to_postgres.js`) |
+
+New database:
+
+```bash
+psql -U postgres -c "CREATE DATABASE society_app"
+psql -U postgres -d society_app -f database/schema.sql
+psql -U postgres -d society_app -f database/seed.sql
+```
+
+Each connection runs in Indian time (`constant.DB_TIME_ZONE`), so `NOW()`, `CURRENT_DATE` and stored times are IST.
+Queries keep MySQL-style `?` placeholders; `config/db.js` turns them into `$1, $2…`.
+
+API field names differ from some column names:
 
 | API field | Stored in |
 | --- | --- |
@@ -89,8 +110,6 @@ The code runs against the existing `society_app` schema. API field names differ 
 | `ip` | `user_devices.last_ip` |
 
 `device_type` and `device_name` are accepted but not stored. The JWT is stored as a SHA-256 hash in `user_devices.refresh_token_hash`; logging out clears it and sets `status` to `logged_out`. OTPs are in `otp_codes`, with `destination` = the email address.
-
-`database/auth_tables.sql` describes an older design and is not used.
 
 ## Auth APIs (`/api/v1/auth`)
 
@@ -122,7 +141,7 @@ Nothing is saved in `users` and no token is generated until the OTP is verified.
 1. `PUT /edit-profile` with a new `email` → OTP mailed to the new email; the old email stays on the account. Any `username`, `address` or `profile_image` in the same request are saved straight away. Calling it again resends the OTP (allowed once every 60 s).
 2. `POST /verify-email-change` with `email` and `otp` → the email is updated.
 
-Sending the account's current email is not a change: no OTP and no error. These OTPs are stored with `purpose` = `email_change` and the `user_id` that requested them; run `database/otp_email_change_purpose.sql` once on each database to add that value.
+Sending the account's current email is not a change: no OTP and no error. These OTPs are stored with `purpose` = `email_change` and the `user_id` that requested them.
 
 A new `profile_image` replaces the old one, and the old file is deleted from `uploads/`.
 

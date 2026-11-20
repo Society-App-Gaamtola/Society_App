@@ -1,6 +1,7 @@
 import { LOGO } from '../config';
 import type { BadgeStatus, Notice, SocietyEvent } from '../types';
-import { dayCount, formatDate, formatTime, fromIsoDay } from '../utils/date';
+import { formatDate, formatTime, fromIsoDay, isoDayCount } from '../utils/date';
+import { t } from '../i18n';
 import type { IoniconName } from '../icons';
 import { mediaUrl, request } from './client';
 
@@ -19,6 +20,13 @@ export type ApiEvent = {
   venue_address: string | null;
   map_link: string | null;
   poster_url: string | null;
+  organizer_name: string | null;
+  contact_number: string | null;
+  /** The venue pin; both null when the creator didn't set it. */
+  latitude: number | null;
+  longitude: number | null;
+  /** Every image of the event (Cloudinary links), in display order. */
+  images: string[];
   event_status: 'upcoming' | 'ongoing' | 'completed';
   category: { id: number; code: string; name: string; color: string };
 };
@@ -70,6 +78,20 @@ export const getNotices = (page: number, filters: NoticeFilters) =>
 
 export const getNotice = (id: string) => request<{ notice: ApiNotice }>('GET', `/user/notices/${id}`);
 
+export type SocialNetwork = 'facebook' | 'instagram' | 'x' | 'youtube';
+export type ApiAppInfo = {
+  society_name: string;
+  contact_email: string;
+  phone: string;
+  address: string;
+  logo_url: string | null;
+  /** Only the networks the admin filled in (App Settings → Social Networking), in display order */
+  social_links: { network: SocialNetwork; url: string }[];
+};
+
+/** The society's details and social pages, as set in the admin panel. */
+export const getAppInfo = () => request<ApiAppInfo>('GET', '/user/app-info');
+
 /** For the category chips on the events screen, named in the app's language. */
 export const getEventCategories = () => request<{ categories: ApiCategory[] }>('GET', '/user/event-categories');
 
@@ -99,7 +121,7 @@ export const toSocietyEvent = (e: ApiEvent): SocietyEvent => {
   const end = e.end_date && e.end_date !== e.event_date ? formatDate(fromIsoDay(e.end_date)) : null;
   const from = timeLabel(e.start_time);
   const to = timeLabel(e.end_time);
-  const days = end ? dayCount(start, end) : null;
+  const days = end && e.end_date ? isoDayCount(e.event_date, e.end_date) : null;
   const poster = mediaUrl(e.poster_url);
 
   return {
@@ -107,7 +129,7 @@ export const toSocietyEvent = (e: ApiEvent): SocietyEvent => {
     title: e.title,
     // Same style as before: a range for multi-day events, otherwise the date with its start time
     date: end ? `${start} - ${end}` : `${start}, ${from}`,
-    days: days ? `${days} Days` : undefined,
+    days: days ? t('{n} Days', { n: days }) : undefined,
     time: to ? `${from} - ${to}` : (from ?? undefined),
     venue: e.venue_address ? `${e.venue_name}, ${e.venue_address}` : e.venue_name,
     startDay: e.event_date,
@@ -118,6 +140,13 @@ export const toSocietyEvent = (e: ApiEvent): SocietyEvent => {
     image: poster ? { uri: poster } : LOGO,
     description: e.description ?? '',
     mapLink: e.map_link,
+    organizer: e.organizer_name,
+    contact: e.contact_number,
+    // The poster alone when the event has no image list (older events)
+    images: e.images?.length ? e.images.map((url) => mediaUrl(url)).filter((url): url is string => !!url) : poster ? [poster] : [],
+    coords: e.latitude != null && e.longitude != null ? { latitude: e.latitude, longitude: e.longitude } : null,
+    address: e.venue_address,
+    venueName: e.venue_name,
   };
 };
 
@@ -126,5 +155,6 @@ export const toNotice = (n: ApiNotice): Notice => ({
   title: n.title,
   date: formatDate(new Date(n.published_at)),
   description: n.body,
+  eventId: n.event_id ? String(n.event_id) : null,
   ...NOTICE_TAG[n.tag],
 });

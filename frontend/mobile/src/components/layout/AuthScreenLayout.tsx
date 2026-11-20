@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { common } from '../../styles/common';
-import { spacing } from '../../theme';
+import { spacing, themedStyles } from '../../theme';
 import LotusFooter from '../ui/LotusFooter';
 import KeyboardAvoid from './KeyboardAvoid';
 
@@ -35,7 +35,7 @@ export default function AuthScreenLayout({ children, showScrollIndicator, overla
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   scroll: { flexGrow: 1, padding: spacing.lg },
   footer: { flex: 1, justifyContent: 'flex-end', paddingTop: spacing.md },
-});
+}));

@@ -5,7 +5,7 @@ import * as authApi from '../api/auth';
 import { ApiError } from '../api/client';
 import type { RootStackParamList } from '../navigation/types';
 import { resetAfterLogin } from '../navigation/navigationRef';
-import { colors, fonts, spacing } from '../theme';
+import { colors, fonts, spacing, themedStyles } from '../theme';
 import { useAuth } from '../context/AuthContext';
 import { showApiError } from '../hooks/useFormErrors';
 import { Ionicons } from '../icons';
@@ -14,6 +14,7 @@ import { formatCountdown } from '../utils/date';
 import { showToast } from '../utils/toast';
 import { EMAIL_CHANGE_STEPS } from '../config';
 import { AuthScreenLayout, BackButton, OtpInput, OutlineButton, PrimaryButton, REGISTER_STEPS, StepIndicator } from '../components';
+import { useT } from '../i18n';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Otp'>;
 
@@ -21,6 +22,7 @@ const OTP_LENGTH = 6;
 const RESEND_SECONDS = 60;
 
 export default function OtpScreen({ navigation, route }: Props) {
+  const t = useT();
   const { mode, email, name, resendAfter } = route.params;
   const { completeLogin, updateUser } = useAuth();
   const [code, setCode] = useState('');
@@ -74,7 +76,7 @@ export default function OtpScreen({ navigation, route }: Props) {
     const draft = getSignupDraft();
     if (!draft) {
       // The app was closed and reopened on this step, so the details are gone.
-      Alert.alert('Please try again', 'Your details were not saved. Please enter them again.');
+      Alert.alert(t('Please try again'), t('Your details were not saved. Please enter them again.'));
       navigation.goBack();
       return;
     }
@@ -104,10 +106,10 @@ export default function OtpScreen({ navigation, route }: Props) {
       {isEmailChange ? <StepIndicator steps={EMAIL_CHANGE_STEPS} current={2} /> : null}
 
       <Text style={styles.heading}>
-        {isLogin ? 'Enter Verification Code' : isEmailChange ? 'Verify New Email' : 'Verify Your Email'}
+        {t(isLogin ? 'Enter Verification Code' : isEmailChange ? 'Verify New Email' : 'Verify Your Email')}
       </Text>
       <Text style={styles.subtext}>
-        Enter the 6-digit verification code sent to <Text style={styles.highlight}>{email}</Text>.
+        {t('Enter the 6-digit verification code sent to')} <Text style={styles.highlight}>{email}</Text>.
       </Text>
 
       <View style={styles.otp}>
@@ -115,12 +117,12 @@ export default function OtpScreen({ navigation, route }: Props) {
       </View>
 
       <View style={styles.resendRow}>
-        <Text style={styles.resendHint}>Didn't receive the code?</Text>
+        <Text style={styles.resendHint}>{t('Didn\'t receive the code?')}</Text>
         {seconds > 0 ? (
-          <Text style={styles.resend}>Resend OTP ({formatCountdown(seconds)})</Text>
+          <Text style={styles.resend}>{`${t('Resend OTP')} (${formatCountdown(seconds)})`}</Text>
         ) : (
           <Pressable onPress={onResend} hitSlop={8}>
-            <Text style={styles.resend}>Resend OTP</Text>
+            <Text style={styles.resend}>{t('Resend OTP')}</Text>
           </Pressable>
         )}
       </View>
@@ -139,16 +141,16 @@ export default function OtpScreen({ navigation, route }: Props) {
       <View style={styles.info}>
         <Ionicons name="shield-checkmark-outline" size={22} color={colors.primary} />
         <Text style={styles.infoText}>
-          {isEmailChange
+          {t(isEmailChange
             ? 'Your current email stays active until this code is verified.'
-            : 'Your email will be used for verification and account security.'}
+            : 'Your email will be used for verification and account security.')}
         </Text>
       </View>
     </AuthScreenLayout>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   heading: { fontFamily: fonts.bold, fontSize: 22, color: colors.primary, marginTop: spacing.lg },
   subtext: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 20, color: colors.textMuted, marginTop: spacing.sm },
   highlight: { fontFamily: fonts.semiBold, color: colors.textDark },
@@ -171,9 +173,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.softTint,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#F1D9D9',
+    borderColor: colors.dangerBorder,
     padding: 14,
     marginTop: spacing.lg,
   },
   infoText: { flex: 1, fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, color: colors.textMuted },
-});
+}));

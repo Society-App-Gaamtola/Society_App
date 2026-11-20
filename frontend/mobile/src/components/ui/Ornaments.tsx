@@ -1,6 +1,6 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
-import { colors } from '../../theme';
+import { colors, themedStyles } from '../../theme';
 
 type CornerPosition = 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight';
 
@@ -83,9 +83,9 @@ export function Lotus({ width = 80 }: { width?: number }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   corner: { position: 'absolute' },
-});
+}));
 
 const cornerStyles: Record<CornerPosition, ViewStyle> = {
   topLeft: { top: 0, left: 0 },

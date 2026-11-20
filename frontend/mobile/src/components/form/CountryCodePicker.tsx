@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '../../icons';
-import { colors, fonts, radius, spacing } from '../../theme';
+import { colors, fonts, radius, spacing, themedStyles } from '../../theme';
 
 export type Country = { code: string; dial: string; flag: string; name: string };
 
@@ -63,7 +63,7 @@ export default function CountryCodePicker({ value, onChange, style }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   box: {
     width: 90,
     height: 50,
@@ -99,4 +99,4 @@ const styles = StyleSheet.create({
   },
   optionActive: { backgroundColor: colors.background },
   optionName: { flex: 1, fontFamily: fonts.regular, fontSize: 14, color: colors.textDark },
-});
+}));

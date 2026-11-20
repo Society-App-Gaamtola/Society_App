@@ -11,9 +11,9 @@ export type AuthUser = {
   name: string;
   memberId: string;
   role: 'member' | 'executive';
+  /** The member type shown under the name: 'Normal Member', 'Executive Member' or 'Super Admin' (English; t() it) */
+  roleLabel: string;
   permissions: Permissions;
-  /** When true, events this user posts go to the admin for approval first. */
-  eventsNeedApproval: boolean;
   email?: string;
   countryCode?: string;
   mobile?: string;
@@ -68,6 +68,15 @@ export type SocietyEvent = {
   image: ImageSourcePropType;
   description: string;
   mapLink: string | null;
+  /** Who runs the event and a number to call, when the creator filled them in. */
+  organizer?: string | null;
+  contact?: string | null;
+  /** All image links of the event, for the carousel on the details screen. */
+  images?: string[];
+  /** Venue pin for the map preview. */
+  coords?: { latitude: number; longitude: number } | null;
+  venueName?: string;
+  address?: string | null;
 };
 
 export type Notice = {
@@ -75,17 +84,22 @@ export type Notice = {
   title: string;
   date: string;
   description: string;
+  /** The event the notice is about, if any (its venue and map link go into a shared notice) */
+  eventId?: string | null;
   tag: BadgeStatus;
   icon: IoniconName;
 };
 
-// --- Notifications and member donations (sample data until their APIs exist)
+// --- Notifications and member donations
 
-export type NotificationKind = 'event' | 'notice' | 'payment';
+export type NotificationKind = 'event' | 'notice' | 'payment' | 'general';
 
 export type AppNotification = {
   id: string;
   kind: NotificationKind;
+  /** What it is about, so the details screen can open it. */
+  refType?: 'event' | 'notice' | 'media' | null;
+  refId?: string | null;
   title: string;
   /** Short text for the list. */
   body: string;
@@ -108,7 +122,7 @@ export type MyDonation = {
   date: string;
   amount: number;
   /** Pending until the treasurer matches it with the bank statement or cash book. */
-  status: 'Successful' | 'Pending';
+  status: 'Successful' | 'Pending' | 'Failed';
   icon: McIconName;
   method: DonationMethod;
   /** UPI transaction ID (UTR) or receipt number. */
@@ -119,92 +133,76 @@ export type MyDonation = {
 export type DirectoryMember = {
   id: string;
   name: string;
+  /** Society member code; empty until the admin assigns one. */
   memberId: string;
-  role: 'Executive' | 'Member';
-  /** Shown to executives only (privacy setting in the PPT). */
-  mobile: string;
+  role: 'Admin' | 'Executive' | 'Member';
+  photoUrl: string | null;
+  /** Null when the member keeps it private (executives and the admin always see it). */
+  mobile: string | null;
+  email: string | null;
 };
 
 // --- Executive events
 
-export type ExecEventStatus = 'Draft' | 'Posted' | 'Scheduled' | 'Needs Approval';
-
-export type ExecEvent = {
-  id: string;
-  ownerId: string;
+/** The Create Event form, carried to the preview and saved through POST / PUT /user/events */
+export type EventDraft = {
   title: string;
-  /** Display date, e.g. "10 Oct 2026". */
-  date: string;
-  /** Optional last day for multi-day events. */
-  endDate?: string;
-  time?: string;
+  categoryId: number;
+  /** In the app's language, for the preview */
+  categoryName: string;
+  /** yyyy-mm-dd */
+  day: string;
+  /** yyyy-mm-dd, for a multi-day event */
+  endDay?: string;
+  /** HH:mm */
+  time: string;
   venue: string;
-  organizer?: string;
-  contact?: string;
-  category: EventCategory;
-  description?: string;
+  organizer: string;
+  contact: string;
+  description: string;
+  /** A photo picked on the phone (uploaded when saved) or the event's poster link */
   imageUri?: string;
-  status: ExecEventStatus;
-  /** Publish time for scheduled events (ms since epoch). */
-  scheduledAt?: number;
-  createdAt: number;
+  /** A new event made from an Event Planning plan (the plan is marked "Event Created") */
+  planId?: number;
 };
-
-export type NewExecEvent = Omit<ExecEvent, 'id' | 'ownerId' | 'createdAt'>;
 
 // --- Donations
 
 export type PaymentMode = 'Cash' | 'UPI' | 'Bank Transfer' | 'Cheque';
-export type DonationStatus = 'Verified' | 'Pending' | 'Draft';
+export type DonationStatus = 'Verified' | 'Pending' | 'Rejected';
 export type DonationPurpose = 'Festival' | 'Aarti' | 'Cultural' | 'General Fund' | 'Other';
 
+/** A donation entry from GET /admin/donations (the Donations section), ready to display */
 export type Donation = {
   id: string;
   donorName: string;
+  /** The member code, or '-' for a donor who isn't a member */
   memberId: string;
-  /** ISO date-time of the donation. */
+  /** yyyy-mm-dd */
   date: string;
   mode: PaymentMode;
   amount: number;
   status: DonationStatus;
   reference?: string;
-  purpose?: DonationPurpose;
+  /** One of the society's donation purposes (App Settings) */
+  purpose?: string;
   note?: string;
-  receipt?: { name: string; uri: string; mimeType?: string };
+  proofUrl?: string | null;
 };
 
-export type NewDonation = Omit<Donation, 'id'>;
 
 // --- Reports
 
 export type ReportFormat = 'PDF' | 'Excel';
 export type ReportType = 'Donation Summary' | 'Transaction History' | 'Member-wise Report';
 
+/** A report someone generated (GET /admin/reports): the file is built again on the phone when opened */
 export type Report = {
-  id: string;
-  title: string;
+  id: number;
+  type: ReportType;
+  /** yyyy-mm-dd; null = all dates */
+  range: DateRange | null;
   period: string;
   generatedOn: string;
-  format: ReportFormat;
-  /** Local file of a generated report; seed entries have none. */
-  fileUri?: string;
-};
-
-// --- Finance
-
-export type ExpenseCategory = {
-  id: string;
-  title: string;
-  icon: IoniconName;
-  spent: number;
-  budget: number;
-};
-
-export type Transaction = {
-  id: string;
-  date: string;
-  title: string;
-  note: string;
-  amount: number;
-  status: 'Completed';
+  generatedBy?: string | null;
 };

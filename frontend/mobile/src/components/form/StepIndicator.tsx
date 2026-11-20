@@ -1,9 +1,9 @@
 import { Fragment } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '../../icons';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
+import { useT } from '../../i18n';
 
-const INACTIVE = '#E4DACD';
 
 type Props = {
   steps: string[];
@@ -13,6 +13,7 @@ type Props = {
 
 /** Numbered steps joined by a line; finished steps show a tick. */
 export default function StepIndicator({ steps, current }: Props) {
+  const t = useT();
   return (
     <View style={styles.row} accessibilityLabel={`Step ${current} of ${steps.length}: ${steps[current - 1]}`}>
       {steps.map((label, i) => {
@@ -30,7 +31,7 @@ export default function StepIndicator({ steps, current }: Props) {
                 )}
               </View>
               <Text style={[styles.label, number === current && styles.labelActive]} numberOfLines={2}>
-                {label}
+                {t(label)}
               </Text>
             </View>
           </Fragment>
@@ -42,22 +43,22 @@ export default function StepIndicator({ steps, current }: Props) {
 
 export const REGISTER_STEPS = ['Personal Details', 'Verify OTP', 'Profile & Address'];
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center', marginTop: 8 },
   step: { alignItems: 'center', width: 84 },
   circle: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: INACTIVE,
+    backgroundColor: colors.sand,
     alignItems: 'center',
     justifyContent: 'center',
   },
   circleActive: { backgroundColor: colors.primary },
   number: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textMuted },
   numberActive: { color: colors.white },
-  line: { flex: 1, height: 1.5, backgroundColor: INACTIVE, marginTop: 14, marginHorizontal: -28 },
+  line: { flex: 1, height: 1.5, backgroundColor: colors.sand, marginTop: 14, marginHorizontal: -28 },
   lineActive: { backgroundColor: colors.primary },
   label: { fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted, marginTop: 6, textAlign: 'center' },
   labelActive: { fontFamily: fonts.semiBold, color: colors.primary },
-});
+}));

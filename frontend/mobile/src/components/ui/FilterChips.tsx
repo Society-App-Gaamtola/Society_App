@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
+import { useT } from '../../i18n';
 
 type Props<T extends string> = {
   options: readonly T[];
@@ -9,6 +10,7 @@ type Props<T extends string> = {
 };
 
 export default function FilterChips<T extends string>({ options, selected, onSelect, style }: Props<T>) {
+  const t = useT();
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.scroll, style]} contentContainerStyle={styles.content}>
       {options.map((option) => {
@@ -21,7 +23,7 @@ export default function FilterChips<T extends string>({ options, selected, onSel
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
           >
-            <Text style={[styles.text, active && styles.textActive]}>{option}</Text>
+            <Text style={[styles.text, active && styles.textActive]}>{t(option)}</Text>
           </Pressable>
         );
       })}
@@ -29,7 +31,7 @@ export default function FilterChips<T extends string>({ options, selected, onSel
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   scroll: { flexGrow: 0 },
   content: { gap: 8 },
   chip: {
@@ -45,4 +47,4 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   text: { fontFamily: fonts.medium, fontSize: 12, color: colors.textDark },
   textActive: { color: colors.white },
-});
+}));

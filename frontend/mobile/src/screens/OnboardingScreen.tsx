@@ -15,8 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { common } from '../styles/common';
-import { colors, fonts, radius, spacing } from '../theme';
+import { colors, fonts, radius, spacing, themedStyles } from '../theme';
 import { Loader } from '../components';
+import { getAppLanguage, useT } from '../i18n';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
 
@@ -50,6 +51,7 @@ const HORIZONTAL_PADDING = spacing.lg;
 const LOADER_MS = 700;
 
 export default function OnboardingScreen({ navigation }: Props) {
+  const t = useT();
   const { width, height } = useWindowDimensions();
   const listRef = useRef<FlatList<Slide>>(null);
   const [index, setIndex] = useState(0);
@@ -78,7 +80,7 @@ export default function OnboardingScreen({ navigation }: Props) {
     <SafeAreaView style={common.screen}>
       <View style={styles.header}>
         <Pressable onPress={goToLanguageSelect} hitSlop={12}>
-          <Text style={styles.skip}>Skip</Text>
+          <Text style={styles.skip}>{t('Skip')}</Text>
         </Pressable>
       </View>
 
@@ -95,8 +97,8 @@ export default function OnboardingScreen({ navigation }: Props) {
         renderItem={({ item }) => (
           <View style={[styles.slide, { width }]}>
             <Image source={item.image} style={[styles.image, { height: height * 0.45 }]} resizeMode="cover" />
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.description}>{item.description}</Text>
+            <Text style={styles.title}>{t(item.title)}</Text>
+            <Text style={styles.description}>{t(item.description)}</Text>
           </View>
         )}
       />
@@ -113,12 +115,12 @@ export default function OnboardingScreen({ navigation }: Props) {
       >
         <Text style={styles.buttonText}>{isLast ? 'Get Started →' : 'Next →'}</Text>
       </Pressable>
-      <Loader visible={leaving} message="Loading..." language="en" />
+      <Loader visible={leaving} message="Loading..." language={getAppLanguage()} />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   header: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -155,4 +157,4 @@ const styles = StyleSheet.create({
   },
   buttonPressed: { backgroundColor: colors.primaryDark },
   buttonText: { fontFamily: fonts.semiBold, fontSize: 16, color: colors.white },
-});
+}));

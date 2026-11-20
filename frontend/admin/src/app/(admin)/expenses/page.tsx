@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { BadgeCheck, BarChart3, Clock, FileText, Plus, ReceiptText, TrendingUp, Wallet, XCircle } from 'lucide-react';
+import { BadgeCheck, BarChart3, Clock, Download, FileText, Plus, ReceiptText, TrendingUp, Wallet, XCircle } from 'lucide-react';
 import {
   ConfirmDialog,
   DetailList,
   ExportButton,
   Field,
+  FileLink,
   FileUpload,
   FormDialog,
   PageHeader,
@@ -15,47 +16,65 @@ import {
   StatCardsSkeleton,
   StatusBadge,
   ViewDialog,
-  FileLink,
 } from '@/components/common';
 import { DataTable, type Column } from '@/components/DataTable';
 import { FilterBar } from '@/components/FilterBar';
 import { Button, Input, NativeSelect } from '@/components/ui/primitives';
-import { expensesHooks, useSetExpenseStatus } from '@/hooks/useExpenses';
-import { useSettings } from '@/hooks/useSettings';
+import { DEFAULT_PAGE_SIZE } from '@/config';
+import { useAppSettings, useDeleteExpense, useExpensesPage, useExpenseStatus, useSaveExpense } from '@/hooks/useFinance';
 import { useUrlState } from '@/hooks/useUrlState';
-import { exportExcel } from '@/lib/exporters';
+import { exportExpenseVoucher, exportTable, type ExportFormat } from '@/lib/exporters';
 import { cn, formatDate, formatINR, formatNumber, periodLabel, recordNo, todayISO } from '@/lib/utils';
-import { PAYMENT_MODES, REVIEW_STATUSES, type Expense, type NewRecord } from '@/types';
+import { uploadFinanceFile } from '@/services/cloudinary';
+import {
+  expensesApi,
+  expenseStatusLabel,
+  EXPENSE_STATUS_OPTIONS,
+  methodLabel,
+  PAYMENT_MODE_OPTIONS,
+  type Expense,
+  type ExpenseBody,
+  type ExpenseQuery,
+  type PaymentMode,
+} from '@/services/finance';
 
-type Draft = NewRecord<Expense>;
+type Draft = Omit<ExpenseBody, 'amount'> & { amount: string };
 
 const emptyDraft = (category: string): Draft => ({
   description: '',
-  vendor: '',
+  paid_to: '',
   category,
-  amount: 0,
-  mode: 'Cash',
-  date: todayISO(),
-  status: 'Pending',
-  approvedBy: 'Super Admin',
-  receipt: null,
+  amount: '',
+  mode: 'cash',
+  reference_no: '',
+  txn_date: todayISO(),
+  status: 'pending',
+  bill_url: null,
+});
+
+const toDraft = (e: Expense): Draft => ({
+  description: e.description,
+  paid_to: e.paid_to ?? '',
+  category: e.category ?? '',
+  amount: String(e.amount),
+  mode: (e.mode as PaymentMode) ?? 'cash',
+  reference_no: e.reference_no ?? '',
+  txn_date: e.txn_date,
+  status: e.status,
+  bill_url: e.bill_url,
 });
 
 function ExpenseForm({ open, onOpenChange, expense }: { open: boolean; onOpenChange: (open: boolean) => void; expense?: Expense }) {
-  const { data: settings } = useSettings();
-  const categories = settings?.expenseCategories ?? [];
-  const create = expensesHooks.useCreate();
-  const update = expensesHooks.useUpdate();
+  const { data: settings } = useAppSettings();
+  const categories = settings?.settings.expense_categories ?? [];
+  const save = useSaveExpense();
   const [draft, setDraft] = useState<Draft>(emptyDraft(''));
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open) return;
     setErrors({});
-    if (expense) {
-      const { id: _id, created_at: _c, updated_at: _u, ...rest } = expense;
-      setDraft(rest);
-    } else setDraft(emptyDraft(categories[0] ?? 'Other'));
+    setDraft(expense ? toDraft(expense) : emptyDraft(categories[0] ?? ''));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, expense]);
 
@@ -64,15 +83,21 @@ function ExpenseForm({ open, onOpenChange, expense }: { open: boolean; onOpenCha
   const submit = () => {
     const found: Record<string, string> = {};
     if (!draft.description.trim()) found.description = 'Description is required.';
-    if (!draft.vendor.trim()) found.vendor = 'Vendor is required.';
-    if (!(draft.amount > 0)) found.amount = 'Enter an amount above zero.';
-    if (!draft.date) found.date = 'Date is required.';
+    if (!draft.paid_to.trim()) found.paid_to = 'Who was paid is required.';
+    if (!draft.category) found.category = 'Choose a category.';
+    if (!(Number(draft.amount) > 0)) found.amount = 'Enter an amount above zero.';
+    if (!draft.txn_date) found.txn_date = 'Date is required.';
+    else if (draft.txn_date > todayISO()) found.txn_date = "The date can't be in the future.";
     setErrors(found);
     if (Object.keys(found).length) return;
-    const body = { ...draft, description: draft.description.trim(), vendor: draft.vendor.trim() };
-    const done = { onSuccess: () => onOpenChange(false) };
-    if (expense) update.mutate({ id: expense.id, changes: body }, done);
-    else create.mutate(body, done);
+    const body: ExpenseBody = {
+      ...draft,
+      amount: Number(draft.amount),
+      description: draft.description.trim(),
+      paid_to: draft.paid_to.trim(),
+      reference_no: draft.reference_no.trim(),
+    };
+    save.mutate({ id: expense?.id, body }, { onSuccess: () => onOpenChange(false) });
   };
 
   return (
@@ -81,7 +106,7 @@ function ExpenseForm({ open, onOpenChange, expense }: { open: boolean; onOpenCha
       onOpenChange={onOpenChange}
       title={expense ? `Edit ${recordNo('EXP', expense.id)}` : 'Add Expense'}
       submitLabel={expense ? 'Save Changes' : 'Add Expense'}
-      pending={create.isPending || update.isPending}
+      pending={save.isPending}
       onSubmit={submit}
       className="max-w-2xl"
     >
@@ -89,95 +114,120 @@ function ExpenseForm({ open, onOpenChange, expense }: { open: boolean; onOpenCha
         <Field label="Description" error={errors.description} className="sm:col-span-2">
           <Input value={draft.description} onChange={(e) => set('description', e.target.value)} autoFocus />
         </Field>
-        <Field label="Vendor / Paid To" error={errors.vendor}>
-          <Input value={draft.vendor} onChange={(e) => set('vendor', e.target.value)} />
+        <Field label="Vendor / Paid To" error={errors.paid_to}>
+          <Input value={draft.paid_to} onChange={(e) => set('paid_to', e.target.value)} />
         </Field>
-        <Field label="Category">
+        <Field label="Category" error={errors.category}>
           <NativeSelect value={draft.category} onChange={(e) => set('category', e.target.value)}>
+            <option value="">Choose…</option>
             {[...new Set([...categories, draft.category])].filter(Boolean).map((c) => (
               <option key={c}>{c}</option>
             ))}
           </NativeSelect>
         </Field>
         <Field label="Amount (₹)" error={errors.amount}>
-          <Input type="number" min={1} value={draft.amount || ''} onChange={(e) => set('amount', Number(e.target.value))} />
+          <Input type="number" min={1} value={draft.amount} onChange={(e) => set('amount', e.target.value)} />
         </Field>
-        <Field label="Date" error={errors.date}>
-          <Input type="date" value={draft.date} onChange={(e) => set('date', e.target.value)} />
+        <Field label="Date" error={errors.txn_date}>
+          <Input type="date" value={draft.txn_date} max={todayISO()} onChange={(e) => set('txn_date', e.target.value)} />
         </Field>
         <Field label="Payment Mode">
-          <NativeSelect value={draft.mode} onChange={(e) => set('mode', e.target.value as Draft['mode'])}>
-            {PAYMENT_MODES.map((m) => (
-              <option key={m}>{m}</option>
+          <NativeSelect value={draft.mode} onChange={(e) => set('mode', e.target.value as PaymentMode)}>
+            {PAYMENT_MODE_OPTIONS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
             ))}
           </NativeSelect>
+        </Field>
+        <Field label="Reference / Cheque No.">
+          <Input value={draft.reference_no} onChange={(e) => set('reference_no', e.target.value)} />
         </Field>
         <Field label="Status">
-          <NativeSelect value={draft.status} onChange={(e) => set('status', e.target.value as Draft['status'])}>
-            {REVIEW_STATUSES.map((s) => (
-              <option key={s}>{s}</option>
+          <NativeSelect value={draft.status} onChange={(e) => set('status', e.target.value)}>
+            {EXPENSE_STATUS_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
             ))}
           </NativeSelect>
-        </Field>
-        <Field label="Approved By" className="sm:col-span-2">
-          <Input value={draft.approvedBy} onChange={(e) => set('approvedBy', e.target.value)} />
         </Field>
       </div>
       <Field label="Bill / Receipt">
-        <FileUpload value={draft.receipt} onChange={(url) => set('receipt', url)} label="Upload bill photo or PDF" />
+        <FileUpload value={draft.bill_url} onChange={(url) => set('bill_url', url)} label="Upload bill photo or PDF" maxMb={10} upload={uploadFinanceFile} />
       </Field>
     </FormDialog>
   );
 }
 
-const FILTERS = ['category', 'status', 'mode'];
+function useExpenseQuery(): ExpenseQuery {
+  const url = useUrlState();
+  return {
+    page: url.page,
+    limit: DEFAULT_PAGE_SIZE,
+    search: url.search || undefined,
+    status: url.get('status') || undefined,
+    mode: (url.get('mode') || undefined) as PaymentMode | undefined,
+    category: url.get('category') || undefined,
+    from_date: url.range.from,
+    to_date: url.range.to,
+    sort: (url.sort?.field as ExpenseQuery['sort']) ?? 'date',
+    order: url.sort?.order ?? 'desc',
+  };
+}
 
 export default function ExpensesPage() {
   const url = useUrlState();
-  const { data: settings } = useSettings();
-  const params = url.toListParams(FILTERS, 'date');
-  const list = expensesHooks.useList({ ...params, sort: url.sort ?? { field: 'date', order: 'desc' } });
-  const all = expensesHooks.useList({ search: params.search, filters: params.filters });
-  const setStatus = useSetExpenseStatus();
-  const remove = expensesHooks.useRemove();
+  const { data: settings } = useAppSettings();
+  const query = useExpenseQuery();
+  const list = useExpensesPage(query);
+  const setStatus = useExpenseStatus();
+  const remove = useDeleteExpense();
   const [form, setForm] = useState<{ open: boolean; expense?: Expense }>({ open: false });
   const [viewing, setViewing] = useState<Expense | null>(null);
   const [deleting, setDeleting] = useState<Expense | null>(null);
+  const summary = list.data?.summary;
 
-  const stats = useMemo(() => {
-    const verified = (all.data?.data ?? []).filter((e) => e.status === 'Verified');
-    const total = verified.reduce((sum, e) => sum + e.amount, 0);
-    return {
-      total,
-      count: all.data?.total ?? 0,
-      highest: Math.max(0, ...verified.map((e) => e.amount)),
-      average: verified.length ? Math.round(total / verified.length) : 0,
-    };
-  }, [all.data]);
+  const societyName = settings?.settings.society_name;
+  const voucher = (e: Expense) => exportExpenseVoucher(e, { societyName, modeLabel: methodLabel, statusLabel: expenseStatusLabel });
 
   const columns = useMemo<Column<Expense>[]>(
     () => [
-      { key: 'id', header: 'Expense No', sortable: true, render: (e) => recordNo('EXP', e.id) },
-      { key: 'date', header: 'Date', sortable: true, className: 'whitespace-nowrap px-4 py-3', render: (e) => formatDate(e.date) },
-      { key: 'description', header: 'Description', className: 'px-4 py-3 font-medium' },
-      { key: 'vendor', header: 'Vendor / Paid To' },
-      { key: 'category', header: 'Category', sortable: true },
-      { key: 'amount', header: 'Amount (₹)', sortable: true, className: 'px-4 py-3 text-right font-medium', render: (e) => formatNumber(e.amount) },
-      { key: 'mode', header: 'Payment Mode', className: 'whitespace-nowrap px-4 py-3' },
-      { key: 'status', header: 'Status', sortable: true, render: (e) => <StatusBadge status={e.status} /> },
+      { key: 'id', header: 'Expense No', render: (e) => recordNo('EXP', e.id) },
+      { key: 'date', header: 'Date', sortable: true, className: 'whitespace-nowrap px-4 py-3', render: (e) => formatDate(e.txn_date) },
       {
-        key: 'receipt',
-        header: 'Receipt',
-        render: (e) =>
-          e.receipt ? (
-            <FileLink href={e.receipt} className="inline-flex rounded-md p-1.5 text-[#C62828] hover:bg-accent" aria-label={`Open bill for ${recordNo('EXP', e.id)}`} title="Open bill">
-              <FileText className="h-4 w-4" />
-            </FileLink>
-          ) : (
-            <span className="inline-flex p-1.5 text-[#CFC6BB]" title="No bill uploaded">
-              <FileText className="h-4 w-4" aria-label="No bill uploaded" />
-            </span>
-          ),
+        key: 'description',
+        header: 'Description',
+        render: (e) => (
+          <span>
+            <span className="block font-medium">{e.description}</span>
+            <span className="block text-xs text-muted-foreground">{e.paid_to}</span>
+          </span>
+        ),
+      },
+      { key: 'category', header: 'Category', render: (e) => e.category ?? '—' },
+      { key: 'amount', header: 'Amount (₹)', sortable: true, className: 'px-4 py-3 text-right font-medium', render: (e) => formatNumber(e.amount) },
+      { key: 'mode', header: 'Payment Mode', className: 'whitespace-nowrap px-4 py-3', render: (e) => methodLabel(e.mode) },
+      { key: 'status', header: 'Status', render: (e) => <StatusBadge status={expenseStatusLabel(e.status)} /> },
+      {
+        key: 'bill',
+        header: 'Receipt / Bill',
+        render: (e) => (
+          <span className="inline-flex items-center gap-0.5">
+            <button type="button" onClick={() => voucher(e)} className="rounded-md p-1.5 text-[#C62828] hover:bg-accent" aria-label={`Download voucher ${recordNo('EXP', e.id)}`} title="Download voucher (PDF)">
+              <Download className="h-4 w-4" />
+            </button>
+            {e.bill_url ? (
+              <FileLink href={e.bill_url} className="inline-flex rounded-md p-1.5 text-[#C62828] hover:bg-accent" aria-label={`Open bill for ${recordNo('EXP', e.id)}`} title="Open uploaded bill">
+                <FileText className="h-4 w-4" />
+              </FileLink>
+            ) : (
+              <span className={cn('inline-flex p-1.5 text-muted-foreground/50')} title="No bill uploaded">
+                <FileText className="h-4 w-4" aria-label="No bill uploaded" />
+              </span>
+            )}
+          </span>
+        ),
       },
       {
         key: 'actions',
@@ -189,77 +239,82 @@ export default function ExpensesPage() {
             onView={() => setViewing(e)}
             onDelete={() => setDeleting(e)}
             more={[
-              { label: 'Mark Verified', icon: BadgeCheck, hidden: e.status === 'Verified', onSelect: () => setStatus.mutate({ id: e.id, status: 'Verified' }) },
-              { label: 'Mark Pending', icon: Clock, hidden: e.status === 'Pending', onSelect: () => setStatus.mutate({ id: e.id, status: 'Pending' }) },
-              { label: 'Reject', icon: XCircle, destructive: true, hidden: e.status === 'Rejected', onSelect: () => setStatus.mutate({ id: e.id, status: 'Rejected' }) },
+              { label: 'Mark Verified', icon: BadgeCheck, hidden: e.status === 'verified', onSelect: () => setStatus.mutate({ id: e.id, status: 'verified' }) },
+              { label: 'Mark Pending', icon: Clock, hidden: e.status === 'pending', onSelect: () => setStatus.mutate({ id: e.id, status: 'pending' }) },
+              { label: 'Reject', icon: XCircle, destructive: true, hidden: e.status === 'rejected', onSelect: () => setStatus.mutate({ id: e.id, status: 'rejected' }) },
             ]}
           />
         ),
       },
     ],
-    [setStatus],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [setStatus, societyName],
   );
 
-  const onExport = async () => {
-    const rows = all.data?.data ?? [];
-    await exportExcel(
+  const onExport = async (format: ExportFormat) => {
+    const { page, limit, ...filters } = query;
+    const rows = await expensesApi.listAll(filters);
+    await exportTable(
       {
         title: 'Expenses',
-        subtitle: `${periodLabel(url.get('from'), url.get('to'))} · ${rows.length} entries`,
-        columns: ['Expense No', 'Date', 'Description', 'Vendor', 'Category', 'Amount', 'Mode', 'Status'],
-        rows: [...rows]
-          .sort((a, b) => b.date.localeCompare(a.date))
-          .map((e) => [recordNo('EXP', e.id), formatDate(e.date), e.description, e.vendor, e.category, formatNumber(e.amount), e.mode, e.status]),
+        subtitle: `${periodLabel(query.from_date, query.to_date)} · ${rows.length} entries`,
+        columns: ['Expense No', 'Date', 'Description', 'Paid To', 'Category', 'Amount', 'Mode', 'Status'],
+        rows: rows.map((e) => [recordNo('EXP', e.id), formatDate(e.txn_date), e.description, e.paid_to ?? '', e.category ?? '', formatNumber(e.amount), methodLabel(e.mode), expenseStatusLabel(e.status)]),
       },
       'expenses',
+      format,
     );
   };
 
   return (
     <>
       <PageHeader
-        title="Expense Management"
-        subtitle="Record and manage society expenses and vendor payments"
+        title="Society Expenses"
+        subtitle="Record and verify what the society spends. Only verified expenses count in the totals and reports"
         actions={
           <>
             <Button onClick={() => setForm({ open: true })}>
               <Plus className="h-4 w-4" /> Add Expense
             </Button>
-            <ExportButton onExport={onExport} disabled={!all.data} />
+            <ExportButton onExport={onExport} disabled={!list.data?.pagination.total} />
           </>
         }
       />
-      {all.isLoading ? (
+      {!summary ? (
         <StatCardsSkeleton />
       ) : (
         <div className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard icon={Wallet} value={formatINR(stats.total)} label="Total Expenses (verified)" tone="red" />
-          <StatCard icon={ReceiptText} value={stats.count} label="Total Transactions" tone="amber" />
-          <StatCard icon={TrendingUp} value={formatINR(stats.highest)} label="Highest Expense" tone="orange" />
-          <StatCard icon={BarChart3} value={formatINR(stats.average)} label="Average Expense" tone="green" />
+          <StatCard icon={Wallet} value={formatINR(summary.verified_total)} label="Total Expenses (verified)" tone="red" />
+          <StatCard icon={ReceiptText} value={summary.count} label="Total Entries" tone="amber" />
+          <StatCard icon={TrendingUp} value={formatINR(summary.highest)} label="Highest Expense" tone="orange" />
+          <StatCard icon={BarChart3} value={formatINR(summary.average)} label="Average Expense" tone="green" />
         </div>
       )}
       <FilterBar
-        searchPlaceholder="Search by description or vendor name..."
+        searchPlaceholder="Search by description, vendor or reference..."
         dateRange
         selects={[
-          { name: 'category', label: 'Categories', options: settings?.expenseCategories ?? [] },
-          { name: 'status', label: 'Status', options: REVIEW_STATUSES },
-          { name: 'mode', label: 'Payment Modes', options: PAYMENT_MODES },
+          { name: 'category', label: 'Categories', options: settings?.settings.expense_categories ?? [] },
+          { name: 'status', label: 'Status', options: EXPENSE_STATUS_OPTIONS },
+          { name: 'mode', label: 'Payment Modes', options: PAYMENT_MODE_OPTIONS },
         ]}
       />
       <DataTable
         columns={columns}
-        rows={list.data?.data}
-        total={list.data?.total ?? 0}
+        rows={list.data?.expenses}
+        total={list.data?.pagination.total ?? 0}
         page={url.page}
+        pageSize={DEFAULT_PAGE_SIZE}
         isLoading={list.isLoading}
+        isFetching={list.isFetching}
         isError={list.isError}
+        errorMessage={list.error?.message}
         onRetry={() => list.refetch()}
-        sort={url.sort ?? { field: 'date', order: 'desc' }}
+        sort={{ field: query.sort ?? 'date', order: query.order ?? 'desc' }}
         onSortChange={({ field, order }) => url.setParams({ sort: field, order })}
         onPageChange={(page) => url.setParams({ page })}
         itemLabel="entries"
+        emptyMessage="No expenses found."
       />
       <ExpenseForm open={form.open} expense={form.expense} onOpenChange={(open) => setForm((f) => ({ ...f, open }))} />
       <ViewDialog
@@ -267,8 +322,8 @@ export default function ExpensesPage() {
         onOpenChange={(open) => !open && setViewing(null)}
         title={viewing ? `Expense ${recordNo('EXP', viewing.id)}` : ''}
         footer={
-          viewing && viewing.status !== 'Verified' ? (
-            <Button className="bg-[#1E8E4E] hover:bg-[#187540]" onClick={() => setStatus.mutate({ id: viewing.id, status: 'Verified' }, { onSuccess: () => setViewing(null) })}>
+          viewing && viewing.status !== 'verified' ? (
+            <Button className="bg-[#1E8E4E] hover:bg-[#187540]" onClick={() => setStatus.mutate({ id: viewing.id, status: 'verified' }, { onSuccess: () => setViewing(null) })}>
               Verify
             </Button>
           ) : null
@@ -278,17 +333,19 @@ export default function ExpensesPage() {
           <DetailList
             items={[
               ['Description', viewing.description],
-              ['Vendor / Paid To', viewing.vendor],
+              ['Paid To', viewing.paid_to || '—'],
+              ['Category', viewing.category || '—'],
               ['Amount', formatINR(viewing.amount)],
-              ['Date', formatDate(viewing.date)],
-              ['Category', viewing.category],
-              ['Payment Mode', viewing.mode],
-              ['Approved By', viewing.approvedBy],
-              ['Status', <StatusBadge key="s" status={viewing.status} />],
+              ['Date', formatDate(viewing.txn_date)],
+              ['Payment Mode', methodLabel(viewing.mode)],
+              ['Reference', viewing.reference_no || '—'],
+              ['Status', <StatusBadge key="s" status={expenseStatusLabel(viewing.status)} />],
+              ['Entered By', viewing.entered_by_name ?? '—'],
+              ...(viewing.verified_by_name ? [['Reviewed By', viewing.verified_by_name] as [string, string]] : []),
               [
-                'Bill / Receipt',
-                viewing.receipt ? (
-                  <FileLink key="r" href={viewing.receipt} className={cn('text-maroon underline')}>
+                'Bill',
+                viewing.bill_url ? (
+                  <FileLink key="b" href={viewing.bill_url} className="text-maroon underline">
                     Open file
                   </FileLink>
                 ) : (
@@ -303,7 +360,7 @@ export default function ExpensesPage() {
         open={!!deleting}
         onOpenChange={(open) => !open && setDeleting(null)}
         title={`Delete ${deleting ? recordNo('EXP', deleting.id) : ''}?`}
-        description={deleting ? `${deleting.description}, ${formatINR(deleting.amount)}. This cannot be undone.` : ''}
+        description={deleting ? `${deleting.description}, ${formatINR(deleting.amount)}.` : ''}
         confirmLabel="Delete"
         destructive
         onConfirm={() => deleting && remove.mutate(deleting.id)}

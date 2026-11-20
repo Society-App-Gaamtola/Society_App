@@ -1,9 +1,10 @@
 import { Fragment, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { surface } from '../../styles/common';
-import { colors, fonts, type Tone } from '../../theme';
+import { colors, fonts, type Tone, themedStyles } from '../../theme';
 import { Ionicons, type IoniconName } from '../../icons';
 import IconCircle from '../ui/IconCircle';
+import { useT } from '../../i18n';
 
 export type MenuItem = {
   key: string;
@@ -21,10 +22,11 @@ type Props = { title?: string; items: MenuItem[] };
 
 /** A titled card of tappable rows, like a settings list. */
 export default function MenuGroup({ title, items }: Props) {
+  const t = useT();
   if (!items.length) return null;
   return (
     <View style={styles.group}>
-      {title ? <Text style={styles.title}>{title}</Text> : null}
+      {title ? <Text style={styles.title}>{t(title)}</Text> : null}
       <View style={styles.card}>
         {items.map((item, index) => (
           <Fragment key={item.key}>
@@ -40,10 +42,10 @@ export default function MenuGroup({ title, items }: Props) {
                 <Ionicons name={item.icon} size={19} color={item.tone?.text ?? colors.primary} />
               </IconCircle>
               <View style={styles.text}>
-                <Text style={styles.label}>{item.label}</Text>
+                <Text style={styles.label}>{t(item.label)}</Text>
                 {item.hint ? (
                   <Text style={styles.hint} numberOfLines={1}>
-                    {item.hint}
+                    {t(item.hint)}
                   </Text>
                 ) : null}
               </View>
@@ -57,7 +59,7 @@ export default function MenuGroup({ title, items }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   group: { marginTop: 20 },
   title: {
     fontFamily: fonts.semiBold,
@@ -75,4 +77,4 @@ const styles = StyleSheet.create({
   label: { fontFamily: fonts.medium, fontSize: 14, color: colors.textDark },
   hint: { fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted, marginTop: 1 },
   divider: { height: 1, backgroundColor: colors.border, marginLeft: 64 },
-});
+}));

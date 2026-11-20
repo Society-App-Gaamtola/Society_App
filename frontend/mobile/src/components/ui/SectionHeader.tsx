@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
+import { useT } from '../../i18n';
 
 type Props = {
   title: string;
@@ -11,22 +12,23 @@ type Props = {
 };
 
 export default function SectionHeader({ title, onViewAll, icon, style, titleStyle }: Props) {
+  const t = useT();
   return (
     <View style={[styles.header, style]}>
       <View style={styles.titleRow}>
         {icon}
-        <Text style={[styles.title, titleStyle]}>{title}</Text>
+        <Text style={[styles.title, titleStyle]}>{t(title)}</Text>
       </View>
       {onViewAll ? (
         <Pressable onPress={onViewAll} hitSlop={8}>
-          <Text style={styles.viewAll}>View All →</Text>
+          <Text style={styles.viewAll}>{t('View All')} →</Text>
         </Pressable>
       ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -37,4 +39,4 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   title: { fontFamily: fonts.bold, fontSize: 16, color: colors.textDark },
   viewAll: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.primary },
-});
+}));

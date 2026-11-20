@@ -1,31 +1,60 @@
-import { useCallback, useMemo } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { common, surface } from '../styles/common';
-import { colors, fonts, tones } from '../theme';
-import { useMyDonations } from '../hooks/useMyDonations';
+import { colors, fonts, tones, themedStyles } from '../theme';
+import { getMyDonations, toMyDonation } from '../api/member';
 import { Ionicons, MaterialCommunityIcons, type IoniconName } from '../icons';
 import type { MyDonation } from '../types';
 import { formatDateTime } from '../utils/date';
 import { formatINR } from '../utils/format';
-import { AppHeader, IconCircle, Pill } from '../components';
+import { ActionSheet, AppHeader, EmptyState, IconCircle, Pill } from '../components';
+import { useT } from '../i18n';
+import { useAuth } from '../context/AuthContext';
+import { donationReceiptPdf, donationSummaryFile, receiptNo, shareFile, type Donor } from '../services/receipt';
+import type { ReportFormat } from '../types';
 
-const sum = (list: MyDonation[]) => list.reduce((total, d) => total + d.amount, 0);
+/** Every donation of the member, page by page (the summary sheet covers the whole history) */
+async function allMyDonations() {
+  const all: MyDonation[] = [];
+  for (let page = 1; ; page += 1) {
+    const { data } = await getMyDonations(page, 50);
+    all.push(...data.donations.map(toMyDonation));
+    if (!data.pagination.has_more) return all;
+  }
+}
 
 function StatCard({ icon, label, amount }: { icon: IoniconName; label: string; amount: number }) {
+  const t = useT();
   return (
     <View style={styles.stat}>
       <IconCircle size={36}>
         <Ionicons name={icon} size={18} color={colors.primary} />
       </IconCircle>
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statLabel}>{t(label)}</Text>
       <Text style={styles.statAmount}>{formatINR(amount)}</Text>
     </View>
   );
 }
 
-function DonationCard({ donation }: { donation: MyDonation }) {
+function DonationCard({ donation, donor }: { donation: MyDonation; donor: Donor }) {
+  const t = useT();
   const successful = donation.status === 'Successful';
+  const failed = donation.status === 'Failed';
+  const [busy, setBusy] = useState(false);
+
+  // A verified donation: a receipt PDF, shared through the phone's share sheet (WhatsApp, email, save …)
+  const shareReceipt = async () => {
+    setBusy(true);
+    try {
+      const uri = await donationReceiptPdf(donation, donor);
+      await shareFile(uri, 'PDF', t('Receipt {no}', { no: receiptNo(donation.id) }));
+    } catch (e) {
+      Alert.alert(t('Could not create the receipt'), e instanceof Error ? e.message : t('Please try again.'));
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
@@ -38,79 +67,159 @@ function DonationCard({ donation }: { donation: MyDonation }) {
         </View>
         <View style={styles.amountCol}>
           <Text style={styles.amount}>{formatINR(donation.amount)}</Text>
-          <Pill label={successful ? 'Successful' : 'Pending'} tone={successful ? tones.success : tones.warning} />
+          <Pill label={donation.status} tone={successful ? tones.success : failed ? tones.danger : tones.warning} />
         </View>
       </View>
       <View style={common.divider} />
       <Pressable
         style={styles.receipt}
+        disabled={busy}
         onPress={() =>
           successful
-            ? Alert.alert('Receipt', `${donation.title}\n${formatINR(donation.amount)} · ${donation.method}\nReference: ${donation.reference ?? '-'}`)
-            : Alert.alert('Receipt pending', 'Your receipt will be ready once the treasurer verifies this donation.')
+            ? shareReceipt()
+            : failed
+              ? Alert.alert(t('Not received'), t('The treasurer could not match this donation. Please contact the Mandal office.'))
+              : Alert.alert(t('Receipt pending'), t('Your receipt will be ready once the treasurer verifies this donation.'))
         }
         accessibilityRole="button"
       >
-        <Ionicons name="download-outline" size={18} color={colors.primary} />
-        <Text style={styles.receiptText}>View Receipt</Text>
-        <Ionicons name="chevron-forward" size={16} color={colors.mutedIcon} />
+        {busy ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name={successful ? 'share-social-outline' : 'download-outline'} size={18} color={colors.primary} />}
+        <Text style={styles.receiptText}>{t(successful ? 'Share Receipt (PDF)' : 'View Receipt')}</Text>
+        {successful ? <Ionicons name="logo-whatsapp" size={16} color={colors.whatsapp} /> : <Ionicons name="chevron-forward" size={16} color={colors.mutedIcon} />}
       </Pressable>
     </View>
   );
 }
 
-// Saved on the phone until the member donations API exists. Totals count verified donations only.
+// The member's donations from the backend (GET /user/donations), newest first.
+// Totals count donations the treasurer has verified only; they come from the server.
 export default function MyDonationsScreen() {
-  const { donations, reload } = useMyDonations();
+  const t = useT();
+  const { user } = useAuth();
+  const donor: Donor = { name: user?.name ?? '', memberId: user?.memberId };
+  const [summaryMenu, setSummaryMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [donations, setDonations] = useState<MyDonation[]>([]);
+  const [summary, setSummary] = useState({ total: 0, thisYear: 0 });
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Pick up a donation just made on the Donate screen.
+  const load = useCallback(async () => {
+    try {
+      // One page of the latest 50 covers a member's history; older ones aren't shown yet
+      const { data } = await getMyDonations(1, 50);
+      setDonations(data.donations.map(toMyDonation));
+      setSummary({ total: data.summary.total, thisYear: data.summary.this_year });
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('Could not load your donations.'));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  // Also picks up a donation just made on the Donate screen
   useFocusEffect(
     useCallback(() => {
-      reload();
-    }, [reload]),
+      load();
+    }, [load]),
   );
 
-  const { total, thisYear } = useMemo(() => {
-    const verified = donations.filter((d) => d.status === 'Successful');
-    const year = new Date().getFullYear();
-    return { total: sum(verified), thisYear: sum(verified.filter((d) => new Date(d.date).getFullYear() === year)) };
-  }, [donations]);
+  const { total, thisYear } = summary;
+
+  const downloadSummary = async (format: ReportFormat) => {
+    setExporting(true);
+    try {
+      const uri = await donationSummaryFile(await allMyDonations(), donor, summary, format);
+      await shareFile(uri, format, t('My Donations'));
+    } catch (e) {
+      Alert.alert(t('Could not create the summary'), e instanceof Error ? e.message : t('Please try again.'));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <View style={common.screen}>
       <AppHeader leftType="back" rightIcons={['bell', 'avatar']} />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={common.heading}>My Donations</Text>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              load();
+            }}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
+      >
+        <View style={styles.headingRow}>
+          <Text style={[common.heading, common.flex]}>{t('My Donations')}</Text>
+          {donations.length ? (
+            <Pressable style={styles.summaryButton} onPress={() => setSummaryMenu(true)} disabled={exporting} accessibilityRole="button">
+              {exporting ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="document-text-outline" size={16} color={colors.primary} />}
+              <Text style={styles.summaryText}>{t('Summary')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
 
         <View style={styles.stats}>
           <StatCard icon="heart" label="Total Donated" amount={total} />
           <StatCard icon="calendar-outline" label="This Year" amount={thisYear} />
         </View>
 
-        <Text style={styles.sectionTitle}>Donation History</Text>
-        <View style={styles.list}>
-          {donations.map((d) => (
-            <DonationCard key={d.id} donation={d} />
-          ))}
-        </View>
+        <Text style={styles.sectionTitle}>{t('Donation History')}</Text>
+        {loading ? (
+          <ActivityIndicator color={colors.primary} style={styles.loading} />
+        ) : donations.length ? (
+          <View style={styles.list}>
+            {donations.map((d) => (
+              <DonationCard key={d.id} donation={d} donor={donor} />
+            ))}
+          </View>
+        ) : (
+          <EmptyState
+            icon={<Ionicons name={error ? 'cloud-offline-outline' : 'heart-outline'} size={40} color={colors.lightGold} />}
+            text={error ? "Couldn't load your donations. Pull down to try again." : 'No donations yet'}
+          />
+        )}
 
         <View style={styles.note}>
           <Ionicons name="shield-checkmark-outline" size={22} color={colors.primary} />
-          <Text style={styles.noteText}>Your donations are secure and processed through our verified payment partner.</Text>
+          <Text style={styles.noteText}>{t('Every donation is checked by the treasurer before its receipt is issued.')}</Text>
         </View>
       </ScrollView>
+      <ActionSheet
+        visible={summaryMenu}
+        title="Download donation summary"
+        onClose={() => setSummaryMenu(false)}
+        actions={[
+          { label: 'PDF', icon: 'document-outline', onPress: () => downloadSummary('PDF') },
+          { label: 'Excel', icon: 'grid-outline', onPress: () => downloadSummary('Excel') },
+        ]}
+      />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   content: { padding: 16, paddingBottom: 32 },
+  headingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  summaryButton: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1.5, borderColor: colors.primary, borderRadius: 18, paddingHorizontal: 12, height: 34 },
+  summaryText: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.primary },
   stats: { flexDirection: 'row', gap: 12, marginTop: 14 },
   stat: { ...surface, flex: 1, padding: 12, gap: 4 },
   statLabel: { fontFamily: fonts.regular, fontSize: 12, color: colors.textMuted, marginTop: 4 },
   statAmount: { fontFamily: fonts.bold, fontSize: 22, color: colors.primary },
   sectionTitle: { fontFamily: fonts.bold, fontSize: 16, color: colors.textDark, marginTop: 20, marginBottom: 10 },
   list: { gap: 12 },
+  loading: { marginVertical: 24 },
   card: { ...surface, paddingHorizontal: 12 },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
   title: { fontFamily: fonts.semiBold, fontSize: 14, color: colors.textDark },
@@ -129,4 +238,4 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   noteText: { flex: 1, fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, color: colors.textMuted },
-});
+}));

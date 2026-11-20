@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import ModalSheet from './ModalSheet';
 
 type Props = {
@@ -38,8 +38,8 @@ export default function DatePickerSheet({ mode, value, minimumDate, maximumDate,
   );
 }
 
-const styles = StyleSheet.create({
-  sheet: { backgroundColor: colors.white, paddingBottom: 24 },
+const styles = themedStyles(() => ({
+  sheet: { backgroundColor: colors.card, paddingBottom: 24 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -49,4 +49,4 @@ const styles = StyleSheet.create({
   },
   cancel: { fontFamily: fonts.medium, fontSize: 14, color: colors.textMuted },
   done: { fontFamily: fonts.semiBold, fontSize: 14, color: colors.primary },
-});
+}));

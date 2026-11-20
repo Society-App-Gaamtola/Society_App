@@ -5,12 +5,11 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { HomeStackParamList } from '../navigation/types';
 import { common, surface } from '../styles/common';
-import { colors, fonts } from '../theme';
-import { useAuth } from '../context/AuthContext';
-import { useExecEvents } from '../context/EventsContext';
+import { colors, fonts, themedStyles } from '../theme';
 import { Ionicons, type IoniconName } from '../icons';
-import type { NewExecEvent } from '../types';
-import { dayCount, formatDateTime } from '../utils/date';
+import { submitEvent } from '../services/eventSubmit';
+import type { EventBody } from '../api/executive';
+import { formatDate, formatDateTime, formatTime, fromIsoDay, isoDayCount } from '../utils/date';
 import { AppHeader, OutlineButton, PermissionGate, PrimaryButton } from '../components';
 import DatePickerSheet from '../components/sheets/DatePickerSheet';
 
@@ -27,41 +26,48 @@ export default function EventPreviewScreen() {
 function EventPreview() {
   const navigation = useNavigation<Nav>();
   const { params } = useRoute<RouteProp<HomeStackParamList, 'EventPreview'>>();
-  const { user } = useAuth();
-  const { addEvent } = useExecEvents();
-  const event = params.event;
+  const { event, editId } = params;
   const createdOn = useMemo(() => formatDateTime(new Date()), []);
   const [iosPickerValue, setIosPickerValue] = useState<Date | null>(null);
+  const [saving, setSaving] = useState<EventBody['action'] | null>(null);
 
-  const days = dayCount(event.date, event.endDate);
-  const dateText = event.endDate
-    ? `${event.date} - ${event.endDate}${days && days > 1 ? ` (${days} Days)` : ''}`
-    : event.date;
+  const days = event.endDay ? isoDayCount(event.day, event.endDay) : 1;
+  const startText = formatDate(fromIsoDay(event.day));
+  const dateText = event.endDay
+    ? `${startText} - ${formatDate(fromIsoDay(event.endDay))}${days > 1 ? ` (${days} Days)` : ''}`
+    : startText;
+  const [hour, minute] = event.time.split(':').map(Number);
+  const timeText = formatTime(new Date(2000, 0, 1, hour, minute));
 
-  const finish = (status: NewExecEvent['status'], message: string, scheduledAt?: number) => {
-    addEvent({ ...event, status, scheduledAt });
-    Alert.alert(status === 'Scheduled' ? 'Event Scheduled' : 'Event', message, [
-      {
-        text: 'OK',
-        onPress: () => {
-          navigation.popToTop();
-          navigation.navigate('MyEvents');
+  // Saved on the server; its message says what happened (posted, scheduled, or sent to the Super Admin)
+  const finish = async (action: EventBody['action'], publishAt?: Date) => {
+    setSaving(action);
+    try {
+      const { message } = await submitEvent(event, action, { editId, publishAt });
+      Alert.alert(action === 'schedule' ? 'Event Scheduled' : 'Event', message, [
+        {
+          text: 'OK',
+          onPress: () => {
+            navigation.popToTop();
+            navigation.navigate('MyEvents');
+          },
         },
-      },
-    ]);
+      ]);
+    } catch (e) {
+      Alert.alert('Could not save the event', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setSaving(null);
+    }
   };
 
-  const onPost = () => {
-    if (user?.eventsNeedApproval) finish('Needs Approval', 'Event sent to Super Admin for approval');
-    else finish('Posted', 'Event posted successfully');
-  };
+  const onPost = () => finish('post');
 
   const onScheduled = (when: Date) => {
     if (when.getTime() <= Date.now()) {
       Alert.alert('Invalid time', 'Please choose a time in the future.');
       return;
     }
-    finish('Scheduled', `Event will be posted on ${formatDateTime(when)}.`, when.getTime());
+    finish('schedule', when);
   };
 
   const onSchedule = () => {
@@ -116,7 +122,7 @@ function EventPreview() {
 
         <Text style={styles.title}>{event.title}</Text>
         <InfoRow icon="calendar-outline" text={dateText} />
-        {event.time ? <InfoRow icon="time-outline" text={event.time} /> : null}
+        <InfoRow icon="time-outline" text={timeText} />
         <InfoRow icon="location-outline" text={event.venue} />
 
         <Text style={styles.section}>About This Event</Text>
@@ -130,24 +136,16 @@ function EventPreview() {
 
         <Text style={styles.subSection}>Additional Information</Text>
         <View style={styles.card}>
-          <DetailRow label="Category" value={event.category} />
+          <DetailRow label="Category" value={event.categoryName} />
           <View style={common.divider} />
           <DetailRow label="Created On" value={createdOn} />
         </View>
 
-        <View style={styles.warning}>
-          <Ionicons name="alert-circle-outline" size={22} color={colors.warning} />
-          <View style={common.flex}>
-            <Text style={styles.warningTitle}>Publishing is subject to permission settings.</Text>
-            <Text style={styles.warningText}>Event will be visible to members after posting and required approvals.</Text>
-          </View>
-        </View>
-
         <View style={styles.buttonRow}>
           <OutlineButton title="Edit Event" icon="pencil-outline" onPress={() => navigation.goBack()} style={styles.half} />
-          <PrimaryButton title="Post Event" icon="send" onPress={onPost} style={styles.half} />
+          <PrimaryButton title="Post Event" icon="send" onPress={onPost} loading={saving === 'post'} disabled={!!saving} style={styles.half} />
         </View>
-        <OutlineButton title="Schedule for Later" icon="time-outline" onPress={onSchedule} style={styles.schedule} />
+        <OutlineButton title="Schedule for Later" icon="time-outline" onPress={saving ? () => {} : onSchedule} style={styles.schedule} />
       </ScrollView>
 
       {iosPickerValue ? (
@@ -189,7 +187,7 @@ function DetailRow({ icon, label, value }: { icon?: ReactNode; label: string; va
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   scroll: { padding: 16, paddingBottom: 32 },
 
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
@@ -197,13 +195,13 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 8,
-    backgroundColor: '#FBF1D6',
+    backgroundColor: colors.goldTint,
     marginTop: 2,
   },
-  readyText: { fontFamily: fonts.semiBold, fontSize: 11, color: '#8A6A12' },
+  readyText: { fontFamily: fonts.semiBold, fontSize: 11, color: colors.goldText },
 
   banner: { width: '100%', height: 190, borderRadius: 14, marginTop: 14 },
-  bannerEmpty: { backgroundColor: '#EFE6DC', alignItems: 'center', justifyContent: 'center' },
+  bannerEmpty: { backgroundColor: colors.sand, alignItems: 'center', justifyContent: 'center' },
   title: { fontFamily: fonts.bold, fontSize: 20, lineHeight: 28, color: colors.textDark, marginTop: 14, marginBottom: 6 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
   infoText: { flex: 1, fontFamily: fonts.regular, fontSize: 13, color: colors.textDark },
@@ -217,21 +215,7 @@ const styles = StyleSheet.create({
   detailLabel: { width: 90, fontFamily: fonts.regular, fontSize: 12, color: colors.textMuted },
   detailValue: { flex: 1, fontFamily: fonts.semiBold, fontSize: 13, color: colors.textDark, textAlign: 'right' },
 
-  warning: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#FFF6DB',
-    borderWidth: 1,
-    borderColor: '#F1DFA0',
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 18,
-  },
-  warningTitle: { fontFamily: fonts.bold, fontSize: 12, color: colors.textDark },
-  warningText: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, color: colors.textMuted, marginTop: 2 },
-
   buttonRow: { flexDirection: 'row', gap: 10, marginTop: 18 },
   half: { flex: 1, width: 'auto' },
   schedule: { marginTop: 10 },
-});
+}));

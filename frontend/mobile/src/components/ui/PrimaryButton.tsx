@@ -1,7 +1,8 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, fonts, PRIMARY_GRADIENT, radius } from '../../theme';
+import { colors, fonts, PRIMARY_GRADIENT, radius, themedStyles } from '../../theme';
 import { Ionicons, type IoniconName } from '../../icons';
+import { useT } from '../../i18n';
 
 type Props = {
   title: string;
@@ -14,6 +15,7 @@ type Props = {
 };
 
 export default function PrimaryButton({ title, onPress, disabled, loading, style, icon }: Props) {
+  const t = useT();
   return (
     <Pressable
       onPress={onPress}
@@ -27,7 +29,7 @@ export default function PrimaryButton({ title, onPress, disabled, loading, style
         ) : (
           <View style={styles.content}>
             {icon ? <Ionicons name={icon} size={18} color={colors.white} /> : null}
-            <Text style={styles.text}>{title}</Text>
+            <Text style={styles.text}>{t(title)}</Text>
           </View>
         )}
       </LinearGradient>
@@ -35,10 +37,10 @@ export default function PrimaryButton({ title, onPress, disabled, loading, style
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   wrap: { width: '100%', height: 52, borderRadius: radius.button, overflow: 'hidden' },
   dimmed: { opacity: 0.85 },
   gradient: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   text: { fontFamily: fonts.semiBold, fontSize: 15, color: colors.white },
-});
+}));

@@ -6,7 +6,7 @@ import * as authApi from '../api/auth';
 import type { ImageFile } from '../api/auth';
 import type { SharedStackParams } from '../navigation/types';
 import { common, surface } from '../styles/common';
-import { colors, fonts, tones } from '../theme';
+import { colors, fonts, tones, themedStyles } from '../theme';
 import { useAuth } from '../context/AuthContext';
 import { useFormErrors } from '../hooks/useFormErrors';
 import { Ionicons, type IoniconName } from '../icons';
@@ -14,6 +14,7 @@ import { pickProfilePhoto } from '../services/profilePhoto';
 import { showToast } from '../utils/toast';
 import { AppHeader, FormField, IconCircle, InputField, KeyboardAvoid, Pill, PrimaryButton } from '../components';
 import ProfileAvatar from '../components/profile/ProfileAvatar';
+import { useT } from '../i18n';
 
 type Field = 'username' | 'address';
 
@@ -23,6 +24,7 @@ type LockedRowProps = { icon: IoniconName; label: string; value: string; action?
 
 /** A value that is changed somewhere else, or not at all. */
 function LockedRow({ icon, label, value, action, hint, badge }: LockedRowProps) {
+  const t = useT();
   return (
     <View style={styles.locked}>
       <IconCircle size={36} radius={10} color={colors.noteBackground}>
@@ -30,11 +32,11 @@ function LockedRow({ icon, label, value, action, hint, badge }: LockedRowProps) 
       </IconCircle>
       <View style={common.flex}>
         <View style={styles.lockedLabelRow}>
-          <Text style={styles.lockedLabel}>{label}</Text>
+          <Text style={styles.lockedLabel}>{t(label)}</Text>
           {badge}
         </View>
         <Text style={styles.lockedValue} numberOfLines={1}>
-          {value || 'Not added'}
+          {value || t('Not added')}
         </Text>
         {hint ? <Text style={styles.lockedHint}>{hint}</Text> : null}
       </View>
@@ -50,6 +52,7 @@ function LockedRow({ icon, label, value, action, hint, badge }: LockedRowProps) 
 }
 
 export default function EditProfileScreen() {
+  const t = useT();
   const navigation = useNavigation<NativeStackNavigationProp<SharedStackParams>>();
   const { user, updateUser } = useAuth();
   const [username, setUsername] = useState(user?.name ?? '');
@@ -110,8 +113,8 @@ export default function EditProfileScreen() {
       <AppHeader leftType="back" rightIcons={[]} />
       <KeyboardAvoid>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Text style={common.heading}>Edit Profile</Text>
-          <Text style={common.subtext}>Keep your details up to date for the society records.</Text>
+          <Text style={common.heading}>{t('Edit Profile')}</Text>
+          <Text style={common.subtext}>{t('Keep your details up to date for the society records.')}</Text>
 
           {/* Photo */}
           <View style={styles.photoSection}>
@@ -124,12 +127,12 @@ export default function EditProfileScreen() {
             <Pressable onPress={pickPhoto} hitSlop={6} accessibilityRole="button">
               <Text style={styles.photoAction}>{photo ? 'Choose a different photo' : 'Change photo'}</Text>
             </Pressable>
-            <Text style={styles.photoHint}>JPG or PNG, up to 2 MB</Text>
-            {photoError ? <Text style={styles.photoError}>{photoError}</Text> : null}
+            <Text style={styles.photoHint}>{t('JPG or PNG, up to 2 MB')}</Text>
+            {photoError ? <Text style={styles.photoError}>{t(photoError)}</Text> : null}
           </View>
 
           {/* Editable details */}
-          <Text style={styles.sectionTitle}>Basic Details</Text>
+          <Text style={styles.sectionTitle}>{t('Basic Details')}</Text>
           <View style={styles.card}>
             <FormField label="Full Name" error={errors.username}>
               <InputField
@@ -156,7 +159,7 @@ export default function EditProfileScreen() {
           </View>
 
           {/* Contact details changed elsewhere */}
-          <Text style={styles.sectionTitle}>Contact</Text>
+          <Text style={styles.sectionTitle}>{t('Contact')}</Text>
           <View style={[styles.card, styles.cardFlush]}>
             <LockedRow
               icon="mail-outline"
@@ -188,7 +191,7 @@ export default function EditProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   scroll: { padding: 16, paddingBottom: 32 },
   photoSection: { alignItems: 'center', marginTop: 20, marginBottom: 8 },
   cameraBadge: {
@@ -234,4 +237,4 @@ const styles = StyleSheet.create({
 
   button: { marginTop: 24 },
   faded: { opacity: 0.5 },
-});
+}));

@@ -8,6 +8,8 @@ export type ApiUser = {
   id: number;
   role: 'super_admin' | 'executive' | 'member';
   username: string;
+  /** GM0001…, given when sign-up is completed (null before that, and for the Super Admin) */
+  member_code?: string | null;
   email: string;
   country_code: string;
   mobile_number: string;
@@ -17,6 +19,8 @@ export type ApiUser = {
   is_verified: 0 | 1;
   /** 1 = profile still to complete, 2 = completed. */
   steps: number;
+  /** Sections the user may manage (executives: what the Super Admin gave them; the Super Admin: all) */
+  permissions?: { sections: string[] };
   created_at?: string;
 };
 

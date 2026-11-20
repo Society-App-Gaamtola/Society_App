@@ -4,9 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { common } from '../styles/common';
-import { colors, fontFor, fonts, radius, spacing, type Language } from '../theme';
+import { colors, fontFor, fonts, radius, spacing, type Language, themedStyles } from '../theme';
 import { languages, t } from '../i18n/strings';
-import { setAppLanguage } from '../i18n';
+import { getAppLanguage, setAppLanguage } from '../i18n';
 import { Ionicons } from '../icons';
 import { BrandBlock, Loader, Lotus } from '../components';
 
@@ -15,7 +15,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'LanguageSelect'>;
 const MIN_LOADER_MS = 800;
 
 export default function LanguageSelectScreen({ navigation }: Props) {
-  const [selected, setSelected] = useState<Language>('gu');
+  const [selected, setSelected] = useState<Language>(getAppLanguage());
   const [saving, setSaving] = useState(false);
 
   const onContinue = async () => {
@@ -35,8 +35,8 @@ export default function LanguageSelectScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <BrandBlock logoSize={110} fontSize={24} lineHeight={36} />
 
-        <Text style={styles.heading}>{t('selectLanguage', 'en')}</Text>
-        <Text style={styles.subtext}>{t('selectLanguageHint', 'en')}</Text>
+        <Text style={[styles.heading, { fontFamily: fontFor(selected, 'bold') }]}>{t('selectLanguage', selected)}</Text>
+        <Text style={[styles.subtext, { fontFamily: fontFor(selected) }]}>{t('selectLanguageHint', selected)}</Text>
 
         <View style={styles.list}>
           {languages.map(({ code, native, badge }) => {
@@ -66,12 +66,12 @@ export default function LanguageSelectScreen({ navigation }: Props) {
           onPress={onContinue}
           disabled={saving}
         >
-          <Text style={styles.buttonText}>{t('continue', 'en')} →</Text>
+          <Text style={[styles.buttonText, { fontFamily: fontFor(selected, 'bold') }]}>{t('continue', selected)} →</Text>
         </Pressable>
 
         <View style={styles.info}>
           <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
-          <Text style={styles.infoText}>{t('changeLanguageInfo', 'en')}</Text>
+          <Text style={[styles.infoText, { fontFamily: fontFor(selected) }]}>{t('changeLanguageInfo', selected)}</Text>
         </View>
 
         <View style={styles.lotus}>
@@ -83,7 +83,7 @@ export default function LanguageSelectScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   scroll: { flexGrow: 1, padding: spacing.lg },
   heading: { fontFamily: fonts.semiBold, fontSize: 18, lineHeight: 28, color: colors.textDark },
   subtext: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 20, color: colors.textMuted, marginTop: 2 },
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 6,
-    backgroundColor: '#EFEAE4',
+    backgroundColor: colors.sand,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -134,4 +134,4 @@ const styles = StyleSheet.create({
   info: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.md },
   infoText: { flex: 1, fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, color: colors.textMuted },
   lotus: { flex: 1, justifyContent: 'flex-end', alignItems: 'center', paddingTop: spacing.lg },
-});
+}));

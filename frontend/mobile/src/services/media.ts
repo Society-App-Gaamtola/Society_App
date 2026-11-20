@@ -20,17 +20,23 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
  * Folder for a new file in Cloudinary:
  *   society_app/<production|development>/profiles/user_<id>
  *   society_app/<production|development>/gallery/<yyyy>/<mm>   (by month, so no folder grows too big)
+ *   society_app/<production|development>/proofs/user_<id>      (Executive Request payment proof)
+ *   society_app/<production|development>/events/<yyyy>/<mm>    (event posters)
+ *   society_app/<production|development>/finance/<yyyy>/<mm>   (donation proofs entered by executives)
+ * The backend checks the same folders (MEDIA_FOLDERS in backend/config/constant.js).
  */
-export const mediaFolder = (purpose: 'profile' | 'gallery', userId?: string) => {
+export const mediaFolder = (purpose: 'profile' | 'gallery' | 'proof' | 'event' | 'finance', userId?: string) => {
   const base = `${CLOUDINARY.rootFolder}/${CLOUDINARY.envFolder}`;
   if (purpose === 'profile') return `${base}/profiles/user_${userId ?? 'unknown'}`;
+  if (purpose === 'proof') return `${base}/proofs/user_${userId ?? 'unknown'}`;
   const now = new Date();
-  return `${base}/gallery/${now.getFullYear()}/${pad2(now.getMonth() + 1)}`;
+  const folder = purpose === 'event' ? 'events' : purpose === 'finance' ? 'finance' : 'gallery';
+  return `${base}/${folder}/${now.getFullYear()}/${pad2(now.getMonth() + 1)}`;
 };
 
 /**
  * Photos are re-saved as JPEG, and shrunk when bigger than MEDIA.maxImageSide (never enlarged):
- * a 12MB camera photo becomes about 1–2MB, much quicker on mobile data.
+ * a 12MB camera photo becomes about 300–600KB, much quicker on mobile data.
  */
 async function shrinkImage(uri: string) {
   const original = await ImageManipulator.manipulate(uri).renderAsync();
@@ -57,7 +63,12 @@ export async function uploadMedia(media: LocalMedia, folder: string, onProgress?
     throw new UploadError(`Videos must be smaller than ${mb(limit)}. Please trim the video and try again.`);
   }
 
-  const file = media.kind === 'image' ? await shrinkImage(media.uri) : { uri: media.uri, mimeType: media.mimeType ?? 'video/mp4' };
+  // Photos are compressed before upload; a PDF (payment proof) goes as it is, to the image endpoint (Cloudinary accepts PDFs there)
+  const isPdf = media.mimeType === 'application/pdf';
+  const file =
+    media.kind === 'image' && !isPdf
+      ? await shrinkImage(media.uri)
+      : { uri: media.uri, mimeType: media.mimeType ?? (media.kind === 'video' ? 'video/mp4' : 'application/octet-stream') };
 
   const task = createUploadTask(
     `https://api.cloudinary.com/v1_1/${CLOUDINARY.cloudName}/${media.kind}/upload`,

@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import { Ionicons, type IoniconName } from '../../icons';
 
 type Props = { icon: IoniconName; text?: string };
@@ -16,7 +16,7 @@ export default function MetaRow({ icon, text }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   text: { flex: 1, fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted },
-});
+}));

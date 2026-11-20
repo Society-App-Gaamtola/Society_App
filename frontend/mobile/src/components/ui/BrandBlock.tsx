@@ -1,6 +1,6 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { LOGO, SOCIETY_NAME_GU_TWO_LINES } from '../../config';
-import { colors, fonts, spacing } from '../../theme';
+import { colors, fonts, spacing, themedStyles } from '../../theme';
 
 type Props = { logoSize: number; fontSize: number; lineHeight: number };
 
@@ -14,8 +14,8 @@ export default function BrandBlock({ logoSize, fontSize, lineHeight }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   container: { alignItems: 'center', marginBottom: spacing.lg },
   logo: { marginBottom: spacing.sm },
   title: { fontFamily: fonts.gujaratiHeading, color: colors.primary, textAlign: 'center' },
-});
+}));

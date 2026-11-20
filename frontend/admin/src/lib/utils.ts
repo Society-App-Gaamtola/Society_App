@@ -28,6 +28,13 @@ export function formatDateTime(value?: string | null) {
   return `${formatDate(value)} ${String(h % 12 || 12).padStart(2, '0')}:${String(min).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
 }
 
+/** Backend timestamps are UTC ("…Z"). This gives the local time without a zone, for formatDate / formatDateTime */
+export function fromUtc(value: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 19);
+}
+
 export const todayISO = () => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -51,6 +58,32 @@ export const initials = (name: string) =>
     .join('');
 
 export const isImageUrl = (url: string) => /\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(url) || url.startsWith('blob:') || url.startsWith('data:image/');
+
+const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/** "2026-11" → "November 2026" */
+export const monthLabelLong = (key: string) => `${MONTHS_LONG[Number(key.slice(5, 7)) - 1]} ${key.slice(0, 4)}`;
+
+/** Every month from `start` to `end` ("YYYY-MM"), both included. */
+export function monthKeys(start: string, end: string) {
+  const keys: string[] = [];
+  let [y, m] = start.split('-').map(Number);
+  const [endY, endM] = end.split('-').map(Number);
+  while (y < endY || (y === endY && m <= endM)) {
+    keys.push(`${y}-${String(m).padStart(2, '0')}`);
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return keys;
+}
+
+/** First and last day of a month, as "YYYY-MM-DD". month is 1–12 */
+export const monthBounds = (year: number, month: number) => {
+  const mm = String(month).padStart(2, '0');
+  return { from: `${year}-${mm}-01`, to: `${year}-${mm}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}` };
+};
 
 export const periodLabel = (from?: string | null, to?: string | null) =>
   from || to ? `${from ? formatDate(from) : 'Start'} - ${to ? formatDate(to) : 'Today'}` : 'All time';

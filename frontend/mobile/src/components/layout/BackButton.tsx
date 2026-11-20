@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '../../icons';
 import { useNavigation } from '@react-navigation/native';
-import { colors } from '../../theme';
+import { colors, themedStyles } from '../../theme';
 
 type Props = {
   /** Defaults to going back in the navigation stack. */
@@ -24,6 +24,6 @@ export default function BackButton({ onPress, style }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   button: { alignSelf: 'flex-start', padding: 4 },
-});
+}));

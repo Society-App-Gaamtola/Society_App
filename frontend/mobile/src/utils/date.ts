@@ -1,4 +1,5 @@
 import type { DateRange } from '../types';
+import { t } from '../i18n';
 
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -9,8 +10,11 @@ export const MONTH_NAMES = [
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
-/** "10 Oct 2026" */
-export const formatDate = (d: Date) => `${pad2(d.getDate())} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+/** "10 Oct 2026" (the month in the app's language) */
+export const formatDate = (d: Date) => `${pad2(d.getDate())} ${t(MONTHS[d.getMonth()])} ${d.getFullYear()}`;
+
+/** "October 2026"-style month name in the app's language */
+export const monthName = (monthIndex: number) => t(MONTH_NAMES[monthIndex]);
 
 /** "7:00 PM" */
 export const formatTime = (d: Date) => {
@@ -24,13 +28,17 @@ export const formatDateTime = (d: Date) => `${formatDate(d)}, ${formatTime(d)}`;
 /** "01:05", for countdowns. */
 export const formatCountdown = (seconds: number) => `${pad2(Math.floor(seconds / 60))}:${pad2(seconds % 60)}`;
 
-/** Parses a date made by formatDate back into a Date. */
+/** Parses a date made by formatDate back into a Date (its month in English or the app's language). */
 const parseDisplayDate = (s?: string) => {
-  const m = s?.match(/^(\d{1,2}) (\w{3}) (\d{4})$/);
+  const m = s?.match(/^(\d{1,2}) (\S+) (\d{4})$/);
   if (!m) return null;
-  const month = MONTHS.indexOf(m[2]);
+  const month = MONTHS.findIndex((name) => name === m[2] || t(name) === m[2]);
   return month < 0 ? null : new Date(Number(m[3]), month, Number(m[1]));
 };
+
+/** Inclusive number of days between two yyyy-mm-dd dates. */
+export const isoDayCount = (start: string, end: string) =>
+  Math.round((fromIsoDay(end).getTime() - fromIsoDay(start).getTime()) / 86400000) + 1;
 
 /** Inclusive number of days between two display dates, or null if either is missing. */
 export const dayCount = (start?: string, end?: string) => {
@@ -65,10 +73,10 @@ export const formatRange = (range: DateRange) =>
 /** "5 min ago", "2 hours ago", "3 days ago". */
 export const timeAgo = (timestamp: number) => {
   const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 1) return t('Just now');
+  if (minutes < 60) return t('{n} min ago', { n: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+  if (hours < 24) return t(hours > 1 ? '{n} hours ago' : '{n} hour ago', { n: hours });
   const days = Math.floor(hours / 24);
-  return `${days} day${days > 1 ? 's' : ''} ago`;
+  return t(days > 1 ? '{n} days ago' : '{n} day ago', { n: days });
 };

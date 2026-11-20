@@ -1,57 +1,98 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { CalendarDays, EyeOff, Megaphone, Plus, Send, Star, StarOff } from 'lucide-react';
-import { DEFAULT_LOCATION } from '@/config';
+import { Ban, CalendarDays, EyeOff, Megaphone, Plus, Send, Star, StarOff } from 'lucide-react';
 import { ConfirmDialog, DetailList, Field, FileUpload, FormDialog, PageHeader, RowActions, StatusBadge, Tabs, ViewDialog } from '@/components/common';
 import { DataTable, type Column } from '@/components/DataTable';
 import { FilterBar } from '@/components/FilterBar';
-import { Button, Input, NativeSelect, Switch, Textarea } from '@/components/ui/primitives';
-import { eventsHooks } from '@/hooks/useEvents';
-import { noticesHooks } from '@/hooks/useNotices';
-import { useSettings } from '@/hooks/useSettings';
+import { Button, Input, NativeSelect, Textarea } from '@/components/ui/primitives';
+import { DEFAULT_PAGE_SIZE } from '@/config';
+import {
+  useDeleteEvent,
+  useDeleteNotice,
+  useEventCategories,
+  useEventFeatured,
+  useEventsPage,
+  useEventStatus,
+  useNoticeStatus,
+  useNoticesPage,
+  useSaveEvent,
+  useSaveNotice,
+} from '@/hooks/useAdminContent';
 import { useUrlState } from '@/hooks/useUrlState';
-import { formatDate, isImageUrl, todayISO } from '@/lib/utils';
-import { PUBLISH_STATUSES, type Event, type NewRecord, type Notice } from '@/types';
+import { useNavigate } from '@/lib/navigation';
+import { formatDate, formatDateTime, isImageUrl, todayISO } from '@/lib/utils';
+import {
+  EVENT_STATUS_LABEL,
+  NOTICE_STATUS_LABEL,
+  NOTICE_TAG_LABEL,
+  timeLabel,
+  type EventBody,
+  type EventQuery,
+  type NoticeBody,
+  type NoticeQuery,
+} from '@/services/adminEvents';
+import { uploadEventImage } from '@/services/cloudinary';
+import type { BackendEvent, BackendNotice, EventStatusCode, NoticeStatusCode, NoticeTag } from '@/types';
 
-type EventDraft = NewRecord<Event>;
-type NoticeDraft = NewRecord<Notice>;
+type Kind = 'events' | 'notices';
+const EVENT_STATUSES = Object.entries(EVENT_STATUS_LABEL).map(([value, label]) => ({ value, label }));
+const NOTICE_STATUSES = Object.entries(NOTICE_STATUS_LABEL).map(([value, label]) => ({ value, label }));
+const NOTICE_TAGS = Object.entries(NOTICE_TAG_LABEL).map(([value, label]) => ({ value, label }));
 
-const emptyEvent = (category: string): EventDraft => ({
+/** "2026-11-20" + optional end → "20 Nov 2026" or "20 Nov 2026 – 22 Nov 2026" */
+const eventDates = (e: BackendEvent) => (e.end_date && e.end_date !== e.event_date ? `${formatDate(e.event_date)} – ${formatDate(e.end_date)}` : formatDate(e.event_date));
+const eventTimes = (e: BackendEvent) => [timeLabel(e.start_time), timeLabel(e.end_time)].filter(Boolean).join(' – ');
+
+// ---------- Event form (POST / PUT /user/events) ----------
+
+type EventDraft = Omit<EventBody, 'latitude' | 'longitude' | 'images' | 'category_id'> & { category_id: string; publish_at: string };
+
+const emptyEvent = (categoryId: string): EventDraft => ({
   title: '',
-  date: todayISO(),
-  endDate: null,
-  time: '',
-  venue: '',
-  category,
-  status: 'Draft',
-  featured: false,
-  organizer: 'Executive Committee',
-  contact: '',
-  latitude: DEFAULT_LOCATION.latitude,
-  longitude: DEFAULT_LOCATION.longitude,
+  category_id: categoryId,
   description: '',
-  image: null,
+  event_date: todayISO(),
+  end_date: null,
+  start_time: '',
+  end_time: '',
+  venue_name: '',
+  venue_address: '',
+  organizer_name: '',
+  contact_number: '',
+  poster_url: null,
+  action: 'draft',
+  publish_at: '',
 });
 
-const emptyNotice = (tag: string): NoticeDraft => ({ title: '', date: todayISO(), description: '', tag, icon: 'megaphone', status: 'Draft' });
+const eventToDraft = (e: BackendEvent): EventDraft => ({
+  title: e.title,
+  category_id: String(e.category.id),
+  description: e.description ?? '',
+  event_date: e.event_date,
+  end_date: e.end_date,
+  start_time: e.start_time.slice(0, 5),
+  end_time: e.end_time?.slice(0, 5) ?? '',
+  venue_name: e.venue_name,
+  venue_address: e.venue_address ?? '',
+  organizer_name: e.organizer_name ?? '',
+  contact_number: e.contact_number ?? '',
+  poster_url: e.poster_url,
+  // Keep it live / scheduled when it already is; otherwise saving keeps it a draft
+  action: e.status === 'posted' ? 'post' : e.status === 'scheduled' ? 'schedule' : 'draft',
+  publish_at: e.status === 'scheduled' && e.publish_at ? e.publish_at.slice(0, 16) : '',
+});
 
-function EventForm({ open, onOpenChange, event }: { open: boolean; onOpenChange: (open: boolean) => void; event?: Event }) {
-  const { data: settings } = useSettings();
-  const categories = settings?.eventCategories ?? [];
-  const create = eventsHooks.useCreate();
-  const update = eventsHooks.useUpdate();
+function EventForm({ open, onOpenChange, event }: { open: boolean; onOpenChange: (open: boolean) => void; event?: BackendEvent }) {
+  const { data: categories } = useEventCategories();
+  const save = useSaveEvent();
   const [draft, setDraft] = useState<EventDraft>(emptyEvent(''));
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open) return;
     setErrors({});
-    if (event) {
-      const { id: _id, created_at: _c, updated_at: _u, ...rest } = event;
-      setDraft(rest);
-    } else setDraft(emptyEvent(categories[0] ?? ''));
+    setDraft(event ? eventToDraft(event) : emptyEvent(String(categories?.[0]?.id ?? '')));
     // categories only matter for a new event's default
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, event]);
@@ -61,15 +102,28 @@ function EventForm({ open, onOpenChange, event }: { open: boolean; onOpenChange:
   const submit = () => {
     const found: Record<string, string> = {};
     if (!draft.title.trim()) found.title = 'Title is required.';
-    if (!draft.date) found.date = 'Date is required.';
-    if (draft.endDate && draft.endDate < draft.date) found.endDate = 'End date is before the start date.';
-    if (!draft.venue.trim()) found.venue = 'Venue is required.';
+    if (!draft.category_id) found.category_id = 'Choose a category.';
+    if (!draft.event_date) found.event_date = 'Date is required.';
+    if (draft.end_date && draft.end_date < draft.event_date) found.end_date = 'End date is before the start date.';
+    if (!draft.start_time) found.start_time = 'Start time is required.';
+    if (!draft.venue_name.trim()) found.venue_name = 'Venue is required.';
+    if (draft.contact_number && !/^\+?[\d\s-]{7,20}$/.test(draft.contact_number)) found.contact_number = 'Enter a valid phone number.';
+    if (draft.action === 'schedule' && (!draft.publish_at || new Date(draft.publish_at) <= new Date())) found.publish_at = 'Pick a future date and time.';
     setErrors(found);
     if (Object.keys(found).length) return;
-    const body = { ...draft, title: draft.title.trim(), endDate: draft.endDate || null };
-    const done = { onSuccess: () => onOpenChange(false) };
-    if (event) update.mutate({ id: event.id, changes: body }, done);
-    else create.mutate(body, done);
+
+    const body: EventBody = {
+      ...draft,
+      title: draft.title.trim(),
+      venue_name: draft.venue_name.trim(),
+      category_id: Number(draft.category_id),
+      end_date: draft.end_date || null,
+      images: event?.images ?? [], // an edit replaces the image list: keep the event's images
+      latitude: event?.latitude ?? null,
+      longitude: event?.longitude ?? null,
+      ...(draft.action === 'schedule' ? { publish_at: new Date(draft.publish_at).toISOString() } : { publish_at: undefined }),
+    };
+    save.mutate({ id: event?.id, body }, { onSuccess: () => onOpenChange(false) });
   };
 
   return (
@@ -78,7 +132,7 @@ function EventForm({ open, onOpenChange, event }: { open: boolean; onOpenChange:
       onOpenChange={onOpenChange}
       title={event ? 'Edit Event' : 'Create Event'}
       submitLabel={event ? 'Save Changes' : 'Create Event'}
-      pending={create.isPending || update.isPending}
+      pending={save.isPending}
       onSubmit={submit}
       className="max-w-2xl"
     >
@@ -86,157 +140,118 @@ function EventForm({ open, onOpenChange, event }: { open: boolean; onOpenChange:
         <Input value={draft.title} onChange={(e) => set('title', e.target.value)} autoFocus />
       </Field>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Category">
-          <NativeSelect value={draft.category} onChange={(e) => set('category', e.target.value)}>
-            {[...new Set([...categories, draft.category])].filter(Boolean).map((c) => (
-              <option key={c}>{c}</option>
+        <Field label="Category" error={errors.category_id}>
+          <NativeSelect value={draft.category_id} onChange={(e) => set('category_id', e.target.value)}>
+            <option value="">Choose…</option>
+            {categories?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
             ))}
           </NativeSelect>
         </Field>
-        <Field label="Time">
-          <Input value={draft.time} onChange={(e) => set('time', e.target.value)} placeholder="7:00 PM - 10:00 PM" />
+        <Field label="Venue" error={errors.venue_name}>
+          <Input value={draft.venue_name} onChange={(e) => set('venue_name', e.target.value)} />
         </Field>
-        <Field label="Start Date" error={errors.date}>
-          <Input type="date" value={draft.date} onChange={(e) => set('date', e.target.value)} />
+        <Field label="Start Date" error={errors.event_date}>
+          <Input type="date" value={draft.event_date} onChange={(e) => set('event_date', e.target.value)} />
         </Field>
-        <Field label="End Date (optional)" error={errors.endDate}>
-          <Input type="date" value={draft.endDate ?? ''} min={draft.date} onChange={(e) => set('endDate', e.target.value || null)} />
+        <Field label="End Date (optional)" error={errors.end_date}>
+          <Input type="date" value={draft.end_date ?? ''} min={draft.event_date} onChange={(e) => set('end_date', e.target.value || null)} />
         </Field>
-        <Field label="Venue" error={errors.venue}>
-          <Input value={draft.venue} onChange={(e) => set('venue', e.target.value)} />
+        <Field label="Start Time" error={errors.start_time}>
+          <Input type="time" value={draft.start_time} onChange={(e) => set('start_time', e.target.value)} />
+        </Field>
+        <Field label="End Time (optional)">
+          <Input type="time" value={draft.end_time} onChange={(e) => set('end_time', e.target.value)} />
         </Field>
         <Field label="Organizer">
-          <Input value={draft.organizer} onChange={(e) => set('organizer', e.target.value)} />
+          <Input value={draft.organizer_name} onChange={(e) => set('organizer_name', e.target.value)} />
         </Field>
-        <Field label="Contact Number">
-          <Input value={draft.contact} onChange={(e) => set('contact', e.target.value)} inputMode="tel" />
-        </Field>
-        <Field label="Status">
-          <NativeSelect value={draft.status} onChange={(e) => set('status', e.target.value as EventDraft['status'])}>
-            {PUBLISH_STATUSES.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </NativeSelect>
+        <Field label="Contact Number" error={errors.contact_number}>
+          <Input value={draft.contact_number} onChange={(e) => set('contact_number', e.target.value)} inputMode="tel" />
         </Field>
       </div>
+      <Field label="Venue Address (optional)">
+        <Input value={draft.venue_address} onChange={(e) => set('venue_address', e.target.value)} />
+      </Field>
       <Field label="Description">
         <Textarea value={draft.description} onChange={(e) => set('description', e.target.value)} rows={3} />
       </Field>
-      <Field label="Event Image">
-        <FileUpload value={draft.image} onChange={(url) => set('image', url)} accept="image/*" label="Upload image" />
+      <Field label="Poster">
+        <FileUpload value={draft.poster_url} onChange={(url) => set('poster_url', url)} accept="image/*" maxMb={10} label="Upload poster" upload={uploadEventImage} />
       </Field>
-      <div className="flex items-center justify-between text-sm">
-        Show as featured on the app home screen
-        <Switch label="Featured" checked={!!draft.featured} onCheckedChange={(v) => set('featured', v)} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="When">
+          <NativeSelect value={draft.action} onChange={(e) => set('action', e.target.value as EventDraft['action'])}>
+            <option value="draft">Save as draft</option>
+            <option value="post">Post now</option>
+            <option value="schedule">Schedule</option>
+          </NativeSelect>
+        </Field>
+        {draft.action === 'schedule' ? (
+          <Field label="Goes live at" error={errors.publish_at}>
+            <Input type="datetime-local" value={draft.publish_at} onChange={(e) => set('publish_at', e.target.value)} />
+          </Field>
+        ) : null}
       </div>
     </FormDialog>
   );
 }
 
-function NoticeForm({ open, onOpenChange, notice }: { open: boolean; onOpenChange: (open: boolean) => void; notice?: Notice }) {
-  const { data: settings } = useSettings();
-  const tags = settings?.noticeTags ?? [];
-  const create = noticesHooks.useCreate();
-  const update = noticesHooks.useUpdate();
-  const [draft, setDraft] = useState<NoticeDraft>(emptyNotice(''));
-  const [errors, setErrors] = useState<Record<string, string>>({});
+// ---------- Events table ----------
 
-  useEffect(() => {
-    if (!open) return;
-    setErrors({});
-    if (notice) {
-      const { id: _id, created_at: _c, updated_at: _u, ...rest } = notice;
-      setDraft(rest);
-    } else setDraft(emptyNotice(tags[0] ?? 'General'));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, notice]);
-
-  const set = <K extends keyof NoticeDraft>(key: K, value: NoticeDraft[K]) => setDraft((d) => ({ ...d, [key]: value }));
-
-  const submit = () => {
-    const found: Record<string, string> = {};
-    if (!draft.title.trim()) found.title = 'Title is required.';
-    if (!draft.description.trim()) found.description = 'Write the notice text.';
-    setErrors(found);
-    if (Object.keys(found).length) return;
-    const body = { ...draft, title: draft.title.trim() };
-    const done = { onSuccess: () => onOpenChange(false) };
-    if (notice) update.mutate({ id: notice.id, changes: body }, done);
-    else create.mutate(body, done);
+function useEventQuery(): EventQuery {
+  const url = useUrlState();
+  return {
+    page: url.page,
+    limit: DEFAULT_PAGE_SIZE,
+    search: url.search || undefined,
+    status: (url.get('status') || undefined) as EventStatusCode | undefined,
+    category_id: url.get('category') ? Number(url.get('category')) : undefined,
+    from_date: url.range.from,
+    to_date: url.range.to,
   };
-
-  return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={notice ? 'Edit Notice' : 'Create Notice'}
-      submitLabel={notice ? 'Save Changes' : 'Create Notice'}
-      pending={create.isPending || update.isPending}
-      onSubmit={submit}
-    >
-      <Field label="Title" error={errors.title}>
-        <Input value={draft.title} onChange={(e) => set('title', e.target.value)} autoFocus />
-      </Field>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Date">
-          <Input type="date" value={draft.date} onChange={(e) => set('date', e.target.value)} />
-        </Field>
-        <Field label="Category">
-          <NativeSelect value={draft.tag} onChange={(e) => set('tag', e.target.value)}>
-            {[...new Set([...tags, draft.tag])].filter(Boolean).map((t) => (
-              <option key={t}>{t}</option>
-            ))}
-          </NativeSelect>
-        </Field>
-        <Field label="Status">
-          <NativeSelect value={draft.status} onChange={(e) => set('status', e.target.value as NoticeDraft['status'])}>
-            {PUBLISH_STATUSES.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </NativeSelect>
-        </Field>
-      </div>
-      <Field label="Notice" error={errors.description}>
-        <Textarea value={draft.description} onChange={(e) => set('description', e.target.value)} rows={5} />
-      </Field>
-    </FormDialog>
-  );
 }
-
-type Kind = 'events' | 'notices';
 
 function EventsTable({ onCreate }: { onCreate: boolean }) {
   const url = useUrlState();
-  const { data: settings } = useSettings();
-  const list = eventsHooks.useList(url.toListParams(['status', 'category'], 'date'));
-  const update = eventsHooks.useUpdate();
-  const remove = eventsHooks.useRemove();
-  const [form, setForm] = useState<{ open: boolean; event?: Event }>({ open: false });
-  const [viewing, setViewing] = useState<Event | null>(null);
-  const [deleting, setDeleting] = useState<Event | null>(null);
+  const { data: categories } = useEventCategories();
+  const list = useEventsPage(useEventQuery());
+  const setStatus = useEventStatus();
+  const setFeatured = useEventFeatured();
+  const remove = useDeleteEvent();
+  const [form, setForm] = useState<{ open: boolean; event?: BackendEvent }>({ open: false });
+  const [viewing, setViewing] = useState<BackendEvent | null>(null);
+  const [deleting, setDeleting] = useState<BackendEvent | null>(null);
 
   useEffect(() => {
     if (onCreate) setForm({ open: true });
   }, [onCreate]);
 
-  const columns = useMemo<Column<Event>[]>(
+  const columns = useMemo<Column<BackendEvent>[]>(
     () => [
       { key: 'type', header: 'Type', render: () => <CalendarDays className="h-4 w-4 text-maroon" aria-label="Event" /> },
       {
         key: 'title',
         header: 'Title',
-        sortable: true,
         render: (e) => (
-          <button type="button" className="text-left font-medium text-[#1E3A8A] hover:underline" onClick={() => setViewing(e)}>
-            {e.title}
-            {e.featured ? <Star className="ml-1 inline h-3.5 w-3.5 fill-[#D9A21B] text-[#D9A21B]" aria-label="Featured" /> : null}
+          <button type="button" className="text-left hover:underline" onClick={() => setViewing(e)}>
+            <span className="font-medium text-[#1E3A8A]">
+              {e.title}
+              {e.is_featured ? <Star className="ml-1 inline h-3.5 w-3.5 fill-[#D9A21B] text-[#D9A21B]" aria-label="Featured" /> : null}
+            </span>
+            <span className="block text-xs text-muted-foreground">
+              {e.category.name}
+              {e.created_by_name ? ` · by ${e.created_by_name}` : ''}
+            </span>
           </button>
         ),
       },
-      { key: 'date', header: 'Date', sortable: true, className: 'whitespace-nowrap px-4 py-3', render: (e) => formatDate(e.date) },
-      { key: 'time', header: 'Time', className: 'whitespace-nowrap px-4 py-3', render: (e) => e.time || '—' },
-      { key: 'venue', header: 'Venue', render: (e) => e.venue || '—' },
-      { key: 'status', header: 'Status', sortable: true, render: (e) => <StatusBadge status={e.status} /> },
+      { key: 'date', header: 'Date', className: 'whitespace-nowrap px-4 py-3', render: eventDates },
+      { key: 'time', header: 'Time', className: 'whitespace-nowrap px-4 py-3', render: (e) => eventTimes(e) || '—' },
+      { key: 'venue', header: 'Venue', render: (e) => e.venue_name || '—' },
+      { key: 'status', header: 'Status', render: (e) => <StatusBadge status={EVENT_STATUS_LABEL[e.status]} /> },
       {
         key: 'actions',
         header: 'Actions',
@@ -247,18 +262,18 @@ function EventsTable({ onCreate }: { onCreate: boolean }) {
             onView={() => setViewing(e)}
             onDelete={() => setDeleting(e)}
             more={[
-              e.status === 'Published'
-                ? { label: 'Move to Draft', icon: EyeOff, onSelect: () => update.mutate({ id: e.id, changes: { status: 'Draft' } }) }
-                : { label: 'Publish', icon: Send, onSelect: () => update.mutate({ id: e.id, changes: { status: 'Published' } }) },
-              e.featured
-                ? { label: 'Remove from featured', icon: StarOff, onSelect: () => update.mutate({ id: e.id, changes: { featured: false } }) }
-                : { label: 'Mark as featured', icon: Star, onSelect: () => update.mutate({ id: e.id, changes: { featured: true } }) },
+              { label: 'Post now', icon: Send, hidden: e.status === 'posted', onSelect: () => setStatus.mutate({ id: e.id, status: 'posted' }) },
+              { label: 'Move to draft', icon: EyeOff, hidden: e.status === 'draft', onSelect: () => setStatus.mutate({ id: e.id, status: 'draft' }) },
+              { label: 'Cancel event', icon: Ban, hidden: ['cancelled', 'draft'].includes(e.status), destructive: true, onSelect: () => setStatus.mutate({ id: e.id, status: 'cancelled' }) },
+              e.is_featured
+                ? { label: 'Remove from featured', icon: StarOff, onSelect: () => setFeatured.mutate({ id: e.id, featured: false }) }
+                : { label: 'Mark as featured', icon: Star, onSelect: () => setFeatured.mutate({ id: e.id, featured: true }) },
             ]}
           />
         ),
       },
     ],
-    [update],
+    [setFeatured, setStatus],
   );
 
   return (
@@ -267,22 +282,24 @@ function EventsTable({ onCreate }: { onCreate: boolean }) {
         searchPlaceholder="Search by title..."
         dateRange
         selects={[
-          { name: 'status', label: 'Status', options: PUBLISH_STATUSES },
-          { name: 'category', label: 'Categories', options: settings?.eventCategories ?? [] },
+          { name: 'status', label: 'Status', options: EVENT_STATUSES },
+          { name: 'category', label: 'Categories', options: (categories ?? []).map((c) => ({ value: String(c.id), label: c.name })) },
         ]}
       />
       <DataTable
         columns={columns}
-        rows={list.data?.data}
-        total={list.data?.total ?? 0}
+        rows={list.data?.events}
+        total={list.data?.pagination.total ?? 0}
         page={url.page}
+        pageSize={DEFAULT_PAGE_SIZE}
         isLoading={list.isLoading}
+        isFetching={list.isFetching}
         isError={list.isError}
+        errorMessage={list.error?.message}
         onRetry={() => list.refetch()}
-        sort={url.sort}
-        onSortChange={({ field, order }) => url.setParams({ sort: field, order })}
         onPageChange={(page) => url.setParams({ page })}
         itemLabel="events"
+        emptyMessage="No events found."
       />
       <EventForm open={form.open} event={form.event} onOpenChange={(open) => setForm((f) => ({ ...f, open }))} />
       <ViewDialog
@@ -306,20 +323,22 @@ function EventsTable({ onCreate }: { onCreate: boolean }) {
       >
         {viewing ? (
           <div className="space-y-4">
-            {viewing.image && isImageUrl(viewing.image) ? (
+            {viewing.poster_url && isImageUrl(viewing.poster_url) ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={viewing.image} alt="" className="max-h-64 w-full rounded-lg object-cover" />
+              <img src={viewing.poster_url} alt="" className="max-h-64 w-full rounded-lg object-cover" />
             ) : null}
             <DetailList
               items={[
-                ['Date', viewing.endDate ? `${formatDate(viewing.date)} – ${formatDate(viewing.endDate)}` : formatDate(viewing.date)],
-                ['Time', viewing.time],
-                ['Venue', viewing.venue],
-                ['Category', viewing.category],
-                ['Organizer', viewing.organizer],
-                ['Contact', viewing.contact],
-                ['Status', <StatusBadge key="s" status={viewing.status} />],
-                ['Featured', viewing.featured ? 'Yes' : 'No'],
+                ['Date', eventDates(viewing)],
+                ['Time', eventTimes(viewing) || '—'],
+                ['Venue', [viewing.venue_name, viewing.venue_address].filter(Boolean).join(', ')],
+                ['Category', viewing.category.name],
+                ['Organizer', viewing.organizer_name || '—'],
+                ['Contact', viewing.contact_number || '—'],
+                ['Status', <StatusBadge key="s" status={EVENT_STATUS_LABEL[viewing.status]} />],
+                ['Featured', viewing.is_featured ? 'Yes' : 'No'],
+                ['Created by', viewing.created_by_name || '—'],
+                ...(viewing.status === 'scheduled' ? [['Goes live', formatDateTime(viewing.publish_at)] as [string, string]] : []),
               ]}
             />
             {viewing.description ? <p className="whitespace-pre-line text-sm">{viewing.description}</p> : null}
@@ -330,7 +349,7 @@ function EventsTable({ onCreate }: { onCreate: boolean }) {
         open={!!deleting}
         onOpenChange={(open) => !open && setDeleting(null)}
         title={`Delete "${deleting?.title}"?`}
-        description="The event is removed from the app. This cannot be undone."
+        description="The event is removed from the app."
         confirmLabel="Delete"
         destructive
         onConfirm={() => deleting && remove.mutate(deleting.id)}
@@ -339,36 +358,117 @@ function EventsTable({ onCreate }: { onCreate: boolean }) {
   );
 }
 
+// ---------- Notice form (POST / PUT /user/notices) ----------
+
+type NoticeDraft = NoticeBody;
+const emptyNotice: NoticeDraft = { title: '', body: '', tag: 'general', action: 'draft' };
+
+function NoticeForm({ open, onOpenChange, notice }: { open: boolean; onOpenChange: (open: boolean) => void; notice?: BackendNotice }) {
+  const save = useSaveNotice();
+  const [draft, setDraft] = useState<NoticeDraft>(emptyNotice);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!open) return;
+    setErrors({});
+    setDraft(notice ? { title: notice.title, body: notice.body, tag: notice.tag, action: notice.status === 'published' ? 'publish' : 'draft' } : emptyNotice);
+  }, [open, notice]);
+
+  const set = <K extends keyof NoticeDraft>(key: K, value: NoticeDraft[K]) => setDraft((d) => ({ ...d, [key]: value }));
+
+  const submit = () => {
+    const found: Record<string, string> = {};
+    if (!draft.title.trim()) found.title = 'Title is required.';
+    if (!draft.body.trim()) found.body = 'Write the notice text.';
+    setErrors(found);
+    if (Object.keys(found).length) return;
+    save.mutate({ notice, body: { ...draft, title: draft.title.trim(), body: draft.body.trim() } }, { onSuccess: () => onOpenChange(false) });
+  };
+
+  return (
+    <FormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={notice ? 'Edit Notice' : 'Create Notice'}
+      description={notice?.audience === 'selected' ? `Sent to ${notice.recipient_count} selected members` : undefined}
+      submitLabel={notice ? 'Save Changes' : 'Create Notice'}
+      pending={save.isPending}
+      onSubmit={submit}
+    >
+      <Field label="Title" error={errors.title}>
+        <Input value={draft.title} onChange={(e) => set('title', e.target.value)} autoFocus />
+      </Field>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Category">
+          <NativeSelect value={draft.tag} onChange={(e) => set('tag', e.target.value as NoticeTag)}>
+            {NOTICE_TAGS.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+        <Field label="Status">
+          <NativeSelect value={draft.action} onChange={(e) => set('action', e.target.value as NoticeDraft['action'])}>
+            <option value="draft">Draft</option>
+            <option value="publish">Publish now</option>
+          </NativeSelect>
+        </Field>
+      </div>
+      <Field label="Notice" error={errors.body}>
+        <Textarea value={draft.body} onChange={(e) => set('body', e.target.value)} rows={5} />
+      </Field>
+    </FormDialog>
+  );
+}
+
+// ---------- Notices table ----------
+
+function useNoticeQuery(): NoticeQuery {
+  const url = useUrlState();
+  return {
+    page: url.page,
+    limit: DEFAULT_PAGE_SIZE,
+    search: url.search || undefined,
+    status: (url.get('status') || undefined) as NoticeStatusCode | undefined,
+    tag: (url.get('tag') || undefined) as NoticeTag | undefined,
+    from_date: url.range.from,
+    to_date: url.range.to,
+  };
+}
+
 function NoticesTable({ onCreate }: { onCreate: boolean }) {
   const url = useUrlState();
-  const { data: settings } = useSettings();
-  const list = noticesHooks.useList(url.toListParams(['status', 'tag'], 'date'));
-  const update = noticesHooks.useUpdate();
-  const remove = noticesHooks.useRemove();
-  const [form, setForm] = useState<{ open: boolean; notice?: Notice }>({ open: false });
-  const [viewing, setViewing] = useState<Notice | null>(null);
-  const [deleting, setDeleting] = useState<Notice | null>(null);
+  const list = useNoticesPage(useNoticeQuery());
+  const setStatus = useNoticeStatus();
+  const remove = useDeleteNotice();
+  const [form, setForm] = useState<{ open: boolean; notice?: BackendNotice }>({ open: false });
+  const [viewing, setViewing] = useState<BackendNotice | null>(null);
+  const [deleting, setDeleting] = useState<BackendNotice | null>(null);
 
   useEffect(() => {
     if (onCreate) setForm({ open: true });
   }, [onCreate]);
 
-  const columns = useMemo<Column<Notice>[]>(
+  const columns = useMemo<Column<BackendNotice>[]>(
     () => [
       { key: 'type', header: 'Type', render: () => <Megaphone className="h-4 w-4 text-[#C62828]" aria-label="Notice" /> },
       {
         key: 'title',
         header: 'Title',
-        sortable: true,
         render: (n) => (
-          <button type="button" className="text-left font-medium text-[#1E3A8A] hover:underline" onClick={() => setViewing(n)}>
-            {n.title}
+          <button type="button" className="text-left hover:underline" onClick={() => setViewing(n)}>
+            <span className="font-medium text-[#1E3A8A]">{n.title}</span>
+            <span className="block text-xs text-muted-foreground">
+              {n.audience === 'selected' ? `${n.recipient_count} selected members` : 'All members'}
+              {n.created_by_name ? ` · by ${n.created_by_name}` : ''}
+            </span>
           </button>
         ),
       },
-      { key: 'date', header: 'Date', sortable: true, className: 'whitespace-nowrap px-4 py-3', render: (n) => formatDate(n.date) },
-      { key: 'tag', header: 'Category', sortable: true },
-      { key: 'status', header: 'Status', sortable: true, render: (n) => <StatusBadge status={n.status} /> },
+      { key: 'date', header: 'Date', className: 'whitespace-nowrap px-4 py-3', render: (n) => formatDate(n.published_at ?? n.created_at) },
+      { key: 'tag', header: 'Category', render: (n) => <StatusBadge status={NOTICE_TAG_LABEL[n.tag]} /> },
+      { key: 'status', header: 'Status', render: (n) => <StatusBadge status={NOTICE_STATUS_LABEL[n.status]} /> },
       {
         key: 'actions',
         header: 'Actions',
@@ -379,52 +479,73 @@ function NoticesTable({ onCreate }: { onCreate: boolean }) {
             onView={() => setViewing(n)}
             onDelete={() => setDeleting(n)}
             more={[
-              n.status === 'Published'
-                ? { label: 'Move to Draft', icon: EyeOff, onSelect: () => update.mutate({ id: n.id, changes: { status: 'Draft' } }) }
-                : { label: 'Publish', icon: Send, onSelect: () => update.mutate({ id: n.id, changes: { status: 'Published' } }) },
+              n.status === 'published'
+                ? { label: 'Move to draft', icon: EyeOff, onSelect: () => setStatus.mutate({ id: n.id, status: 'draft' }) }
+                : { label: 'Publish now', icon: Send, onSelect: () => setStatus.mutate({ id: n.id, status: 'published' }) },
             ]}
           />
         ),
       },
     ],
-    [update],
+    [setStatus],
   );
 
   return (
     <>
       <FilterBar
-        searchPlaceholder="Search by title..."
+        searchPlaceholder="Search by title or text..."
         dateRange
         selects={[
-          { name: 'status', label: 'Status', options: PUBLISH_STATUSES },
-          { name: 'tag', label: 'Categories', options: settings?.noticeTags ?? [] },
+          { name: 'status', label: 'Status', options: NOTICE_STATUSES },
+          { name: 'tag', label: 'Categories', options: NOTICE_TAGS },
         ]}
       />
       <DataTable
         columns={columns}
-        rows={list.data?.data}
-        total={list.data?.total ?? 0}
+        rows={list.data?.notices}
+        total={list.data?.pagination.total ?? 0}
         page={url.page}
+        pageSize={DEFAULT_PAGE_SIZE}
         isLoading={list.isLoading}
+        isFetching={list.isFetching}
         isError={list.isError}
+        errorMessage={list.error?.message}
         onRetry={() => list.refetch()}
-        sort={url.sort}
-        onSortChange={({ field, order }) => url.setParams({ sort: field, order })}
         onPageChange={(page) => url.setParams({ page })}
         itemLabel="notices"
+        emptyMessage="No notices found."
       />
       <NoticeForm open={form.open} notice={form.notice} onOpenChange={(open) => setForm((f) => ({ ...f, open }))} />
-      <ViewDialog open={!!viewing} onOpenChange={(open) => !open && setViewing(null)} title={viewing?.title ?? ''}>
+      <ViewDialog
+        open={!!viewing}
+        onOpenChange={(open) => !open && setViewing(null)}
+        title={viewing?.title ?? ''}
+        footer={
+          viewing ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setForm({ open: true, notice: viewing });
+                setViewing(null);
+              }}
+            >
+              Edit
+            </Button>
+          ) : null
+        }
+      >
         {viewing ? (
           <div className="space-y-4">
             <DetailList
               items={[
-                ['Date', formatDate(viewing.date)],
-                ['Category', viewing.tag],
-                ['Status', <StatusBadge key="s" status={viewing.status} />],
+                ['Date', formatDateTime(viewing.published_at ?? viewing.created_at)],
+                ['Category', NOTICE_TAG_LABEL[viewing.tag]],
+                ['Status', <StatusBadge key="s" status={NOTICE_STATUS_LABEL[viewing.status]} />],
+                ['Sent to', viewing.audience === 'selected' ? `${viewing.recipient_count} selected members` : 'All members'],
+                ['Created by', viewing.created_by_name || '—'],
               ]}
             />
-            <p className="whitespace-pre-line text-sm">{viewing.description}</p>
+            <p className="whitespace-pre-line text-sm">{viewing.body}</p>
           </div>
         ) : null}
       </ViewDialog>
@@ -432,7 +553,7 @@ function NoticesTable({ onCreate }: { onCreate: boolean }) {
         open={!!deleting}
         onOpenChange={(open) => !open && setDeleting(null)}
         title={`Delete "${deleting?.title}"?`}
-        description="The notice is removed from the app. This cannot be undone."
+        description="The notice is removed from the app."
         confirmLabel="Delete"
         destructive
         onConfirm={() => deleting && remove.mutate(deleting.id)}
@@ -443,12 +564,13 @@ function NoticesTable({ onCreate }: { onCreate: boolean }) {
 
 /** Screen 27. Events and Notices share one screen; each sidebar link opens its own tab. */
 export function EventsNoticesPage({ kind }: { kind: Kind }) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const url = useUrlState();
   // ?new=1 opens the create form, so "Create Notice" works from the Events tab too.
   const creating = url.get('new') === '1';
 
-  const create = (target: Kind) => router.push(`/${target}?new=1`);
+  // Same page with ?new=1 opens the form at once; the other tab shows the loading state while it opens
+  const create = (target: Kind) => navigate(`/${target}?new=1`);
 
   useEffect(() => {
     if (creating) url.setParams({ new: undefined });
@@ -478,7 +600,7 @@ export function EventsNoticesPage({ kind }: { kind: Kind }) {
           { value: 'notices', label: 'Notices' },
         ]}
         value={kind}
-        onChange={(value) => router.push(`/${value}`)}
+        onChange={(value) => navigate(`/${value}`)}
       />
       {kind === 'events' ? <EventsTable onCreate={creating} /> : <NoticesTable onCreate={creating} />}
     </>

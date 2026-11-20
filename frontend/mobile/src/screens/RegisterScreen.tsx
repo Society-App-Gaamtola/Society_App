@@ -4,7 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as authApi from '../api/auth';
 import type { RootStackParamList } from '../navigation/types';
 import { common } from '../styles/common';
-import { colors, fonts, spacing } from '../theme';
+import { colors, fonts, spacing, themedStyles } from '../theme';
 import { useFormErrors } from '../hooks/useFormErrors';
 import { setSignupDraft } from '../services/signupDraft';
 import { digitsOnly, isEmail, MIN_PASSWORD_LENGTH } from '../utils/validation';
@@ -20,6 +20,7 @@ import {
   StepIndicator,
   type Country,
 } from '../components';
+import { useT } from '../i18n';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 type Field = 'name' | 'mobile' | 'email' | 'password' | 'confirm';
@@ -32,6 +33,7 @@ const API_FIELDS: Record<string, Field> = {
 };
 
 export default function RegisterScreen({ navigation }: Props) {
+  const t = useT();
   const [name, setName] = useState('');
   const [country, setCountry] = useState<Country>(COUNTRIES[0]);
   const [mobile, setMobile] = useState('');
@@ -54,7 +56,7 @@ export default function RegisterScreen({ navigation }: Props) {
     if (!trimmedEmail) next.email = 'Please enter your email address.';
     else if (!isEmail(trimmedEmail)) next.email = 'Enter a valid email address.';
     if (!password) next.password = 'Please create a password.';
-    else if (password.length < MIN_PASSWORD_LENGTH) next.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+    else if (password.length < MIN_PASSWORD_LENGTH) next.password = t('Password must be at least {n} characters.', { n: MIN_PASSWORD_LENGTH });
     if (confirm !== password) next.confirm = 'Passwords do not match.';
     setErrors(next);
     if (Object.keys(next).length) return;
@@ -79,8 +81,8 @@ export default function RegisterScreen({ navigation }: Props) {
       <BackButton />
       <StepIndicator steps={REGISTER_STEPS} current={1} />
 
-      <Text style={styles.heading}>Personal Details</Text>
-      <Text style={styles.subtext}>Enter your details to create a member account.</Text>
+      <Text style={styles.heading}>{t('Personal Details')}</Text>
+      <Text style={styles.subtext}>{t('Enter your details to create a member account.')}</Text>
 
       <FormField {...fieldStyle} label="Full Name" error={errors.name}>
         <InputField
@@ -144,14 +146,14 @@ export default function RegisterScreen({ navigation }: Props) {
 
       <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.loginLink}>
         <Text style={styles.loginText}>
-          Already a member? <Text style={styles.loginBold}>Login</Text>
+          Already a member? <Text style={styles.loginBold}>{t('Login')}</Text>
         </Text>
       </Pressable>
     </AuthScreenLayout>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   heading: { fontFamily: fonts.bold, fontSize: 22, color: colors.primary, marginTop: spacing.lg },
   subtext: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 20, color: colors.textMuted, marginTop: 2, marginBottom: spacing.md },
   field: { marginBottom: spacing.md },
@@ -161,4 +163,4 @@ const styles = StyleSheet.create({
   loginLink: { alignSelf: 'center', marginTop: spacing.md },
   loginText: { fontFamily: fonts.regular, fontSize: 13, color: colors.textMuted },
   loginBold: { fontFamily: fonts.semiBold, color: colors.primary },
-});
+}));

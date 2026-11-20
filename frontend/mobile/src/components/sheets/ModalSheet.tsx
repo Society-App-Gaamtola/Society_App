@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Modal, Pressable, StyleSheet, View, type ModalProps, type StyleProp, type ViewStyle } from 'react-native';
-import { colors } from '../../theme';
+import { colors, themedStyles } from '../../theme';
 
 type Props = {
   visible: boolean;
@@ -20,6 +20,6 @@ export default function ModalSheet({ visible, animationType, onClose, style, chi
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   backdrop: { flex: 1, backgroundColor: colors.backdrop },
-});
+}));

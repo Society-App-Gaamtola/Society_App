@@ -3,89 +3,53 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FileText, Pencil, Plus } from 'lucide-react';
-import { Avatar, FileLink, ConfirmDialog, Field, FormDialog, PageHeader, ReasonDialog, StatusBadge, Tabs } from '@/components/common';
+import { FileText, Pencil, Plus, Search } from 'lucide-react';
+import { Avatar, ConfirmDialog, Field, FileLink, FormDialog, PageHeader, ReasonDialog, StatusBadge, Tabs } from '@/components/common';
 import { DataTable, type Column } from '@/components/DataTable';
 import { FilterBar } from '@/components/FilterBar';
-import { Button, NativeSelect, Switch } from '@/components/ui/primitives';
-import {
-  executiveRequestsHooks,
-  permissionsHooks,
-  useAddExecutive,
-  useApproveExecutiveRequest,
-  useRejectExecutiveRequest,
-  useRemoveExecutive,
-  useUpdatePermissions,
-} from '@/hooks/useExecutives';
-import { membersHooks } from '@/hooks/useMembers';
+import { Button, Input, NativeSelect, Switch } from '@/components/ui/primitives';
+import { DEFAULT_PAGE_SIZE } from '@/config';
+import { useAddExecutive, useExecutivesPage, useRemoveExecutive, useRequestsPage, useReviewRequest, useSetPermissions } from '@/hooks/useAdminContent';
+import { useMembersPage } from '@/hooks/useAdminMembers';
 import { useUrlState } from '@/hooks/useUrlState';
-import { formatDate } from '@/lib/utils';
-import { DEFAULT_PERMISSIONS, type PermissionFlags } from '@/services/executives';
-import { PERMISSION_KEYS, type ExecutivePermission, type ExecutiveRequest, type Member, type PermissionKey } from '@/types';
+import { formatDate, formatINR } from '@/lib/utils';
+import { DEFAULT_PERMISSIONS, SECTION_LABEL, type RequestStatus } from '@/services/adminExecutives';
+import { memberMobile, memberName } from '@/services/adminMembers';
+import { PERMISSION_SECTIONS, type AdminExecutive, type BackendExecutiveRequest, type ExecutivePermissions, type PermissionSection } from '@/types';
 
-const PERMISSION_TITLES: Record<PermissionKey, string> = {
-  events: 'Events',
-  notices: 'Notices',
-  donations: 'Donations',
-  expenses: 'Expenses',
-  reports: 'Reports',
-  media: 'Media',
-  settings: 'Settings',
-};
+const REQUEST_TABS: { value: RequestStatus; label: string }[] = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+];
 
-const REQUEST_STATUSES = [
-  { value: 'Pending review', label: 'Pending' },
-  { value: 'Approved', label: 'Approved' },
-  { value: 'Rejected', label: 'Rejected' },
-] as const;
-
-/** Member photos by member ID, for avatars in both tables. */
-function useMemberLookup() {
-  const { data } = membersHooks.useList({});
-  return useMemo(() => new Map((data?.data ?? []).map((m) => [m.memberId, m])), [data]);
-}
+// ---------- Requests (GET /executive/executive-requests, review API) ----------
 
 function RequestsView() {
   const url = useUrlState();
-  const members = useMemberLookup();
-  const status = url.get('status') || 'Pending review';
-  const list = executiveRequestsHooks.useList({ ...url.toListParams(), filters: { status }, sort: url.sort ?? { field: 'submittedOn', order: 'desc' } });
-  const counts = {
-    'Pending review': executiveRequestsHooks.useList({ filters: { status: 'Pending review' }, page: 1, pageSize: 1 }).data?.total,
-    Approved: executiveRequestsHooks.useList({ filters: { status: 'Approved' }, page: 1, pageSize: 1 }).data?.total,
-    Rejected: executiveRequestsHooks.useList({ filters: { status: 'Rejected' }, page: 1, pageSize: 1 }).data?.total,
-  };
-  const approve = useApproveExecutiveRequest();
-  const reject = useRejectExecutiveRequest();
-  const [approving, setApproving] = useState<ExecutiveRequest | null>(null);
-  const [rejecting, setRejecting] = useState<ExecutiveRequest | null>(null);
+  const status = (url.get('status') || 'pending') as RequestStatus;
+  const list = useRequestsPage({ page: url.page, limit: DEFAULT_PAGE_SIZE, status, search: url.search || undefined });
+  const review = useReviewRequest();
+  const [approving, setApproving] = useState<BackendExecutiveRequest | null>(null);
+  const [rejecting, setRejecting] = useState<BackendExecutiveRequest | null>(null);
+  const counts = list.data?.counts;
 
-  const columns = useMemo<Column<ExecutiveRequest>[]>(
+  const columns = useMemo<Column<BackendExecutiveRequest>[]>(
     () => [
       {
-        key: 'memberName',
+        key: 'applicant',
         header: 'Applicant',
-        render: (r) => {
-          const member = members.get(r.memberId);
-          return (
-            <div className="flex items-center gap-2">
-              <Avatar name={r.memberName} src={member?.photo} size={36} />
-              <div>
-                {member ? (
-                  <Link href={`/members/${member.id}`} className="font-medium hover:text-maroon">
-                    {r.memberName}
-                  </Link>
-                ) : (
-                  <span className="font-medium">{r.memberName}</span>
-                )}
-                <div className="text-xs text-muted-foreground">{r.contact}</div>
-              </div>
-            </div>
-          );
-        },
+        render: (r) => (
+          <Link href={`/members/${r.user_id}`} className="flex items-center gap-2 hover:text-maroon">
+            <Avatar name={r.full_name || r.email} size={36} />
+            <span>
+              <span className="block font-medium">{r.full_name || r.email}</span>
+              <span className="block text-xs text-muted-foreground">{r.mobile}</span>
+            </span>
+          </Link>
+        ),
       },
-      { key: 'memberId', header: 'Member ID' },
-      { key: 'submittedOn', header: 'Request Date', sortable: true, className: 'whitespace-nowrap px-4 py-3', render: (r) => formatDate(r.submittedOn) },
+      { key: 'date', header: 'Request Date', className: 'whitespace-nowrap px-4 py-3', render: (r) => formatDate(r.created_at) },
       {
         key: 'reason',
         header: 'Message',
@@ -93,40 +57,31 @@ function RequestsView() {
         render: (r) => (
           <>
             {r.reason}
-            {r.donationReference ? <div className="mt-1 text-muted-foreground">Donation ref: {r.donationReference}</div> : null}
-            {r.rejectionReason ? <div className="mt-1 text-[#C62828]">Rejected: {r.rejectionReason}</div> : null}
+            <div className="mt-1 text-muted-foreground">
+              Donation {formatINR(r.donation_amount)} · UTR {r.reference_no}
+              {r.donation_status ? ` · ${r.donation_status}` : ' · not found in donations'}
+            </div>
+            {r.review_note ? <div className="mt-1 text-[#C62828]">Note: {r.review_note}</div> : null}
           </>
         ),
       },
       {
-        key: 'documents',
-        header: 'Supporting Documents',
-        render: (r) => {
-          const docs = [...(r.documents ?? []), ...(r.paymentProof ? [{ name: 'Payment Proof', url: r.paymentProof }] : [])];
-          if (!docs.length) return <span className="text-xs text-muted-foreground">None</span>;
-          return (
-            <ul className="space-y-1 text-xs">
-              {docs.map((d) => (
-                <li key={d.name} className="flex items-center gap-1.5">
-                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                  {d.url ? (
-                    <FileLink href={d.url} className="text-maroon underline">
-                      {d.name}
-                    </FileLink>
-                  ) : (
-                    <span title="File not uploaded">{d.name}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          );
-        },
+        key: 'proof',
+        header: 'Payment Proof',
+        render: (r) =>
+          r.payment_proof_url ? (
+            <FileLink href={r.payment_proof_url} className="inline-flex items-center gap-1 text-xs text-maroon underline">
+              <FileText className="h-3.5 w-3.5" /> View
+            </FileLink>
+          ) : (
+            <span className="text-xs text-muted-foreground">None</span>
+          ),
       },
       {
         key: 'actions',
         header: 'Actions',
         render: (r) =>
-          r.status === 'Pending review' ? (
+          r.status === 'pending' ? (
             <div className="flex flex-col gap-1.5">
               <Button size="sm" className="bg-[#1E8E4E] hover:bg-[#187540]" onClick={() => setApproving(r)}>
                 Approve
@@ -136,31 +91,32 @@ function RequestsView() {
               </Button>
             </div>
           ) : (
-            <StatusBadge status={r.status} />
+            <StatusBadge status={r.status === 'approved' ? 'Approved' : 'Rejected'} />
           ),
       },
     ],
-    [members],
+    [],
   );
 
   return (
     <>
       <Tabs
-        tabs={REQUEST_STATUSES.map((s) => ({ value: s.value, label: s.label, count: counts[s.value] }))}
+        tabs={REQUEST_TABS.map((t) => ({ value: t.value, label: t.label, count: counts?.[t.value] }))}
         value={status}
-        onChange={(value) => url.setParams({ status: value === 'Pending review' ? undefined : value })}
+        onChange={(value) => url.setParams({ status: value === 'pending' ? undefined : value })}
       />
-      <FilterBar searchPlaceholder="Search by name or mobile number..." keep={['tab', 'status']} />
+      <FilterBar searchPlaceholder="Search by name, mobile or email..." keep={['tab', 'status']} />
       <DataTable
         columns={columns}
-        rows={list.data?.data}
-        total={list.data?.total ?? 0}
+        rows={list.data?.requests}
+        total={list.data?.pagination.total ?? 0}
         page={url.page}
+        pageSize={DEFAULT_PAGE_SIZE}
         isLoading={list.isLoading}
+        isFetching={list.isFetching}
         isError={list.isError}
+        errorMessage={list.error?.message}
         onRetry={() => list.refetch()}
-        sort={url.sort}
-        onSortChange={({ field, order }) => url.setParams({ sort: field, order })}
         onPageChange={(page) => url.setParams({ page })}
         itemLabel="requests"
         emptyMessage="No requests here."
@@ -168,119 +124,122 @@ function RequestsView() {
       <ConfirmDialog
         open={!!approving}
         onOpenChange={(open) => !open && setApproving(null)}
-        title={`Approve ${approving?.memberName}?`}
-        description="They become an Executive Member with default permissions (Events and Notices). You can change these on the Permissions tab."
+        title={`Approve ${approving?.full_name || approving?.email}?`}
+        description="They become an Executive with the default permissions (Events and Notices, events need your approval). They are logged out and log in again with the new role."
         confirmLabel="Approve"
-        onConfirm={() => approving && approve.mutate(approving.id)}
+        onConfirm={() => approving && review.mutate({ id: approving.id, action: 'approve' })}
       />
       <ReasonDialog
         open={!!rejecting}
         onOpenChange={(open) => !open && setRejecting(null)}
-        title={`Reject ${rejecting?.memberName}'s request`}
-        pending={reject.isPending}
-        onSubmit={(reason) => rejecting && reject.mutate({ id: rejecting.id, reason }, { onSuccess: () => setRejecting(null) })}
+        title={`Reject ${rejecting?.full_name || rejecting?.email}'s request`}
+        pending={review.isPending}
+        onSubmit={(reason) => rejecting && review.mutate({ id: rejecting.id, action: 'reject', reason }, { onSuccess: () => setRejecting(null) })}
       />
     </>
   );
 }
 
-const flagsOf = (p?: ExecutivePermission): PermissionFlags =>
-  p
-    ? { ...Object.fromEntries(PERMISSION_KEYS.map((k) => [k, !!p[k]])), eventsNeedApproval: !!p.eventsNeedApproval } as PermissionFlags
-    : { ...Object.fromEntries(PERMISSION_KEYS.map((k) => [k, false])), eventsNeedApproval: true } as PermissionFlags;
+// ---------- Permissions ----------
 
-function PermissionToggles({ flags, onChange }: { flags: PermissionFlags; onChange: (flags: PermissionFlags) => void }) {
+const withSection = (p: ExecutivePermissions, section: PermissionSection, on: boolean): ExecutivePermissions => ({
+  sections: on ? [...new Set([...p.sections, section])] : p.sections.filter((s) => s !== section),
+});
+
+function PermissionToggles({ value, onChange }: { value: ExecutivePermissions; onChange: (value: ExecutivePermissions) => void }) {
   return (
     <div className="space-y-3">
-      {PERMISSION_KEYS.map((key) => (
-        <div key={key} className="flex items-center justify-between text-sm">
-          {PERMISSION_TITLES[key]}
-          <Switch label={PERMISSION_TITLES[key]} checked={flags[key]} onCheckedChange={(v) => onChange({ ...flags, [key]: v })} />
+      {PERMISSION_SECTIONS.map((section) => (
+        <div key={section} className="flex items-center justify-between text-sm">
+          {SECTION_LABEL[section]}
+          <Switch label={SECTION_LABEL[section]} checked={value.sections.includes(section)} onCheckedChange={(on) => onChange(withSection(value, section, on))} />
         </div>
       ))}
-      <div className="flex items-center justify-between border-t border-border pt-3 text-sm">
-        <span>
-          Their events need admin approval
-          <span className="block text-xs text-muted-foreground">New events stay as Draft until you publish them.</span>
-        </span>
-        <Switch label="Events need approval" checked={flags.eventsNeedApproval} onCheckedChange={(v) => onChange({ ...flags, eventsNeedApproval: v })} />
-      </div>
     </div>
   );
 }
 
+/** Pick an active member (searched on the backend, 50 at a time) and their permissions */
 function AddExecutiveDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const candidates = membersHooks.useList({ filters: { type: 'Normal', status: 'Active' }, sort: { field: 'name', order: 'asc' } });
   const add = useAddExecutive();
+  const [search, setSearch] = useState('');
+  const [typed, setTyped] = useState('');
   const [memberId, setMemberId] = useState('');
-  const [flags, setFlags] = useState<PermissionFlags>(DEFAULT_PERMISSIONS);
+  const [permissions, setPermissions] = useState<ExecutivePermissions>(DEFAULT_PERMISSIONS);
   const [error, setError] = useState('');
+  const candidates = useMembersPage({ page: 1, limit: 50, role: 'member', status: 'active', signup: 'completed', search: search || undefined, sort: 'name', order: 'asc' });
+
   useEffect(() => {
     if (open) {
+      setSearch('');
+      setTyped('');
       setMemberId('');
-      setFlags(DEFAULT_PERMISSIONS);
+      setPermissions(DEFAULT_PERMISSIONS);
       setError('');
     }
   }, [open]);
+
+  // Search after typing stops for a moment
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(typed.trim()), 400);
+    return () => clearTimeout(timer);
+  }, [typed]);
 
   return (
     <FormDialog
       open={open}
       onOpenChange={onOpenChange}
       title="Add Executive"
-      description="Gives an active member admin access to the sections you choose."
+      description="Gives an active member executive access to the sections you choose. They log in again with the new role."
       submitLabel="Add Executive"
       pending={add.isPending}
-      onSubmit={() => (memberId ? add.mutate({ memberId, flags }, { onSuccess: () => onOpenChange(false) }) : setError('Choose a member.'))}
+      onSubmit={() => (memberId ? add.mutate({ id: Number(memberId), permissions }, { onSuccess: () => onOpenChange(false) }) : setError('Choose a member.'))}
     >
       <Field label="Member" error={error}>
-        <NativeSelect value={memberId} onChange={(e) => setMemberId(e.target.value)}>
-          <option value="">Select a member…</option>
-          {candidates.data?.data.map((m) => (
-            <option key={m.id} value={m.memberId}>
-              {m.name} ({m.memberId})
-            </option>
-          ))}
-        </NativeSelect>
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Search by name, mobile or member code…" value={typed} onChange={(e) => setTyped(e.target.value)} />
+          </div>
+          <NativeSelect value={memberId} onChange={(e) => setMemberId(e.target.value)} disabled={candidates.isLoading}>
+            <option value="">{candidates.isLoading ? 'Loading members…' : `Select a member (${candidates.data?.pagination.total ?? 0} found)…`}</option>
+            {candidates.data?.members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {memberName(m)} {m.member_code ? `(${m.member_code})` : ''} · {memberMobile(m)}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
       </Field>
-      <PermissionToggles flags={flags} onChange={setFlags} />
+      <PermissionToggles value={permissions} onChange={setPermissions} />
     </FormDialog>
   );
 }
 
-function EditPermissionsDialog({
-  member,
-  permission,
-  onOpenChange,
-}: {
-  member: Member | null;
-  permission?: ExecutivePermission;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const update = useUpdatePermissions();
-  const add = useAddExecutive();
+function EditPermissionsDialog({ executive, onOpenChange }: { executive: AdminExecutive | null; onOpenChange: (open: boolean) => void }) {
+  const save = useSetPermissions();
   const remove = useRemoveExecutive();
-  const [flags, setFlags] = useState<PermissionFlags>(flagsOf(permission));
+  const [permissions, setPermissions] = useState<ExecutivePermissions>(DEFAULT_PERMISSIONS);
   const [confirmRemove, setConfirmRemove] = useState(false);
-  useEffect(() => setFlags(flagsOf(permission)), [permission, member]);
+  useEffect(() => {
+    if (executive) setPermissions(executive.permissions);
+  }, [executive]);
   const done = { onSuccess: () => onOpenChange(false) };
 
   return (
     <>
       <FormDialog
-        open={!!member}
+        open={!!executive}
         onOpenChange={onOpenChange}
-        title={`Permissions: ${member?.name ?? ''}`}
-        description={member?.memberId}
+        title={`Permissions: ${executive ? memberName(executive) : ''}`}
+        description={executive?.member_code ?? undefined}
         submitLabel="Save Permissions"
-        pending={update.isPending || add.isPending}
-        onSubmit={() =>
-          permission ? update.mutate({ id: permission.id, changes: flags }, done) : member && add.mutate({ memberId: member.memberId, flags }, done)
-        }
+        pending={save.isPending}
+        onSubmit={() => executive && save.mutate({ id: executive.id, permissions }, done)}
       >
-        <PermissionToggles flags={flags} onChange={setFlags} />
+        <PermissionToggles value={permissions} onChange={setPermissions} />
         <div className="border-t border-border pt-3">
-          <Button type="button" variant="outline" className="border-[#C62828] text-[#C62828]" onClick={() => setConfirmRemove(true)} disabled={!permission}>
+          <Button type="button" variant="outline" className="border-[#C62828] text-[#C62828]" onClick={() => setConfirmRemove(true)}>
             Remove executive access
           </Button>
         </div>
@@ -288,11 +247,11 @@ function EditPermissionsDialog({
       <ConfirmDialog
         open={confirmRemove}
         onOpenChange={setConfirmRemove}
-        title={`Remove ${member?.name}'s executive access?`}
-        description="All permissions are removed and they become a Normal member."
+        title={`Remove ${executive ? memberName(executive) : ''}'s executive access?`}
+        description="All permissions are removed, they become a normal member and are logged out of the app."
         confirmLabel="Remove"
         destructive
-        onConfirm={() => permission && remove.mutate(permission, done)}
+        onConfirm={() => executive && remove.mutate(executive.id, done)}
       />
     </>
   );
@@ -300,46 +259,36 @@ function EditPermissionsDialog({
 
 function PermissionsView() {
   const url = useUrlState();
-  const executives = membersHooks.useList({ ...url.toListParams(), filters: { type: 'Executive' } });
-  const permissions = permissionsHooks.useList({});
-  const update = useUpdatePermissions();
-  const add = useAddExecutive();
+  const list = useExecutivesPage({ page: url.page, limit: DEFAULT_PAGE_SIZE, search: url.search || undefined });
+  const save = useSetPermissions();
   const [adding, setAdding] = useState(false);
-  const [editing, setEditing] = useState<Member | null>(null);
+  const [editing, setEditing] = useState<AdminExecutive | null>(null);
 
-  const byMember = useMemo(() => new Map((permissions.data?.data ?? []).map((p) => [p.memberId, p])), [permissions.data]);
-
-  const columns = useMemo<Column<Member>[]>(() => {
-    const toggle = (m: Member, key: PermissionKey, value: boolean) => {
-      const p = byMember.get(m.memberId);
-      if (p) update.mutate({ id: p.id, changes: { [key]: value } });
-      else add.mutate({ memberId: m.memberId, flags: { ...flagsOf(), [key]: value } });
-    };
-    return [
+  const columns = useMemo<Column<AdminExecutive>[]>(
+    () => [
       {
         key: 'name',
-        header: 'Member',
-        sortable: true,
+        header: 'Executive',
         render: (m) => (
           <Link href={`/members/${m.id}`} className="flex items-center gap-2 hover:text-maroon">
-            <Avatar name={m.name} src={m.photo} size={34} />
+            <Avatar name={memberName(m)} src={m.photo_url} size={34} />
             <span>
-              <span className="block font-medium">{m.name}</span>
-              <span className="block text-xs text-muted-foreground">{m.memberId}</span>
+              <span className="block font-medium">{memberName(m)}</span>
+              <span className="block text-xs text-muted-foreground">{m.member_code ?? memberMobile(m)}</span>
             </span>
           </Link>
         ),
       },
-      { key: 'type', header: 'Role', render: (m) => <StatusBadge status={m.type} /> },
-      ...PERMISSION_KEYS.map(
-        (key): Column<Member> => ({
-          key,
-          header: PERMISSION_TITLES[key],
+      ...PERMISSION_SECTIONS.map(
+        (section): Column<AdminExecutive> => ({
+          key: section,
+          header: SECTION_LABEL[section],
           render: (m) => (
             <Switch
-              label={`${PERMISSION_TITLES[key]} for ${m.name}`}
-              checked={!!byMember.get(m.memberId)?.[key]}
-              onCheckedChange={(v) => toggle(m, key, v)}
+              label={`${SECTION_LABEL[section]} for ${memberName(m)}`}
+              checked={m.permissions.sections.includes(section)}
+              disabled={save.isPending}
+              onCheckedChange={(on) => save.mutate({ id: m.id, permissions: withSection(m.permissions, section, on) })}
             />
           ),
         }),
@@ -353,41 +302,41 @@ function PermissionsView() {
           </Button>
         ),
       },
-    ];
-  }, [add, byMember, update]);
+    ],
+    [save],
+  );
 
   return (
     <>
-      <div className="mb-3 flex justify-end">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-60 flex-1">
+          <FilterBar searchPlaceholder="Search executives by name, mobile or member code..." keep={['tab']} />
+        </div>
         <Button onClick={() => setAdding(true)}>
           <Plus className="h-4 w-4" /> Add Executive
         </Button>
       </div>
       <DataTable
         columns={columns}
-        rows={executives.data?.data}
-        total={executives.data?.total ?? 0}
+        rows={list.data?.executives}
+        total={list.data?.pagination.total ?? 0}
         page={url.page}
-        isLoading={executives.isLoading}
-        isError={executives.isError}
-        onRetry={() => executives.refetch()}
-        sort={url.sort}
-        onSortChange={({ field, order }) => url.setParams({ sort: field, order })}
+        pageSize={DEFAULT_PAGE_SIZE}
+        isLoading={list.isLoading}
+        isFetching={list.isFetching}
+        isError={list.isError}
+        errorMessage={list.error?.message}
+        onRetry={() => list.refetch()}
         onPageChange={(page) => url.setParams({ page })}
         itemLabel="executives"
-        emptyMessage="No executive members yet."
+        emptyMessage="No executives yet. Add one, or approve an Executive Request."
       />
-      <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <Switch label="Allowed example" checked onCheckedChange={() => undefined} disabled /> Allowed
-        </span>
-        <span className="flex items-center gap-1.5">
-          <Switch label="Not allowed example" checked={false} onCheckedChange={() => undefined} disabled /> Not allowed
-        </span>
-        <span>Changes save as soon as you flip a switch.</span>
-      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Changes save as soon as you flip a switch and apply to the executive at once. Events, Notices and Media are checked by the app today;
+        Donations, Expenses, Reports and Settings apply when those sections open to executives.
+      </p>
       <AddExecutiveDialog open={adding} onOpenChange={setAdding} />
-      <EditPermissionsDialog member={editing} permission={editing ? byMember.get(editing.memberId) : undefined} onOpenChange={(open) => !open && setEditing(null)} />
+      <EditPermissionsDialog executive={editing} onOpenChange={(open) => !open && setEditing(null)} />
     </>
   );
 }
@@ -399,14 +348,14 @@ export default function ExecutivesPage() {
   return (
     <>
       <PageHeader
-        title={tab === 'requests' ? 'Executive Requests' : 'Executive Permissions'}
-        subtitle={tab === 'requests' ? 'Review and manage executive membership requests' : 'Grant or manage access for executive members'}
+        title={tab === 'requests' ? 'Executive Requests' : 'Executives & Permissions'}
+        subtitle={tab === 'requests' ? 'Review and manage executive membership requests' : 'Executives and the sections they can manage'}
       />
       <Tabs
         variant="underline"
         tabs={[
           { value: 'requests', label: 'Requests' },
-          { value: 'permissions', label: 'Permissions' },
+          { value: 'permissions', label: 'Executives & Permissions' },
         ]}
         value={tab}
         onChange={(value) => router.replace(value === 'permissions' ? '/executives?tab=permissions' : '/executives', { scroll: false })}

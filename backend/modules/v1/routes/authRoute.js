@@ -38,19 +38,25 @@ authRoutes.put(
   authController.completeProfile,
 );
 
-// Any logged-in user, on their own account
-authRoutes.get("/profile", authController.getProfile);
+// Any logged-in user on their own account: app members / executives and the admin panel's Super Admin.
+// Listed explicitly like every protected route (rule 8)
+const { SUPER_ADMIN, EXECUTIVE, MEMBER } = constant.ROLES;
+const anyRole = middleware.allowedRoles(SUPER_ADMIN, EXECUTIVE, MEMBER);
+
+authRoutes.get("/profile", anyRole, authController.getProfile);
 
 // allowEmpty: a request with only a profile_image has no body fields
 authRoutes.put(
   "/edit-profile",
+  anyRole,
   upload.single("profile_image"),
   middleware.validateJoi(editProfileSchema, true),
   authController.editProfile,
 );
 
-authRoutes.post("/verify-email-change", middleware.validateJoi(verifyEmailChangeSchema), authController.verifyEmailChange);
+authRoutes.post("/verify-email-change", anyRole, middleware.validateJoi(verifyEmailChangeSchema), authController.verifyEmailChange);
 
-authRoutes.put("/change-password", middleware.validateJoi(changePasswordSchema), authController.changePassword);
+// Logs out every other device of this user (this one stays logged in)
+authRoutes.put("/change-password", anyRole, middleware.validateJoi(changePasswordSchema), authController.changePassword);
 
 export default authRoutes;

@@ -1,8 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import { Ionicons } from '../../icons';
 import ModalSheet from './ModalSheet';
+import { useT } from '../../i18n';
 
 type Props<T extends string> = {
   visible: boolean;
@@ -15,11 +16,12 @@ type Props<T extends string> = {
 
 /** Bottom sheet with a single-choice list, used for dropdown fields. */
 export default function SelectSheet<T extends string>({ visible, title, options, selected, onSelect, onClose }: Props<T>) {
+  const t = useT();
   const insets = useSafeAreaInsets();
   return (
     <ModalSheet visible={visible} animationType="slide" onClose={onClose} style={[styles.sheet, { paddingBottom: 12 + insets.bottom }]}>
       <View style={styles.handle} />
-      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.title}>{t(title)}</Text>
       {options.map((option) => {
         const active = option === selected;
         return (
@@ -33,7 +35,7 @@ export default function SelectSheet<T extends string>({ visible, title, options,
             accessibilityRole="radio"
             accessibilityState={{ selected: active }}
           >
-            <Text style={[styles.optionText, active && styles.optionActive]}>{option}</Text>
+            <Text style={[styles.optionText, active && styles.optionActive]}>{t(option)}</Text>
             {active ? <Ionicons name="checkmark" size={20} color={colors.primary} /> : null}
           </Pressable>
         );
@@ -42,9 +44,9 @@ export default function SelectSheet<T extends string>({ visible, title, options,
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   sheet: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.card,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingTop: 10,
@@ -63,4 +65,4 @@ const styles = StyleSheet.create({
   pressed: { backgroundColor: colors.tint },
   optionText: { fontFamily: fonts.regular, fontSize: 14, color: colors.textDark },
   optionActive: { fontFamily: fonts.semiBold, color: colors.primary },
-});
+}));

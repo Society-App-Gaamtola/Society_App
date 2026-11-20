@@ -1,8 +1,9 @@
 import { useState, type ComponentRef, type Ref } from 'react';
 import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import { surface } from '../../styles/common';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import { Ionicons, type IoniconName } from '../../icons';
+import { useT } from '../../i18n';
 
 type Props = {
   value: string;
@@ -26,6 +27,7 @@ export default function SearchBar({
   actionLabel,
   onActionPress,
 }: Props) {
+  const t = useT();
   const [focused, setFocused] = useState(false);
 
   return (
@@ -36,7 +38,7 @@ export default function SearchBar({
           ref={inputRef}
           value={value}
           onChangeText={onChangeText}
-          placeholder={placeholder}
+          placeholder={t(placeholder)}
           placeholderTextColor={colors.placeholder}
           style={styles.input}
           returnKeyType="search"
@@ -59,7 +61,7 @@ export default function SearchBar({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: { flexDirection: 'row', gap: 10, marginTop: 14 },
   search: {
     ...surface,
@@ -81,4 +83,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

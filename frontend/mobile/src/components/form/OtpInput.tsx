@@ -1,6 +1,6 @@
 import { useRef, useState, type ComponentRef } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 
 type Props = {
   length?: number;
@@ -70,7 +70,7 @@ export default function OtpInput({ length = 6, value, onChange, autoFocus }: Pro
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
   box: {
     flex: 1,
@@ -87,4 +87,4 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   boxFocused: { borderColor: colors.primary },
-});
+}));

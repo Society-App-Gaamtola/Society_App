@@ -12,9 +12,10 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useIsFocused } from '@react-navigation/native';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import { Ionicons } from '../../icons';
 import type { SocietyEvent } from '../../types';
+import { useT } from '../../i18n';
 
 const BANNER_HEIGHT = 180;
 const AUTO_SLIDE_MS = 4000;
@@ -84,6 +85,7 @@ export default function FeaturedCarousel({ items, onOpen, horizontalPadding = 16
 }
 
 const Banner = memo(function Banner({ event, width, onOpen }: { event: SocietyEvent; width: number; onOpen: (id: string) => void }) {
+  const t = useT();
   return (
     <View style={[styles.banner, { width }]}>
       <Image source={event.image} style={styles.image} resizeMode="cover" />
@@ -100,14 +102,14 @@ const Banner = memo(function Banner({ event, width, onOpen }: { event: SocietyEv
           <Text style={styles.meta}>{event.venue}</Text>
         </View>
         <Pressable style={styles.button} onPress={() => onOpen(event.id)}>
-          <Text style={styles.buttonText}>View Details →</Text>
+          <Text style={styles.buttonText}>{t('View Details')} →</Text>
         </Pressable>
       </LinearGradient>
     </View>
   );
 });
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   carousel: { marginTop: 16, height: BANNER_HEIGHT, borderRadius: 14, overflow: 'hidden' },
   banner: { height: BANNER_HEIGHT },
   image: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
@@ -127,5 +129,5 @@ const styles = StyleSheet.create({
   buttonText: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.white },
   dots: { position: 'absolute', bottom: 10, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.5)' },
-  dotActive: { backgroundColor: colors.white },
-});
+  dotActive: { backgroundColor: colors.card },
+}));

@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
-import { colors, fonts, radius } from '../../theme';
+import { colors, fonts, radius, themedStyles } from '../../theme';
 import { Ionicons, type IoniconName } from '../../icons';
+import { useT } from '../../i18n';
 
 type Props = {
   title: string;
@@ -11,6 +12,7 @@ type Props = {
 };
 
 export default function OutlineButton({ title, onPress, style, icon }: Props) {
+  const t = useT();
   return (
     <Pressable
       onPress={onPress}
@@ -18,12 +20,12 @@ export default function OutlineButton({ title, onPress, style, icon }: Props) {
       style={({ pressed }) => [styles.button, pressed && styles.pressed, style]}
     >
       {icon ? <Ionicons name={icon} size={18} color={colors.primary} /> : null}
-      <Text style={styles.text}>{title}</Text>
+      <Text style={styles.text}>{t(title)}</Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   button: {
     width: '100%',
     height: 52,
@@ -38,4 +40,4 @@ const styles = StyleSheet.create({
   },
   pressed: { backgroundColor: colors.background },
   text: { fontFamily: fonts.semiBold, fontSize: 15, color: colors.primary },
-});
+}));

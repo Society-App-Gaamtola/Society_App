@@ -36,7 +36,6 @@ export { default as BackButton } from './layout/BackButton';
 export { default as FormActionBar } from './layout/FormActionBar';
 export { default as KeyboardAvoid } from './layout/KeyboardAvoid';
 export { default as PermissionGate } from './layout/PermissionGate';
-export { default as ScreenPlaceholder } from './layout/ScreenPlaceholder';
 
 export { default as ActionSheet } from './sheets/ActionSheet';
 export { default as SelectSheet } from './sheets/SelectSheet';

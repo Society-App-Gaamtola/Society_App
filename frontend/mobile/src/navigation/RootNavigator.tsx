@@ -1,4 +1,4 @@
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, type NavigationState } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { colors } from '../theme';
 import SplashScreen from '../screens/SplashScreen';
@@ -7,7 +7,8 @@ import type { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-const navTheme = {
+// Built when the navigator mounts, so it has the current theme's colors
+const navTheme = () => ({
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
@@ -17,12 +18,22 @@ const navTheme = {
     text: colors.textDark,
     border: colors.border,
   },
-};
+});
+
+// The navigation state is kept here, so switching the theme (which redraws the whole app) returns to the same screen
+let savedNavigationState: NavigationState | undefined;
 
 // Screens load the first time they open (getComponent), which keeps app start fast on low-end phones.
 export default function RootNavigator() {
   return (
-    <NavigationContainer ref={navigationRef} theme={navTheme}>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={navTheme()}
+      initialState={savedNavigationState}
+      onStateChange={(state) => {
+        savedNavigationState = state;
+      }}
+    >
       <Stack.Navigator
         initialRouteName="Splash"
         screenOptions={{

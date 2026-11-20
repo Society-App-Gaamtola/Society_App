@@ -1,6 +1,6 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { surface } from '../../styles/common';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import { Ionicons } from '../../icons';
 import type { SocietyEvent } from '../../types';
 import MetaRow from '../ui/MetaRow';
@@ -25,10 +25,10 @@ export default function EventListCard({ event, onPress }: { event: SocietyEvent;
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: { ...surface, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10 },
   image: { width: 64, height: 64, borderRadius: 8 },
   info: { flex: 1, gap: 3 },
   title: { fontFamily: fonts.semiBold, fontSize: 14, color: colors.textDark },
   right: { alignItems: 'flex-end', justifyContent: 'space-between', alignSelf: 'stretch' },
-});
+}));

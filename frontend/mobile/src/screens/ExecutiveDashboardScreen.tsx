@@ -5,14 +5,15 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { HomeStackParamList, MainTabParamList } from '../navigation/types';
 import { common, surface } from '../styles/common';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themedStyles } from '../theme';
 import { hasPermission, useAuth } from '../context/AuthContext';
-import { useExecEvents } from '../context/EventsContext';
+import { getMyEvents, type ApiEventStatus, type ApiExecEvent } from '../api/executive';
 import { getHome, toSocietyEvent } from '../api/user';
 import { Ionicons, MaterialCommunityIcons, type McIconName } from '../icons';
-import type { ExecEventStatus, Permission, SocietyEvent } from '../types';
+import type { Permission, SocietyEvent } from '../types';
 import { timeAgo } from '../utils/date';
 import { AppHeader, EventListCard, FeaturedCarousel, IconCircle, SectionHeader } from '../components';
+import { useLanguage } from '../i18n';
 
 type Nav = CompositeNavigationProp<
   NativeStackNavigationProp<HomeStackParamList, 'HomeMain'>,
@@ -29,19 +30,22 @@ type Action = {
 
 const PADDING = 16;
 
-const activityLabel: Record<ExecEventStatus, string> = {
-  Draft: 'Event draft saved',
-  Posted: 'Event posted',
-  Scheduled: 'Event scheduled',
-  'Needs Approval': 'Event sent for approval',
+// What the latest change to one of the user's events was, from its status
+const activityLabel: Record<ApiEventStatus, string> = {
+  draft: 'Event draft saved',
+  posted: 'Event posted',
+  scheduled: 'Event scheduled',
+  cancelled: 'Event cancelled',
 };
 
-const comingSoon = (label: string) => () => Alert.alert(label, 'Coming soon.');
 
 export default function ExecutiveDashboardScreen() {
+  // Reloaded in the new language when the user switches it (category names, dates and server messages)
+  const language = useLanguage();
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
-  const { myEvents } = useExecEvents();
+  // The user's latest events (Recent Activity), when they may manage events
+  const [recent, setRecent] = useState<ApiExecEvent[]>([]);
   const [hero, setHero] = useState<SocietyEvent[]>([]);
   const [upcomingEvent, setUpcomingEvent] = useState<SocietyEvent | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -56,10 +60,14 @@ export default function ExecutiveDashboardScreen() {
       heroRef.current = slides;
       setHero(slides);
       setUpcomingEvent(data.upcoming_events[0] ? toSocietyEvent(data.upcoming_events[0]) : null);
+      if (hasPermission(user, 'events')) {
+        const mine = await getMyEvents(1);
+        setRecent(mine.data.events.slice(0, 3));
+      }
     } catch {
       // What was loaded before stays on screen; the API client already handles expired logins.
     }
-  }, []);
+  }, [language]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFocusEffect(
     useCallback(() => {
@@ -81,14 +89,15 @@ export default function ExecutiveDashboardScreen() {
 
   const actions: Action[] = [
     { label: 'Create Event', icon: 'calendar-plus', permission: 'events', onPress: () => navigation.navigate('CreateEvent') },
-    { label: 'Post Notice', icon: 'file-document-outline', permission: 'notices', onPress: comingSoon('Post Notice') },
+    { label: 'Post Notice', icon: 'file-document-outline', permission: 'notices', onPress: () => navigation.navigate('PostNotice') },
+    { label: 'My Notices', icon: 'file-document-multiple-outline', permission: 'notices', onPress: () => navigation.navigate('MyNotices') },
     { label: 'My Events', icon: 'calendar-check-outline', permission: 'events', onPress: () => navigation.navigate('MyEvents') },
-    { label: 'Event Planning', icon: 'clipboard-list-outline', permission: 'events', onPress: comingSoon('Event Planning') },
+    { label: 'Event Planning', icon: 'clipboard-list-outline', permission: 'events', onPress: () => navigation.navigate('EventPlanning') },
     { label: 'Upload Media', icon: 'image-plus', permission: 'media', onPress: () => navigation.navigate('Gallery') },
+    { label: 'Media Approval', icon: 'image-check-outline', permission: 'media', onPress: () => navigation.navigate('MediaApproval') },
+    { label: 'Expenses', icon: 'wallet-outline', permission: 'expenses', onPress: () => navigation.navigate('SocietyExpenses') },
     { label: 'Member Directory', icon: 'account-group-outline', onPress: () => navigation.navigate('MemberDirectory') },
   ];
-
-  const recent = myEvents.slice(0, 3);
 
   return (
     <View style={common.screen}>
@@ -137,23 +146,6 @@ export default function ExecutiveDashboardScreen() {
           })}
         </View>
 
-        <SectionHeader
-          title="Tasks Requiring Approval"
-          icon={<Ionicons name="alert-circle-outline" size={18} color={colors.warning} />}
-        />
-        <View style={styles.approval}>
-          <IconCircle size={40}>
-            <Ionicons name="megaphone-outline" size={20} color={colors.primary} />
-          </IconCircle>
-          <View style={common.flex}>
-            <Text style={styles.approvalTitle}>Some actions are subject to Super Admin permission</Text>
-            <Text style={styles.approvalText}>
-              Event creation, financial activities and executive approvals require Super Admin approval as per society
-              rules.
-            </Text>
-          </View>
-        </View>
-
         <SectionHeader title="Upcoming Event" onViewAll={() => navigation.navigate('Events', { screen: 'EventsMain' })} />
         {upcomingEvent ? (
           <EventListCard
@@ -178,7 +170,7 @@ export default function ExecutiveDashboardScreen() {
                     {e.title}
                   </Text>
                 </View>
-                <Text style={styles.activityTime}>{timeAgo(e.createdAt)}</Text>
+                <Text style={styles.activityTime}>{timeAgo(Date.parse(e.updated_at))}</Text>
               </View>
             ))
           ) : (
@@ -190,7 +182,7 @@ export default function ExecutiveDashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   scroll: { padding: PADDING, paddingBottom: 32 },
 
   greetingRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
@@ -201,11 +193,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#EBD9A6',
-    backgroundColor: '#FBF1D6',
+    borderColor: colors.goldBorder,
+    backgroundColor: colors.goldTint,
     marginTop: 4,
   },
-  roleText: { fontFamily: fonts.semiBold, fontSize: 11, color: '#8A6A12' },
+  roleText: { fontFamily: fonts.semiBold, fontSize: 11, color: colors.goldText },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 20 },
   tile: {
@@ -222,16 +214,6 @@ const styles = StyleSheet.create({
   tileLabel: { fontFamily: fonts.medium, fontSize: 11, color: colors.textDark },
   tileLock: { position: 'absolute', top: 8, right: 8 },
 
-  approval: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.noteBackground,
-    borderRadius: 12,
-    padding: 12,
-  },
-  approvalTitle: { fontFamily: fonts.bold, fontSize: 13, lineHeight: 18, color: colors.textDark },
-  approvalText: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, color: colors.textMuted, marginTop: 2 },
 
   activityCard: { ...surface, paddingHorizontal: 12 },
   activityRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
@@ -240,4 +222,4 @@ const styles = StyleSheet.create({
   activitySub: { fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted },
   activityTime: { fontFamily: fonts.regular, fontSize: 10, color: colors.textMuted },
   empty: { fontFamily: fonts.regular, fontSize: 12, color: colors.textMuted, textAlign: 'center', paddingVertical: 16 },
-});
+}));

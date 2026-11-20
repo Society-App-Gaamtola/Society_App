@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { EventsStackParamList } from '../navigation/types';
 import { common, surface } from '../styles/common';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themedStyles } from '../theme';
 import { LIST_PERFORMANCE_PROPS } from '../config/list';
 import { getEventCategories, getEvents, toSocietyEvent, type ApiCategory } from '../api/user';
 import { usePagedList } from '../hooks/usePagedList';
@@ -14,12 +14,16 @@ import type { DateRange, SocietyEvent } from '../types';
 import { formatRange, toIsoDay } from '../utils/date';
 import { AppHeader, DateRangeButton, EmptyState, FilterChips, MetaRow, SearchBar, StatusBadge } from '../components';
 import DateRangeSheet from '../components/sheets/DateRangeSheet';
+import { useLanguage, useT } from '../i18n';
 
 const ALL = 'All';
 
 const Separator = () => <View style={styles.separator} />;
 
 export default function EventsScreen() {
+  // Reloaded in the new language when the user switches it (category names, dates and server messages)
+  const language = useLanguage();
+  const t = useT();
   const navigation = useNavigation<NativeStackNavigationProp<EventsStackParamList>>();
   const searchRef = useRef<ComponentRef<typeof TextInput>>(null);
   const [categories, setCategories] = useState<ApiCategory[]>([]);
@@ -34,7 +38,7 @@ export default function EventsScreen() {
     getEventCategories()
       .then(({ data }) => setCategories(data.categories))
       .catch(() => {});
-  }, []);
+  }, [language]);
 
   const categoryId = categories.find((c) => c.name === category)?.id;
   const fetchPage = useCallback(
@@ -62,8 +66,8 @@ export default function EventsScreen() {
 
   const header = (
     <View>
-      <Text style={common.heading}>Events & Cultural Programmes</Text>
-      <Text style={common.subtextRelaxed}>Stay updated with our upcoming events and cultural activities.</Text>
+      <Text style={common.heading}>{t('Events & Cultural Programmes')}</Text>
+      <Text style={common.subtextRelaxed}>{t('Stay updated with our upcoming events and cultural activities.')}</Text>
 
       <SearchBar
         value={query}
@@ -120,7 +124,7 @@ export default function EventsScreen() {
           loadingMore ? (
             <ActivityIndicator color={colors.primary} style={styles.footer} />
           ) : error && items.length > 0 ? (
-            <Text style={styles.footerError}>Couldn't load more events. Scroll down to try again.</Text>
+            <Text style={styles.footerError}>{t('Couldn\'t load more events. Scroll down to try again.')}</Text>
           ) : undefined
         }
         renderItem={renderItem}
@@ -159,7 +163,7 @@ const EventCard = memo(function EventCard({ event, onOpen }: { event: SocietyEve
   );
 });
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   list: { padding: 16, paddingBottom: 32, flexGrow: 1 },
   range: { marginTop: 10 },
   chips: { marginTop: 12, marginBottom: 14 },
@@ -172,4 +176,4 @@ const styles = StyleSheet.create({
   info: { flex: 1, gap: 4 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
   title: { flex: 1, fontFamily: fonts.semiBold, fontSize: 14, lineHeight: 20, color: colors.textDark },
-});
+}));

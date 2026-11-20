@@ -1,5 +1,5 @@
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
-import { tones, type Tone } from '../../theme';
+import { tones, type Tone, themedStyles } from '../../theme';
 import type { BadgeStatus } from '../../types';
 import Pill from './Pill';
 
@@ -23,6 +23,6 @@ export default function StatusBadge({ status, style }: Props) {
   return <Pill label={status} tone={palette[status]} style={[styles.badge, style]} />;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   badge: { alignSelf: 'flex-start' },
-});
+}));

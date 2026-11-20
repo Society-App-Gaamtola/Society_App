@@ -2,18 +2,21 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Sharing from 'expo-sharing';
 import { common, surface } from '../styles/common';
-import { colors, fonts, tones } from '../theme';
+import { colors, fonts, tones, themedStyles } from '../theme';
 import { REPORT_MIME_TYPES } from '../config';
-import { useDonations } from '../context/DonationsContext';
-import { useReports } from '../context/ReportsContext';
+import { saveReportRecord } from '../api/executive';
 import { Ionicons, MaterialCommunityIcons, type McIconName } from '../icons';
-import { buildReportData, generateReportFile } from '../services/reportExport';
+import { makeDonationReport, REPORT_API_TYPE } from '../services/reportExport';
 import type { DateRange, ReportFormat, ReportType } from '../types';
-import { formatDateTime, formatRange, toIsoDay } from '../utils/date';
+import { formatRange, toIsoDay } from '../utils/date';
 import { AppHeader, DateRangeButton, FieldLabel, OrDivider, PermissionGate, PrimaryButton } from '../components';
 import DateRangeSheet from '../components/sheets/DateRangeSheet';
 
-const DEFAULT_RANGE: DateRange = { start: '2026-10-01', end: '2026-10-31' };
+/** This month, the default period */
+export const thisMonth = (): DateRange => {
+  const now = new Date();
+  return { start: toIsoDay(new Date(now.getFullYear(), now.getMonth(), 1)), end: toIsoDay(new Date(now.getFullYear(), now.getMonth() + 1, 0)) };
+};
 
 const REPORT_TYPES: { type: ReportType; icon: McIconName }[] = [
   { type: 'Donation Summary', icon: 'chart-pie' },
@@ -22,7 +25,7 @@ const REPORT_TYPES: { type: ReportType; icon: McIconName }[] = [
 ];
 
 const FORMATS: { format: ReportFormat; label: string; icon: McIconName; color: string }[] = [
-  { format: 'PDF', label: 'PDF (Recommended)', icon: 'file-pdf-box', color: tones.danger.text },
+  { format: 'PDF', label: 'PDF (Recommended)', icon: 'file-pdf-box', get color() { return tones.danger.text; } },
   { format: 'Excel', label: 'Excel (Editable)', icon: 'file-excel-box', color: tones.success.text },
 ];
 
@@ -51,10 +54,8 @@ export default function ExportReportsScreen() {
 }
 
 function ExportReports() {
-  const { donations } = useDonations();
-  const { addReport } = useReports();
   const [type, setType] = useState<ReportType>('Donation Summary');
-  const [range, setRange] = useState<DateRange>(DEFAULT_RANGE);
+  const [range, setRange] = useState<DateRange>(thisMonth);
   const [rangeOpen, setRangeOpen] = useState(false);
   const [format, setFormat] = useState<ReportFormat>('PDF');
   const [running, setRunning] = useState<Job | null>(null);
@@ -65,15 +66,10 @@ function ExportReports() {
     setRunning(job);
     setSuccess(false);
     try {
-      const data = buildReportData(donations, type, reportRange);
-      const uri = await generateReportFile(data, reportFormat);
-      addReport({
-        title: `${type} - ${data.period}`,
-        period: data.period,
-        generatedOn: formatDateTime(new Date()),
-        format: reportFormat,
-        fileUri: uri,
-      });
+      // Built from the server's donation entries for the period
+      const { uri } = await makeDonationReport(type, reportRange, reportFormat);
+      // Listed under "Recent Reports" (here and in the admin panel); the file is built again when opened
+      saveReportRecord({ report_type: REPORT_API_TYPE[type], from_date: reportRange.start, to_date: reportRange.end }).catch(() => {});
       setSuccess(true);
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, { mimeType: REPORT_MIME_TYPES[reportFormat], dialogTitle: type });
@@ -201,7 +197,7 @@ function ExportReports() {
       <DateRangeSheet
         visible={rangeOpen}
         initial={range}
-        defaultMonth={DEFAULT_RANGE.start}
+        defaultMonth={range.start}
         allowClear={false}
         onClose={() => setRangeOpen(false)}
         onApply={(r) => {
@@ -213,7 +209,7 @@ function ExportReports() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   scroll: { padding: 16, paddingBottom: 32 },
 
   label: { marginTop: 18, marginBottom: 8 },
@@ -237,9 +233,9 @@ const styles = StyleSheet.create({
     marginTop: 18,
     padding: 12,
     gap: 6,
-    backgroundColor: '#FFF8E6',
+    backgroundColor: colors.goldTint,
     borderWidth: 1,
-    borderColor: '#F1DFA0',
+    borderColor: colors.goldBorder,
     borderRadius: 12,
   },
   includesHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
@@ -257,7 +253,7 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: tones.success.bg,
     borderWidth: 1,
-    borderColor: '#BFE5CC',
+    borderColor: colors.successBorder,
     borderRadius: 10,
   },
   successTitle: { fontFamily: fonts.bold, fontSize: 12, color: tones.success.text },
@@ -281,4 +277,4 @@ const styles = StyleSheet.create({
   quickPressed: { backgroundColor: colors.background },
   quickText: { fontFamily: fonts.semiBold, fontSize: 13 },
   faded: { opacity: 0.5 },
-});
+}));

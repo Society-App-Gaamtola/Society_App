@@ -5,7 +5,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as authApi from '../api/auth';
 import type { RootStackParamList } from '../navigation/types';
 import { common, surface } from '../styles/common';
-import { colors, fonts, tones } from '../theme';
+import { colors, fonts, tones, themedStyles } from '../theme';
 import { useAuth } from '../context/AuthContext';
 import { useFormErrors } from '../hooks/useFormErrors';
 import { Ionicons } from '../icons';
@@ -22,10 +22,12 @@ import {
   PrimaryButton,
   StepIndicator,
 } from '../components';
+import { useT } from '../i18n';
 
 type Field = 'email';
 
 export default function ChangeEmailScreen() {
+  const t = useT();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user } = useAuth();
   const [email, setEmail] = useState('');
@@ -66,7 +68,7 @@ export default function ChangeEmailScreen() {
             <IconCircle size={76} color={tones.success.bg}>
               <Ionicons name="checkmark-circle" size={44} color={tones.success.text} />
             </IconCircle>
-            <Text style={styles.successTitle}>Email updated</Text>
+            <Text style={styles.successTitle}>{t('Email updated')}</Text>
             <Text style={styles.successText}>
               You will now receive codes and updates at{'\n'}
               <Text style={styles.strong}>{currentEmail}</Text>
@@ -83,9 +85,9 @@ export default function ChangeEmailScreen() {
       <AppHeader leftType="back" rightIcons={[]} />
       <KeyboardAvoid>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Text style={common.heading}>Change Email</Text>
+          <Text style={common.heading}>{t('Change Email')}</Text>
           <Text style={[common.subtextRelaxed, styles.subtext]}>
-            We'll send a 6-digit code to your new email. Your current email keeps working until you verify it.
+            {t('We\'ll send a 6-digit code to your new email. Your current email keeps working until you verify it.')}
           </Text>
 
           <StepIndicator steps={EMAIL_CHANGE_STEPS} current={1} />
@@ -95,9 +97,9 @@ export default function ChangeEmailScreen() {
               <Ionicons name="mail-outline" size={20} color={tones.info.text} />
             </IconCircle>
             <View style={common.flex}>
-              <Text style={styles.currentLabel}>Current email</Text>
+              <Text style={styles.currentLabel}>{t('Current email')}</Text>
               <Text style={styles.currentValue} numberOfLines={1}>
-                {currentEmail || 'Not added'}
+                {currentEmail || t('Not added')}
               </Text>
             </View>
             {currentEmail && user?.emailVerified !== undefined ? (
@@ -135,7 +137,7 @@ export default function ChangeEmailScreen() {
           <View style={styles.note}>
             <Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} />
             <Text style={styles.noteText}>
-              The code expires in a few minutes. Check your spam folder if you don't see it.
+              {t('The code expires in a few minutes. Check your spam folder if you don\'t see it.')}
             </Text>
           </View>
         </ScrollView>
@@ -144,7 +146,7 @@ export default function ChangeEmailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   scroll: { padding: 16, paddingBottom: 32 },
   subtext: { marginBottom: 18 },
   current: {
@@ -167,7 +169,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.softTint,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F1D9D9',
+    borderColor: colors.dangerBorder,
     padding: 14,
     marginTop: 20,
   },
@@ -176,4 +178,4 @@ const styles = StyleSheet.create({
   successTitle: { fontFamily: fonts.bold, fontSize: 20, color: colors.textDark, marginTop: 8 },
   successText: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 20, color: colors.textMuted, textAlign: 'center' },
   strong: { fontFamily: fonts.semiBold, color: colors.textDark },
-});
+}));

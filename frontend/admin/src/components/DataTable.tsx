@@ -1,7 +1,9 @@
 'use client';
 
 import { memo, useCallback, type ReactNode } from 'react';
+import { Loader2 } from 'lucide-react';
 import { DEFAULT_PAGE_SIZE } from '@/config';
+import { cn } from '@/lib/utils';
 import type { Id } from '@/types';
 import { ErrorState, SortIcon, TableRowsSkeleton } from './common';
 import { Pagination } from './Pagination';
@@ -24,7 +26,11 @@ type Props<T extends { id: Id }> = {
   page: number;
   pageSize?: number;
   isLoading?: boolean;
+  /** A new page / filter / refresh is loading while the old rows are still shown: they dim under a "Loading…" badge */
+  isFetching?: boolean;
   isError?: boolean;
+  /** Shown instead of the generic "Could not load data" (e.g. the backend's message) */
+  errorMessage?: string;
   onRetry?: () => void;
   sort?: Sort;
   onSortChange?: (sort: Sort) => void;
@@ -74,7 +80,9 @@ export function DataTable<T extends { id: Id }>({
   page,
   pageSize = DEFAULT_PAGE_SIZE,
   isLoading,
+  isFetching,
   isError,
+  errorMessage,
   onRetry,
   sort,
   onSortChange,
@@ -99,17 +107,17 @@ export function DataTable<T extends { id: Id }>({
   if (isError) {
     return (
       <div className="rounded-xl border border-border bg-white">
-        <ErrorState onRetry={onRetry} />
+        <ErrorState message={errorMessage} onRetry={onRetry} />
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-white">
+    <div className="relative overflow-hidden rounded-xl border border-border bg-white" aria-busy={isLoading || isFetching}>
       {isLoading && !rows ? (
-        <TableRowsSkeleton />
+        <TableRowsSkeleton rows={pageSize} />
       ) : (
-        <div className="overflow-x-auto">
+        <div className={cn('overflow-x-auto transition-opacity duration-200', isFetching && 'pointer-events-none opacity-50')}>
           <table className="w-full text-left text-sm">
             <thead className="bg-[#FBF5EC] text-xs font-semibold text-[#1F2A44]">
               <tr>
@@ -174,7 +182,17 @@ export function DataTable<T extends { id: Id }>({
           </table>
         </div>
       )}
-      <Pagination page={page} total={total} pageSize={pageSize} onPageChange={onPageChange} itemLabel={itemLabel} className="border-t border-border" />
+      {isFetching && rows ? (
+        <div className="pointer-events-none absolute inset-x-0 top-14 flex justify-center">
+          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-4 py-1.5 text-sm font-medium text-maroon shadow-md">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+          </span>
+        </div>
+      ) : null}
+      {/* No "Showing 0 to 0 of 0" while the first page is still loading */}
+      {isLoading && !rows ? null : (
+        <Pagination page={page} total={total} pageSize={pageSize} onPageChange={onPageChange} itemLabel={itemLabel} className="border-t border-border" />
+      )}
     </div>
   );
 }

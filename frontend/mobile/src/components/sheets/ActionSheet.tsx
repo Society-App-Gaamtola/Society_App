@@ -1,8 +1,9 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import { Ionicons, type IoniconName } from '../../icons';
 import ModalSheet from './ModalSheet';
+import { useT } from '../../i18n';
 
 type SheetAction = {
   label: string;
@@ -15,12 +16,13 @@ type Props = { visible: boolean; title?: string; actions: SheetAction[]; onClose
 
 /** Bottom sheet of actions, used for "⋯" menus. */
 export default function ActionSheet({ visible, title, actions, onClose }: Props) {
+  const t = useT();
   const insets = useSafeAreaInsets();
   return (
     <ModalSheet visible={visible} animationType="fade" onClose={onClose} style={[styles.menu, { paddingBottom: 12 + insets.bottom }]}>
       {title ? (
         <Text style={styles.title} numberOfLines={1}>
-          {title}
+          {t(title)}
         </Text>
       ) : null}
       {actions.map((action) => (
@@ -33,16 +35,16 @@ export default function ActionSheet({ visible, title, actions, onClose }: Props)
           }}
         >
           <Ionicons name={action.icon} size={20} color={action.danger ? colors.danger : colors.textDark} />
-          <Text style={[styles.text, action.danger && styles.danger]}>{action.label}</Text>
+          <Text style={[styles.text, action.danger && styles.danger]}>{t(action.label)}</Text>
         </Pressable>
       ))}
     </ModalSheet>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   menu: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.card,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingTop: 14,
@@ -53,4 +55,4 @@ const styles = StyleSheet.create({
   pressed: { backgroundColor: colors.tint },
   text: { fontFamily: fonts.medium, fontSize: 14, color: colors.textDark },
   danger: { color: colors.danger },
-});
+}));

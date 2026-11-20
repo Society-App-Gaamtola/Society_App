@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SideDrawerProvider } from '../components/layout/SideDrawer';
 import { useAuth } from '../context/AuthContext';
 import { Ionicons, MaterialCommunityIcons, type IoniconName } from '../icons';
-import { colors, fonts } from '../theme';
+import { colors, fonts, themedStyles } from '../theme';
 import type {
   DonateStackParamList,
   EventsStackParamList,
@@ -14,6 +14,7 @@ import type {
   ProfileStackParamList,
   SharedStackParams,
 } from './types';
+import { useT } from '../i18n';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
@@ -21,7 +22,7 @@ const EventsStack = createNativeStackNavigator<EventsStackParamList>();
 const DonateStack = createNativeStackNavigator<DonateStackParamList>();
 const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 
-const stackOptions = { headerShown: false, contentStyle: { backgroundColor: colors.background } };
+const stackOptions = () => ({ headerShown: false, contentStyle: { backgroundColor: colors.background } });
 
 /** Screens pushed inside both the Home and Events tabs. Each one loads the first time it opens. */
 const SHARED_SCREENS: { name: keyof SharedStackParams; getComponent: () => React.ComponentType<any> }[] = [
@@ -36,6 +37,11 @@ const SHARED_SCREENS: { name: keyof SharedStackParams; getComponent: () => React
   { name: 'CreateEvent', getComponent: () => require('../screens/CreateEventScreen').default },
   { name: 'MyEvents', getComponent: () => require('../screens/MyEventsScreen').default },
   { name: 'EventPreview', getComponent: () => require('../screens/EventPreviewScreen').default },
+  { name: 'PostNotice', getComponent: () => require('../screens/PostNoticeScreen').default },
+  { name: 'MyNotices', getComponent: () => require('../screens/MyNoticesScreen').default },
+  { name: 'AddExpense', getComponent: () => require('../screens/AddExpenseScreen').default },
+  { name: 'MediaApproval', getComponent: () => require('../screens/MediaApprovalScreen').default },
+  { name: 'EventPlanning', getComponent: () => require('../screens/EventPlanningScreen').default },
   { name: 'DonationEntries', getComponent: () => require('../screens/DonationEntriesScreen').default },
   { name: 'AddDonation', getComponent: () => require('../screens/AddDonationScreen').default },
   { name: 'FinancialReports', getComponent: () => require('../screens/FinancialReportsScreen').default },
@@ -60,7 +66,7 @@ function HomeMain() {
 
 function HomeStackScreen() {
   return (
-    <HomeStack.Navigator screenOptions={stackOptions}>
+    <HomeStack.Navigator screenOptions={stackOptions()}>
       <HomeStack.Screen name="HomeMain" component={HomeMain} />
       {SHARED_SCREENS.map((screen) => (
         <HomeStack.Screen key={screen.name} name={screen.name} getComponent={screen.getComponent} />
@@ -71,7 +77,7 @@ function HomeStackScreen() {
 
 function EventsStackScreen() {
   return (
-    <EventsStack.Navigator screenOptions={stackOptions}>
+    <EventsStack.Navigator screenOptions={stackOptions()}>
       <EventsStack.Screen name="EventsMain" getComponent={() => require('../screens/EventsScreen').default} />
       {SHARED_SCREENS.map((screen) => (
         <EventsStack.Screen key={screen.name} name={screen.name} getComponent={screen.getComponent} />
@@ -83,7 +89,7 @@ function EventsStackScreen() {
 /** Donate has its own stack, so My Donations opened from it returns to it on Back. */
 function DonateStackScreen() {
   return (
-    <DonateStack.Navigator screenOptions={stackOptions}>
+    <DonateStack.Navigator screenOptions={stackOptions()}>
       <DonateStack.Screen name="DonateMain" getComponent={() => require('../screens/DonateScreen').default} />
       {SHARED_SCREENS.map((screen) => (
         <DonateStack.Screen key={screen.name} name={screen.name} getComponent={screen.getComponent} />
@@ -95,7 +101,7 @@ function DonateStackScreen() {
 /** Profile has its own stack, so screens opened from it return to it on Back. */
 function ProfileStackScreen() {
   return (
-    <ProfileStack.Navigator screenOptions={stackOptions}>
+    <ProfileStack.Navigator screenOptions={stackOptions()}>
       <ProfileStack.Screen name="ProfileMain" getComponent={() => require('../screens/ProfileScreen').default} />
       {SHARED_SCREENS.map((screen) => (
         <ProfileStack.Screen key={screen.name} name={screen.name} getComponent={screen.getComponent} />
@@ -118,6 +124,9 @@ const DONATE_OPTIONS: BottomTabNavigationOptions = {
 
 export default function MainTabs() {
   const { bottom } = useSafeAreaInsets();
+  // Tab names follow the app language (re-rendered when it changes)
+  const t = useT();
+  const label = (title: string, options: BottomTabNavigationOptions): BottomTabNavigationOptions => ({ ...options, title: t(title) });
   const screenOptions = useMemo<BottomTabNavigationOptions>(
     () => ({
       headerShown: false,
@@ -125,7 +134,7 @@ export default function MainTabs() {
       tabBarInactiveTintColor: colors.mutedIcon,
       tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11 },
       tabBarStyle: {
-        backgroundColor: colors.white,
+        backgroundColor: colors.card,
         borderTopColor: colors.border,
         borderTopWidth: 1,
         height: 64 + bottom,
@@ -140,11 +149,11 @@ export default function MainTabs() {
   return (
     <SideDrawerProvider>
       <Tab.Navigator screenOptions={screenOptions}>
-        <Tab.Screen name="Home" component={HomeStackScreen} options={HOME_OPTIONS} />
-        <Tab.Screen name="Events" component={EventsStackScreen} options={EVENTS_OPTIONS} />
-        <Tab.Screen name="Gallery" getComponent={() => require('../screens/GalleryScreen').default} options={GALLERY_OPTIONS} />
-        <Tab.Screen name="Donate" component={DonateStackScreen} options={DONATE_OPTIONS} />
-        <Tab.Screen name="Profile" component={ProfileStackScreen} options={PROFILE_OPTIONS} />
+        <Tab.Screen name="Home" component={HomeStackScreen} options={label('Home', HOME_OPTIONS)} />
+        <Tab.Screen name="Events" component={EventsStackScreen} options={label('Events', EVENTS_OPTIONS)} />
+        <Tab.Screen name="Gallery" getComponent={() => require('../screens/GalleryScreen').default} options={label('Gallery', GALLERY_OPTIONS)} />
+        <Tab.Screen name="Donate" component={DonateStackScreen} options={label('Donate', DONATE_OPTIONS)} />
+        <Tab.Screen name="Profile" component={ProfileStackScreen} options={label('Profile', PROFILE_OPTIONS)} />
       </Tab.Navigator>
     </SideDrawerProvider>
   );

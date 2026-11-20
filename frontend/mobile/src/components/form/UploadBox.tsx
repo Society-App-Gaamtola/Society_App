@@ -1,26 +1,28 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, themedStyles } from '../../theme';
 import { Ionicons } from '../../icons';
 import IconCircle from '../ui/IconCircle';
+import { useT } from '../../i18n';
 
 type Props = { title: string; hint: string; error?: boolean; onPress: () => void };
 
 /** Dashed tap target for choosing a file. */
 export default function UploadBox({ title, hint, error, onPress }: Props) {
+  const t = useT();
   return (
     <Pressable style={[styles.box, error && styles.error]} onPress={onPress} accessibilityRole="button">
       <IconCircle size={40} radius={8}>
         <Ionicons name="image-outline" size={22} color={colors.primary} />
       </IconCircle>
       <View>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.hint}>{hint}</Text>
+        <Text style={styles.title}>{t(title)}</Text>
+        <Text style={styles.hint}>{t(hint)}</Text>
       </View>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   box: {
     height: 70,
     flexDirection: 'row',
@@ -36,4 +38,4 @@ const styles = StyleSheet.create({
   error: { borderColor: colors.danger },
   title: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.textDark },
   hint: { fontFamily: fonts.regular, fontSize: 10, color: colors.textMuted },
-});
+}));

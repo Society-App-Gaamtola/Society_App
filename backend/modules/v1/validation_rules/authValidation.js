@@ -3,19 +3,19 @@ import constant from "../../../config/constant.js";
 import { mediaUrl } from "./userValidation.js";
 
 const countryCode = Joi.string().trim().pattern(/^\+\d{1,4}$/).default(constant.DEFAULT_COUNTRY_CODE);
-const mobileNumber = Joi.string().trim().pattern(/^\d{7,15}$/);
+export const mobileNumber = Joi.string().trim().pattern(/^\d{7,15}$/);
 const otpPurpose = Joi.string().valid(constant.OTP_PURPOSE.SIGNUP, constant.OTP_PURPOSE.LOGIN).required();
-const email = Joi.string().trim().lowercase().email();
+export const email = Joi.string().trim().lowercase().email();
 const newPassword = Joi.string().min(constant.PASSWORD_MIN_LENGTH).max(constant.PASSWORD_MAX_LENGTH);
 const language = Joi.string().valid(...constant.LANGUAGES).default(constant.DEFAULT_LANGUAGE);
-const username = Joi.string().trim().min(constant.USERNAME_MIN_LENGTH).max(constant.USERNAME_MAX_LENGTH);
-const address = Joi.string().trim().max(constant.ADDRESS_MAX_LENGTH);
+export const username = Joi.string().trim().min(constant.USERNAME_MIN_LENGTH).max(constant.USERNAME_MAX_LENGTH);
+export const address = Joi.string().trim().max(constant.ADDRESS_MAX_LENGTH);
 const otp = Joi.number().integer().min(100000).max(999999).required();
 
 const requiredForSignup = { is: constant.OTP_PURPOSE.SIGNUP, then: Joi.required() };
 
 // Device info is saved with the token (device_token is the FCM push token)
-const deviceFields = {
+export const deviceFields = {
   device_token: Joi.string().trim().max(512).allow(null, ""),
   device_type: Joi.string().trim().allow(null, ""),
   device_name: Joi.string().trim().allow(null, ""),

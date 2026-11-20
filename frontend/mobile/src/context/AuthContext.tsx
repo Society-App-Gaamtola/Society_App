@@ -1,27 +1,42 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Alert } from 'react-native';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Alert, AppState } from 'react-native';
 import * as authApi from '../api/auth';
 import type { ApiUser, AuthData } from '../api/auth';
-import { ApiCode, ApiError, mediaUrl, setAuthToken, setSessionExpiredHandler } from '../api/client';
-import { MOCK_USERS } from '../data/seeds';
+import { mediaUrl, setSessionExpiredHandler } from '../api/client';
 import { resetToLogin } from '../navigation/navigationRef';
 import { endSession, startSession, updateSessionUser } from '../services/session';
 import type { AuthUser, Permission, Permissions } from '../types';
 
 const NO_PERMISSIONS: Permissions = { events: false, notices: false, donations: false, expenses: false, reports: false, media: false };
 
-// The login response has no permissions yet, so executives get these until it does.
-const EXECUTIVE_PERMISSIONS: Permissions = { events: true, notices: true, donations: true, expenses: false, reports: true, media: true };
+// The sections the backend sent (login / profile): an executive's, as set in the admin panel
+const toPermissions = (sections: string[] = []): Permissions => ({
+  events: sections.includes('events'),
+  notices: sections.includes('notices'),
+  donations: sections.includes('donations'),
+  expenses: sections.includes('expenses'),
+  reports: sections.includes('reports'),
+  media: sections.includes('media'),
+});
+
+// Everyone logs in the same way; the role comes from the backend (users.role_id). A member the admin makes an
+// executive gets the executive screens with the same email and password, after the next profile reload.
+// The Super Admin uses the executive screens in the app too (and the admin panel for the rest).
+const ROLE_LABEL: Record<ApiUser['role'], string> = {
+  member: 'Normal Member',
+  executive: 'Executive Member',
+  super_admin: 'Super Admin',
+};
 
 const toAuthUser = (u: ApiUser): AuthUser => {
   const isMember = u.role === 'member';
   return {
     id: String(u.id),
     name: u.username,
-    memberId: '',
+    memberId: u.member_code ?? '',
     role: isMember ? 'member' : 'executive',
-    permissions: isMember ? NO_PERMISSIONS : EXECUTIVE_PERMISSIONS,
-    eventsNeedApproval: !isMember,
+    roleLabel: ROLE_LABEL[u.role] ?? 'Normal Member',
+    permissions: isMember ? NO_PERMISSIONS : toPermissions(u.permissions?.sections),
     email: u.email,
     countryCode: u.country_code,
     mobile: u.mobile_number,
@@ -33,17 +48,8 @@ const toAuthUser = (u: ApiUser): AuthUser => {
   };
 };
 
-export type LoginAs = AuthUser['role'];
-
-const WRONG_LOGIN_TAB: Record<LoginAs, string> = {
-  executive: 'This is not an executive account. Please use Member login.',
-  member: 'This is an executive account. Please use Executive login.',
-};
-
 type AuthContextValue = {
   user: AuthUser | null;
-  /** The tab chosen on the login screen. completeLogin refuses an account of the other role. */
-  setLoginAs: (role: LoginAs | null) => void;
   /** Saves the login returned by the backend and returns the signed-in user. */
   completeLogin: (data: AuthData, remember?: boolean) => Promise<AuthUser>;
   /** Applies the user returned after a profile change. */
@@ -52,8 +58,6 @@ type AuthContextValue = {
   refreshUser: () => Promise<void>;
   /** Logs out on the backend and on this device. */
   signOut: () => Promise<void>;
-  /** Dev only: view the app as a mock user. Does not change the backend login. */
-  switchMockUser: (id: string) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -71,22 +75,9 @@ export function AuthProvider({ initialUser = null, children }: { initialUser?: A
     return () => setSessionExpiredHandler(null);
   }, []);
 
-  const loginAs = useRef<LoginAs | null>(null);
-  const setLoginAs = useCallback((role: LoginAs | null) => {
-    loginAs.current = role;
-  }, []);
-
-  // Password login, OTP login and sign-up all end here, so the role check covers all of them.
+  // Password login, OTP login and sign-up all end here. The account's role decides which screens open
   const completeLogin = useCallback(async (data: AuthData, remember = true) => {
     const signedIn = toAuthUser(data.userData);
-    const expected = loginAs.current;
-    if (expected && signedIn.role !== expected) {
-      // Close the session the backend just opened, so the refused login leaves nothing behind.
-      setAuthToken(data.token);
-      await authApi.logout().catch(() => {});
-      setAuthToken(null);
-      throw new ApiError(WRONG_LOGIN_TAB[expected], ApiCode.error);
-    }
     await startSession(data.token, signedIn, remember);
     setUser(signedIn);
     return signedIn;
@@ -103,11 +94,19 @@ export function AuthProvider({ initialUser = null, children }: { initialUser?: A
     await updateUser(data.userData);
   }, [updateUser]);
 
-  // The saved copy may be out of date (changed on another device or by an admin), so reload it once on start.
+  // The saved copy may be out of date (changed on another device, or the admin changed the role), so reload it on
+  // start and whenever the app comes back to the foreground: a member made executive gets the new screens then
   useEffect(() => {
     if (initialUser) refreshUser().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(() => {
+    if (!user) return;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshUser().catch(() => {});
+    });
+    return () => subscription.remove();
+  }, [user?.id, refreshUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const signOut = useCallback(async () => {
     // The device logs out even if the backend can't be reached.
@@ -119,14 +118,12 @@ export function AuthProvider({ initialUser = null, children }: { initialUser?: A
   const value = useMemo(
     () => ({
       user,
-      setLoginAs,
       completeLogin,
       updateUser,
       refreshUser,
       signOut,
-      switchMockUser: (id: string) => setUser(MOCK_USERS.find((u) => u.id === id) ?? null),
     }),
-    [user, setLoginAs, completeLogin, updateUser, refreshUser, signOut],
+    [user, completeLogin, updateUser, refreshUser, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

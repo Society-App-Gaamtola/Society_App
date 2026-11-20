@@ -1,76 +1,80 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Field, FileUpload, FormDialog } from '@/components/common';
+import { Field, FormDialog } from '@/components/common';
 import { Input, NativeSelect, Textarea } from '@/components/ui/primitives';
-import { membersHooks, useCreateMember } from '@/hooks/useMembers';
-import { todayISO } from '@/lib/utils';
-import type { Member } from '@/types';
+import { useEditMember } from '@/hooks/useAdminMembers';
+import { memberName, type MemberChanges } from '@/services/adminMembers';
+import type { AdminMember } from '@/types';
 
-type Draft = Pick<Member, 'name' | 'mobile' | 'email' | 'type' | 'status' | 'address' | 'joinedOn'> & {
-  gender: NonNullable<Member['gender']>;
-  dob: string;
-  photo: string | null;
-};
+type Draft = { name: string; email: string; country_code: string; mobile: string; member_code: string; address: string; role: 'member' | 'executive' };
 
-const EMPTY: Draft = {
-  name: '',
-  mobile: '+91 ',
-  email: '',
-  type: 'Normal',
-  status: 'Active',
-  address: '',
-  joinedOn: todayISO(),
-  gender: 'Male',
-  dob: '',
-  photo: null,
-};
+const toDraft = (m: AdminMember): Draft => ({
+  name: m.name ?? '',
+  email: m.email,
+  country_code: m.country_code,
+  mobile: m.mobile,
+  member_code: m.member_code ?? '',
+  address: m.address ?? '',
+  role: m.role === 'executive' ? 'executive' : 'member',
+});
 
 function validate(d: Draft) {
   const errors: Partial<Record<keyof Draft, string>> = {};
-  if (!d.name.trim()) errors.name = 'Name is required.';
-  if (d.mobile.replace(/\D/g, '').length < 10) errors.mobile = 'Enter a valid mobile number.';
-  if (d.email && !/^\S+@\S+\.\S+$/.test(d.email)) errors.email = 'Enter a valid email.';
+  if (d.name.trim().length < 2) errors.name = 'Name is required.';
+  if (!/^\S+@\S+\.\S+$/.test(d.email.trim())) errors.email = 'Enter a valid email.';
+  if (!/^\+\d{1,4}$/.test(d.country_code.trim())) errors.country_code = 'Like +91';
+  if (!/^\d{7,15}$/.test(d.mobile.trim())) errors.mobile = 'Enter a valid mobile number.';
   return errors;
 }
 
-/** Add a member, or edit one when `member` is given. */
-export function MemberForm({ open, onOpenChange, member }: { open: boolean; onOpenChange: (open: boolean) => void; member?: Member }) {
-  const create = useCreateMember();
-  const update = membersHooks.useUpdate();
-  const [draft, setDraft] = useState<Draft>(EMPTY);
+/** Only the fields that changed are sent (PUT /admin/members/:id); a role change goes to its own API */
+function changesOf(before: Draft, after: Draft): MemberChanges {
+  const changes: MemberChanges = {};
+  if (after.name.trim() !== before.name) changes.username = after.name.trim();
+  if (after.email.trim().toLowerCase() !== before.email) changes.email = after.email.trim().toLowerCase();
+  if (after.mobile.trim() !== before.mobile || after.country_code.trim() !== before.country_code) {
+    changes.country_code = after.country_code.trim();
+    changes.mobile_number = after.mobile.trim();
+  }
+  if (after.member_code.trim() !== before.member_code) changes.member_code = after.member_code.trim();
+  if (after.address.trim() !== before.address) changes.address = after.address.trim();
+  return changes;
+}
+
+/** Edit a member's details (members join through the app, so there is no "add" here) */
+export function MemberForm({ open, onOpenChange, member }: { open: boolean; onOpenChange: (open: boolean) => void; member?: AdminMember }) {
+  const edit = useEditMember();
+  const [draft, setDraft] = useState<Draft | null>(null);
   const [errors, setErrors] = useState<ReturnType<typeof validate>>({});
 
   useEffect(() => {
-    if (!open) return;
-    setErrors({});
-    setDraft(
-      member
-        ? { ...EMPTY, ...member, gender: member.gender ?? 'Male', dob: member.dob ?? '', photo: member.photo ?? null }
-        : { ...EMPTY, joinedOn: todayISO() },
-    );
+    if (open && member) {
+      setDraft(toDraft(member));
+      setErrors({});
+    }
   }, [open, member]);
 
-  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => ({ ...d, [key]: value }));
+  if (!member || !draft) return null;
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => (d ? { ...d, [key]: value } : d));
 
   const submit = () => {
     const found = validate(draft);
     setErrors(found);
     if (Object.keys(found).length) return;
-    const body = { ...draft, name: draft.name.trim(), email: draft.email.trim() };
-    const done = { onSuccess: () => onOpenChange(false) };
-    if (member) update.mutate({ id: member.id, changes: body }, done);
-    else create.mutate({ ...body, notes: '' }, done);
+    const before = toDraft(member);
+    const role = draft.role !== before.role ? draft.role : undefined;
+    edit.mutate({ id: member.id, changes: changesOf(before, draft), role }, { onSuccess: () => onOpenChange(false) });
   };
 
   return (
     <FormDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={member ? `Edit ${member.name}` : 'Add Member'}
-      description={member ? `Member ID ${member.memberId}` : 'A member ID is given automatically.'}
-      submitLabel={member ? 'Save Changes' : 'Add Member'}
-      pending={create.isPending || update.isPending}
+      title={`Edit ${memberName(member)}`}
+      description={member.member_code ? `Member code ${member.member_code}` : 'No member code yet'}
+      submitLabel="Save Changes"
+      pending={edit.isPending}
       onSubmit={submit}
       className="max-w-2xl"
     >
@@ -78,43 +82,27 @@ export function MemberForm({ open, onOpenChange, member }: { open: boolean; onOp
         <Field label="Full Name" error={errors.name}>
           <Input value={draft.name} onChange={(e) => set('name', e.target.value)} autoFocus />
         </Field>
-        <Field label="Mobile Number" error={errors.mobile}>
-          <Input value={draft.mobile} onChange={(e) => set('mobile', e.target.value)} inputMode="tel" />
-        </Field>
         <Field label="Email Address" error={errors.email}>
           <Input type="email" value={draft.email} onChange={(e) => set('email', e.target.value)} />
         </Field>
-        <Field label="Date of Birth">
-          <Input type="date" value={draft.dob} onChange={(e) => set('dob', e.target.value)} max={todayISO()} />
+        <Field label="Mobile Number" error={errors.country_code || errors.mobile}>
+          <div className="flex gap-2">
+            <Input className="w-20" value={draft.country_code} onChange={(e) => set('country_code', e.target.value)} aria-label="Country code" />
+            <Input className="flex-1" value={draft.mobile} onChange={(e) => set('mobile', e.target.value.replace(/\D/g, ''))} inputMode="tel" aria-label="Mobile number" />
+          </div>
         </Field>
-        <Field label="Gender">
-          <NativeSelect value={draft.gender} onChange={(e) => set('gender', e.target.value as Draft['gender'])}>
-            <option>Male</option>
-            <option>Female</option>
-            <option>Other</option>
-          </NativeSelect>
+        <Field label="Member Code">
+          <Input value={draft.member_code} onChange={(e) => set('member_code', e.target.value)} placeholder="e.g. GM025" />
         </Field>
-        <Field label="Join Date">
-          <Input type="date" value={draft.joinedOn} onChange={(e) => set('joinedOn', e.target.value)} />
-        </Field>
-        <Field label="Member Type">
-          <NativeSelect value={draft.type} onChange={(e) => set('type', e.target.value as Draft['type'])}>
-            <option value="Normal">Normal</option>
-            <option value="Executive">Executive</option>
-          </NativeSelect>
-        </Field>
-        <Field label="Status">
-          <NativeSelect value={draft.status} onChange={(e) => set('status', e.target.value as Draft['status'])}>
-            <option>Active</option>
-            <option>Inactive</option>
+        <Field label="Role">
+          <NativeSelect value={draft.role} onChange={(e) => set('role', e.target.value as Draft['role'])}>
+            <option value="member">Member</option>
+            <option value="executive">Executive</option>
           </NativeSelect>
         </Field>
       </div>
       <Field label="Residential Address">
         <Textarea value={draft.address} onChange={(e) => set('address', e.target.value)} rows={2} />
-      </Field>
-      <Field label="Profile Photo">
-        <FileUpload value={draft.photo} onChange={(url) => set('photo', url)} accept="image/*" label="Upload photo" />
       </Field>
     </FormDialog>
   );

@@ -2,8 +2,9 @@ import { useEffect, useRef } from 'react';
 import { Animated, Easing, Modal, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { LOGO } from '../../config';
-import { colors, fontFor, spacing, type Language } from '../../theme';
+import { colors, fontFor, spacing, type Language, themedStyles } from '../../theme';
 import { sineLoop } from '../../utils/animation';
+import { useT } from '../../i18n';
 
 type Props = {
   visible: boolean;
@@ -20,6 +21,7 @@ const LOGO_SIZE = SIZE - 22;
 
 /** Full-screen overlay: the society logo inside a spinning gold ring. */
 export default function Loader({ visible, message, language }: Props) {
+  const t = useT();
   const spin = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(0)).current;
 
@@ -74,14 +76,14 @@ export default function Loader({ visible, message, language }: Props) {
               resizeMode="contain"
             />
           </View>
-          <Text style={[styles.message, { fontFamily: fontFor(language) }]}>{message}</Text>
+          <Text style={[styles.message, { fontFamily: fontFor(language) }]}>{message ? t(message) : message}</Text>
         </View>
       </View>
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   container: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.backdrop },
   card: {
     alignItems: 'center',
@@ -104,4 +106,4 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     textAlign: 'center',
   },
-});
+}));
