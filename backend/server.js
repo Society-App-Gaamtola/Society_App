@@ -18,8 +18,10 @@ const app = express();
 // Render puts a proxy in front: take the visitor's IP from X-Forwarded-For (activity log)
 app.set("trust proxy", 1);
 
-// Health check for Render / uptime monitors: no api-key, no database
-app.get("/health", (req, res) => res.json({ status: "ok" }));
+// Health / wake-up route for Render and uptime monitors (e.g. a ping every 10 minutes keeps the free plan awake).
+// Registered before everything else: no api-key, no token, no rate limit and never a database query,
+// so pinging it costs the database nothing (Neon can keep sleeping)
+app.get("/health", (req, res) => res.json({ status: "ok", uptime_seconds: Math.round(process.uptime()) }));
 
 app.use(cors({
   origin: constant.ADMIN_PANEL_URL, 

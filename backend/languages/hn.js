@@ -44,6 +44,7 @@ const hi = {
 	rest_user_email_not_found: "यह ईमेल पंजीकृत नहीं है",
 	rest_keywords_otp_sent: "OTP सफलतापूर्वक भेजा गया",
 	rest_otp_wait_before_resend: "नया OTP माँगने से पहले कृपया प्रतीक्षा करें",
+	rest_too_many_requests: "बहुत अधिक प्रयास हो गए। कृपया कुछ मिनट रुककर फिर से कोशिश करें",
 	rest_invalid_otp: "अमान्य OTP",
 	rest_expired_otp: "OTP की समय-सीमा समाप्त हो गई है। कृपया नया OTP माँगें",
 	rest_otp_attempts_exceeded: "बहुत अधिक गलत प्रयास। कृपया नया OTP माँगें",

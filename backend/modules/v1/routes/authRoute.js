@@ -18,14 +18,16 @@ const {
 
 const authRoutes = express.Router();
 
-// Public (listed in constant.BYPASS_ROUTES)
-authRoutes.post("/signup", middleware.validateJoi(signupSchema), authController.signUp);
+// Public (listed in constant.BYPASS_ROUTES). Rate limited first (constant.RATE_LIMITS, no database query)
+const { authLimits } = middleware;
 
-authRoutes.post("/login", middleware.validateJoi(loginSchema), authController.login);
+authRoutes.post("/signup", authLimits.ip, authLimits.otpSend, middleware.validateJoi(signupSchema), authController.signUp);
 
-authRoutes.post("/send-otp", middleware.validateJoi(sendOtpSchema), authController.sendOtp);
+authRoutes.post("/login", authLimits.ip, authLimits.login, middleware.validateJoi(loginSchema), authController.login);
 
-authRoutes.post("/verify-otp", middleware.validateJoi(verifyOtpSchema), authController.verifyOtp);
+authRoutes.post("/send-otp", authLimits.ip, authLimits.otpSend, middleware.validateJoi(sendOtpSchema), authController.sendOtp);
+
+authRoutes.post("/verify-otp", authLimits.ip, authLimits.otpVerify, middleware.validateJoi(verifyOtpSchema), authController.verifyOtp);
 
 authRoutes.delete("/logout", authController.logout);
 

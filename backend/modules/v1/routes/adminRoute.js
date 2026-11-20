@@ -23,7 +23,8 @@ const settingsSection = [executives, middleware.requirePermission("settings")];
 const adminRoutes = express.Router();
 
 // Public (listed in constant.BYPASS_ROUTES). Body: email, password. Logout is the shared DELETE /auth/logout
-adminRoutes.post("/login", middleware.validateJoi(loginSchema), adminController.login);
+// Rate limited first, together with the app's /auth/login (constant.RATE_LIMITS, no database query)
+adminRoutes.post("/login", middleware.authLimits.ip, middleware.authLimits.login, middleware.validateJoi(loginSchema), adminController.login);
 
 // Cards, pending counts and the monthly chart. ?from_date=&to_date= (optional)
 adminRoutes.get("/dashboard", superAdmin, middleware.validateJoi(dashboardSchema, true), adminController.getDashboard);

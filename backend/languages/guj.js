@@ -44,6 +44,7 @@ const gu = {
 	rest_user_email_not_found: "આ ઇમેઇલ નોંધાયેલ નથી",
 	rest_keywords_otp_sent: "OTP સફળતાપૂર્વક મોકલાયો",
 	rest_otp_wait_before_resend: "નવો OTP માંગતા પહેલાં કૃપા કરીને રાહ જુઓ",
+	rest_too_many_requests: "ઘણા બધા પ્રયાસો થયા. કૃપા કરીને થોડી મિનિટ રાહ જોઈને ફરી પ્રયાસ કરો",
 	rest_invalid_otp: "અમાન્ય OTP",
 	rest_expired_otp: "OTPની સમયમર્યાદા પૂરી થઈ ગઈ છે. કૃપા કરીને નવો OTP માંગો",
 	rest_otp_attempts_exceeded: "ઘણા બધા ખોટા પ્રયાસો. કૃપા કરીને નવો OTP માંગો",

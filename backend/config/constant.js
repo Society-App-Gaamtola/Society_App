@@ -52,6 +52,18 @@ export default {
         "/api/v1/admin/login",
     ],
 
+    // ---------- Rate limits (public auth routes; counted in the server's memory, never in the database) ----------
+    // AUTH_IP: every login / sign-up / OTP request from one IP, all routes together (stops floods)
+    // LOGIN, OTP_SEND, OTP_VERIFY: per IP + the email or mobile number the request is for, so one person can't
+    // guess passwords / OTPs or fill a mailbox, while other users on the same network are not blocked
+    // Too many → HTTP 429, code 0, rest_too_many_requests, data { retry_after_seconds }
+    RATE_LIMITS: {
+        AUTH_IP: { window_minutes: 15, max: 100 },
+        LOGIN: { window_minutes: 15, max: 10 },     // POST /auth/login, /admin/login
+        OTP_SEND: { window_minutes: 60, max: 5 },   // POST /auth/signup, /auth/send-otp (each sends an email)
+        OTP_VERIFY: { window_minutes: 15, max: 10 }, // POST /auth/verify-otp
+    },
+
     // ---------- Auth ----------
     TOKEN_EXPIRY_DAYS: 365,
     BCRYPT_ROUNDS: 10,

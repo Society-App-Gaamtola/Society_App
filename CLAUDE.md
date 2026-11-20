@@ -144,8 +144,18 @@ backend/
    401 `rest_role_changed_login_again`. Sets `req.loginUser = { id, role, name, email, country_code, mobile_number }`.
    Then each route's `allowedRoles` checks that role (no query). Keep it to one query: it runs on every request.
 
-Before all of this: `app.set("trust proxy", 1)` (Render's proxy) and `GET /health` → `{ status: "ok" }` (no api-key,
-no database; for Render's health check / an uptime monitor).
+Before all of this: `app.set("trust proxy", 1)` (Render's proxy) and `GET /health` → `{ status: "ok", uptime_seconds }`
+(no api-key, no token, no rate limit, **never a database query**). It is the wake-up / keep-awake route for Render's
+health check and an uptime monitor (a ping every 10 minutes keeps the free plan awake; Neon can still sleep).
+
+**Rate limits** on the public auth routes (`middleware.authLimits`, `express-rate-limit`, settings in
+`constant.RATE_LIMITS`). The counts are in the server's memory, never the database, and a refused request stops
+before `validateJoi` / the module. Too many → **HTTP 429**, code 0, `rest_too_many_requests`, `data: { retry_after_seconds }`.
+- `ip` (`AUTH_IP`, 100 / 15 min per IP, all routes together): on signup, login, send-otp, verify-otp, admin login.
+- `login` (10 / 15 min), `otpSend` (5 / hour: signup, send-otp), `otpVerify` (10 / 15 min). Each counts per
+  IP + email / mobile, so other users on the same network aren't blocked. `/auth/login` and `/admin/login` share one count.
+- The counts reset when the server restarts, and each server keeps its own (one server today).
+- In a route the limiters come first: `router.post("/login", authLimits.ip, authLimits.login, validateJoi(...), ...)`.
 
 Load safety (do not remove):
 - `db.js`: the pool has an `error` listener. Neon closes idle connections, and without the listener Node would crash.
@@ -175,6 +185,7 @@ Every response is HTTP 200 with this body, unless noted otherwise:
 | `5` | Logged in but profile not finished → app opens Profile & Address (token returned) | `authModule.sendLoginResponse` |
 | `-1` | Missing/invalid API key or token, logged out device, inactive account. **HTTP 401** | `checkApi`, `tokenMiddleware` |
 | `0` + **HTTP 403** | Logged in but the role is not allowed | `allowedRoles` |
+| `0` + **HTTP 429** | Too many login / sign-up / OTP requests (rate limit). `data` = `{ retry_after_seconds }` | `middleware.authLimits` |
 | `0` + **HTTP 500** | Unexpected error (logged with the function name) | `middleware.sendServerError(res, "fnName", error)` |
 
 Lists always return `{ <items>: [...], pagination }`, where

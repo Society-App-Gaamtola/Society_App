@@ -44,6 +44,7 @@ const en = {
 	rest_user_email_not_found: "This email is not registered",
 	rest_keywords_otp_sent: "OTP sent successfully",
 	rest_otp_wait_before_resend: "Please wait before requesting a new OTP",
+	rest_too_many_requests: "Too many attempts. Please wait a few minutes and try again",
 	rest_invalid_otp: "Invalid OTP",
 	rest_expired_otp: "OTP has expired. Please request a new one",
 	rest_otp_attempts_exceeded: "Too many wrong attempts. Please request a new OTP",

@@ -1,6 +1,7 @@
 import localizify from "localizify";
 import CryptoJS from "crypto-js";
 import jwt from "jsonwebtoken";
+import { rateLimit, ipKeyGenerator } from "express-rate-limit";
 import Codes from "../config/status_codes.js";
 import common from "../config/common.js";
 import constant from "../config/constant.js";
@@ -252,6 +253,35 @@ const allowedRoles = (...roles) => {
     };
 };
 
+// The email or mobile number a public auth request is for (the body is already decrypted here)
+const authIdentifier = (req) => {
+    const { email, country_code = "", mobile_number = "" } = req.body || {};
+    return String(email || `${country_code}${mobile_number}`).trim().toLowerCase();
+};
+
+// Refuses a request once its key has used up the rule (constant.RATE_LIMITS.X) in the time window.
+// The counts live in this server's memory: no database query. perAccount = count per IP + email / mobile
+// instead of per IP. Too many → HTTP 429, code 0, data { retry_after_seconds }
+const rateLimiter = (rule, perAccount = false) => rateLimit({
+    windowMs: rule.window_minutes * 60 * 1000,
+    limit: rule.max,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    keyGenerator: (req) => (perAccount ? `${ipKeyGenerator(req.ip)}|${authIdentifier(req)}` : ipKeyGenerator(req.ip)),
+    handler: (req, res) => sendApiResponse(res, Codes.TOO_MANY_REQUESTS, Codes.RESPONSE_ERROR, "rest_too_many_requests", {
+        retry_after_seconds: Math.max(1, Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000)),
+    }),
+});
+
+// One instance each, shared by every route that uses it (so /auth/login and /admin/login count together).
+// In a route, before validateJoi: router.post("/login", authLimits.ip, authLimits.login, validateJoi(...), ...)
+const authLimits = {
+    ip: rateLimiter(constant.RATE_LIMITS.AUTH_IP),
+    login: rateLimiter(constant.RATE_LIMITS.LOGIN, true),
+    otpSend: rateLimiter(constant.RATE_LIMITS.OTP_SEND, true),
+    otpVerify: rateLimiter(constant.RATE_LIMITS.OTP_VERIFY, true),
+};
+
 const checkApi = (req, res, next) => {
     const apiKey = req.headers['api-key'];
     if (!apiKey || apiKey !== process.env.API_KEY) {
@@ -281,5 +311,6 @@ export default {
     tokenMiddleware,
     allowedRoles,
     requirePermission,
+    authLimits,
     checkApi,
 };
