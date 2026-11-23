@@ -198,7 +198,12 @@ function useDonationQuery(): DonationQuery {
 export default function DonationsPage() {
   const url = useUrlState();
   const { data: settings } = useAppSettings();
-  const societyName = settings?.settings.society_name;
+  // Receipts carry App Settings' name, phone(s), address and logo
+  const s = settings?.settings;
+  const society = useMemo(
+    () => ({ name: s?.society_name, phone: s?.phone, address: s?.address, logoUrl: s?.logo_url }),
+    [s?.society_name, s?.phone, s?.address, s?.logo_url],
+  );
   const query = useDonationQuery();
   const list = useDonationsPage(query);
   const setStatus = useDonationStatus();
@@ -208,7 +213,7 @@ export default function DonationsPage() {
   const [deleting, setDeleting] = useState<Donation | null>(null);
   const summary = list.data?.summary;
 
-  const receipt = (d: Donation) => exportDonationReceipt(d, { societyName, modeLabel: methodLabel, statusLabel: donationStatusLabel });
+  const receipt = (d: Donation) => exportDonationReceipt(d, { society, modeLabel: methodLabel, statusLabel: donationStatusLabel });
 
   const columns = useMemo<Column<Donation>[]>(
     () => [
@@ -256,7 +261,7 @@ export default function DonationsPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [setStatus, societyName],
+    [setStatus, society],
   );
 
   /** Every donation matching the filters, read page by page */

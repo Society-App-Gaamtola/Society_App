@@ -41,6 +41,8 @@ const eventSchema = Joi.object({
   publish_at: futureTime.when("action", { is: EVENT_ACTIONS.SCHEDULE, then: Joi.required(), otherwise: Joi.strip() }),
   // Create only: the Event Planning plan this event is made from (it becomes "converted" and links to the event)
   plan_id: id.allow(null),
+  // Publish and Share: also email the event to every member when it goes live (post now, or when scheduled)
+  email_members: Joi.boolean().default(false),
 }).and("latitude", "longitude").messages({ "object.and": "latitude and longitude must be sent together" });
 
 // ---------- Notices ----------
@@ -48,13 +50,16 @@ const eventSchema = Joi.object({
 const noticeSchema = Joi.object({
   title: Joi.string().trim().max(constant.TITLE_MAX_LENGTH).required(),
   body: Joi.string().trim().max(constant.DESCRIPTION_MAX_LENGTH).required(),
-  tag: Joi.string().trim().lowercase().valid(...constant.NOTICE_TAGS).default("general"),
+  // One of App Settings' notice_tags (checked in the module: the list can change). Left out = the first one
+  tag: Joi.string().trim().lowercase().max(constant.NOTICE_TAG_MAX_LENGTH),
   event_id: id.allow(null),
   audience: Joi.string().valid(...Object.values(NOTICE_AUDIENCE)).default(NOTICE_AUDIENCE.ALL),
   recipient_ids: Joi.array().items(id).unique().min(1).max(constant.MAX_NOTICE_RECIPIENTS)
     .when("audience", { is: NOTICE_AUDIENCE.SELECTED, then: Joi.required(), otherwise: Joi.strip() }),
   action: Joi.string().valid(...Object.values(NOTICE_ACTIONS)).required(),
   publish_at: futureTime,
+  // Publish and Share: also email the notice to its members when it goes live
+  email_members: Joi.boolean().default(false),
 });
 
 // ---------- Media (gallery moderation) ----------

@@ -6,11 +6,12 @@ import { colors, fonts, tones, themedStyles } from '../theme';
 import { REPORT_MIME_TYPES } from '../config';
 import { saveReportRecord } from '../api/executive';
 import { Ionicons, MaterialCommunityIcons, type McIconName } from '../icons';
-import { makeDonationReport, REPORT_API_TYPE } from '../services/reportExport';
+import { makeReport, REPORT_API_TYPE } from '../services/reportExport';
 import type { DateRange, ReportFormat, ReportType } from '../types';
 import { formatRange, toIsoDay } from '../utils/date';
 import { AppHeader, DateRangeButton, FieldLabel, OrDivider, PermissionGate, PrimaryButton } from '../components';
 import DateRangeSheet from '../components/sheets/DateRangeSheet';
+import { useT } from '../i18n';
 
 /** This month, the default period */
 export const thisMonth = (): DateRange => {
@@ -22,6 +23,8 @@ const REPORT_TYPES: { type: ReportType; icon: McIconName }[] = [
   { type: 'Donation Summary', icon: 'chart-pie' },
   { type: 'Transaction History', icon: 'format-list-bulleted' },
   { type: 'Member-wise Report', icon: 'account-group-outline' },
+  { type: 'Expense Report', icon: 'receipt' },
+  { type: 'Income & Expense Summary', icon: 'scale-balance' },
 ];
 
 const FORMATS: { format: ReportFormat; label: string; icon: McIconName; color: string }[] = [
@@ -29,12 +32,14 @@ const FORMATS: { format: ReportFormat; label: string; icon: McIconName; color: s
   { format: 'Excel', label: 'Excel (Editable)', icon: 'file-excel-box', color: tones.success.text },
 ];
 
-const INCLUDES = [
-  'Total donation amount and count',
-  'Category-wise breakdown',
-  'Payment method-wise summary',
-  'Monthly trend and charts',
-];
+/** What each report contains (the "Report Includes" box) */
+const INCLUDES: Record<ReportType, string[]> = {
+  'Donation Summary': ['Total donation amount and count', 'Category-wise breakdown', 'Payment method-wise summary', 'Monthly trend and charts'],
+  'Transaction History': ['Total donation amount and count', 'Every donation with donor, mode and status'],
+  'Member-wise Report': ['Total donation amount and count', 'Donations per member'],
+  'Expense Report': ['Verified expense total and count', 'Category-wise spending', 'Payment mode summary', 'Every expense with its status'],
+  'Income & Expense Summary': ['Income, expenses and balance', 'Income and expenses by category', 'Month by month totals', 'Entries waiting for verification'],
+};
 
 const last30Days = (): DateRange => {
   const end = new Date();
@@ -54,6 +59,7 @@ export default function ExportReportsScreen() {
 }
 
 function ExportReports() {
+  const t = useT();
   const [type, setType] = useState<ReportType>('Donation Summary');
   const [range, setRange] = useState<DateRange>(thisMonth);
   const [rangeOpen, setRangeOpen] = useState(false);
@@ -66,16 +72,16 @@ function ExportReports() {
     setRunning(job);
     setSuccess(false);
     try {
-      // Built from the server's donation entries for the period
-      const { uri } = await makeDonationReport(type, reportRange, reportFormat);
+      // Built on the phone from the server's entries for the period
+      const { uri } = await makeReport(type, reportRange, reportFormat);
       // Listed under "Recent Reports" (here and in the admin panel); the file is built again when opened
       saveReportRecord({ report_type: REPORT_API_TYPE[type], from_date: reportRange.start, to_date: reportRange.end }).catch(() => {});
       setSuccess(true);
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { mimeType: REPORT_MIME_TYPES[reportFormat], dialogTitle: type });
+        await Sharing.shareAsync(uri, { mimeType: REPORT_MIME_TYPES[reportFormat], dialogTitle: t(type) });
       }
     } catch (e) {
-      Alert.alert('Export failed', e instanceof Error ? e.message : 'Could not generate the report. Please try again.');
+      Alert.alert(t('Export failed'), e instanceof Error ? e.message : t('Could not generate the report. Please try again.'));
     } finally {
       setRunning(null);
     }
@@ -85,23 +91,23 @@ function ExportReports() {
     <View style={common.screen}>
       <AppHeader leftType="back" rightIcons={['bell', 'avatar']} />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={common.heading}>Export Reports</Text>
-        <Text style={common.subtext}>Generate and export donation reports.</Text>
+        <Text style={common.heading}>{t('Export Reports')}</Text>
+        <Text style={common.subtext}>{t('Generate and export donation and expense reports.')}</Text>
 
         <FieldLabel text="Report Type" style={styles.label} />
-        <View style={styles.tiles}>
-          {REPORT_TYPES.map((t) => {
-            const active = t.type === type;
+        <View style={styles.typeTiles}>
+          {REPORT_TYPES.map((r) => {
+            const active = r.type === type;
             return (
               <Pressable
-                key={t.type}
-                onPress={() => setType(t.type)}
-                style={[styles.tile, active && styles.tileActive]}
+                key={r.type}
+                onPress={() => setType(r.type)}
+                style={[styles.tile, styles.typeTile, active && styles.tileActive]}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: active }}
               >
-                <MaterialCommunityIcons name={t.icon} size={24} color={active ? colors.primary : colors.mutedIcon} />
-                <Text style={[styles.tileLabel, active && styles.tileLabelActive]}>{t.type}</Text>
+                <MaterialCommunityIcons name={r.icon} size={24} color={active ? colors.primary : colors.mutedIcon} />
+                <Text style={[styles.tileLabel, active && styles.tileLabelActive]}>{t(r.type)}</Text>
               </Pressable>
             );
           })}
@@ -123,7 +129,7 @@ function ExportReports() {
                 accessibilityState={{ selected: active }}
               >
                 <MaterialCommunityIcons name={f.icon} size={26} color={f.color} />
-                <Text style={[styles.tileLabel, active && styles.tileLabelActive]}>{f.label}</Text>
+                <Text style={[styles.tileLabel, active && styles.tileLabelActive]}>{t(f.label)}</Text>
               </Pressable>
             );
           })}
@@ -132,12 +138,12 @@ function ExportReports() {
         <View style={styles.includes}>
           <View style={styles.includesHeader}>
             <Ionicons name="information-circle-outline" size={18} color={colors.warning} />
-            <Text style={styles.includesTitle}>Report Includes</Text>
+            <Text style={styles.includesTitle}>{t('Report Includes')}</Text>
           </View>
-          {INCLUDES.map((item) => (
+          {INCLUDES[type].map((item) => (
             <View key={item} style={styles.includeRow}>
               <Ionicons name="checkmark-circle" size={12} color={tones.success.text} />
-              <Text style={styles.includeText}>{item}</Text>
+              <Text style={styles.includeText}>{t(item)}</Text>
             </View>
           ))}
         </View>
@@ -155,15 +161,16 @@ function ExportReports() {
           <View style={styles.success}>
             <Ionicons name="checkmark-circle" size={22} color={tones.success.text} />
             <View style={common.flex}>
-              <Text style={styles.successTitle}>Report exported successfully!</Text>
-              <Text style={styles.successText}>Your report has been generated and is ready to download.</Text>
+              <Text style={styles.successTitle}>{t('Report exported successfully!')}</Text>
+              <Text style={styles.successText}>{t('Your report has been generated and is ready to download.')}</Text>
             </View>
           </View>
         ) : null}
 
         <OrDivider style={styles.or} />
 
-        <Text style={styles.quickTitle}>Quick Download (Last 30 Days)</Text>
+        <Text style={styles.quickTitle}>{t('Quick Download (Last 30 Days)')}</Text>
+        <Text style={styles.quickHint}>{t('The report type picked above, for the last 30 days.')}</Text>
         <View style={styles.quickRow}>
           {FORMATS.map((f) => {
             const job: Job = `quick-${f.format}`;
@@ -185,7 +192,7 @@ function ExportReports() {
                 ) : (
                   <>
                     <MaterialCommunityIcons name={f.icon} size={20} color={f.color} />
-                    <Text style={[styles.quickText, { color: f.color }]}>Download {f.format}</Text>
+                    <Text style={[styles.quickText, { color: f.color }]}>{t('Download {format}', { format: f.format })}</Text>
                   </>
                 )}
               </Pressable>
@@ -215,6 +222,9 @@ const styles = themedStyles(() => ({
   label: { marginTop: 18, marginBottom: 8 },
 
   tiles: { flexDirection: 'row', gap: 10 },
+  // Five report types: three per row
+  typeTiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  typeTile: { flexGrow: 1, flexBasis: '30%' },
   tile: {
     ...surface,
     flex: 1,
@@ -261,7 +271,8 @@ const styles = themedStyles(() => ({
 
   or: { marginVertical: 18 },
 
-  quickTitle: { fontFamily: fonts.bold, fontSize: 13, color: colors.textDark, marginBottom: 10 },
+  quickTitle: { fontFamily: fonts.bold, fontSize: 13, color: colors.textDark },
+  quickHint: { fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted, marginTop: 2, marginBottom: 10 },
   quickRow: { flexDirection: 'row', gap: 10 },
   quickButton: {
     flex: 1,

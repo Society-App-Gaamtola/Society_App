@@ -27,13 +27,22 @@ export function FilterBar({
   const [text, setText] = useState(search);
   const setParamsRef = useRef(setParams);
   setParamsRef.current = setParams;
+  // The search this box last put in the URL. The URL updates a moment after router.replace (longer on the live
+  // site): when it catches up with our own older text, the box must not jump back and erase what was typed since
+  const pushedRef = useRef(search);
 
-  // Follow outside changes such as Reset or the top bar search.
-  useEffect(() => setText(search), [search]);
+  // Follow outside changes only, such as Reset or the top bar search
+  useEffect(() => {
+    if (search !== pushedRef.current) setText(search);
+    pushedRef.current = search;
+  }, [search]);
 
   useEffect(() => {
-    if (text === search) return;
-    const timer = setTimeout(() => setParamsRef.current({ search: text }), DEBOUNCE_MS);
+    if (text === pushedRef.current) return;
+    const timer = setTimeout(() => {
+      pushedRef.current = text;
+      setParamsRef.current({ search: text });
+    }, DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [text, search]);
 

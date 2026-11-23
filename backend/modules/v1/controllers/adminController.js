@@ -9,6 +9,9 @@ const adminController = {
         return adminModule.getDashboard(request, res);
     },
 
+    async createMember(request, res) {
+        return adminModule.createMember(request, res);
+    },
     async getActivities(request, res) {
         return adminModule.getActivities(request, res);
     },

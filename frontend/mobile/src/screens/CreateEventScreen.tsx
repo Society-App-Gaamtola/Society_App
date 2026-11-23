@@ -15,6 +15,7 @@ import { Ionicons } from '../icons';
 import type { EventDraft } from '../types';
 import { formatDate, formatTime, fromIsoDay, startOfDay, toIsoDay } from '../utils/date';
 import { showToast } from '../utils/toast';
+import { useT } from '../i18n';
 import { digitsOnly } from '../utils/validation';
 import {
   AppHeader,
@@ -53,6 +54,7 @@ export default function CreateEventScreen() {
 }
 
 function CreateEventForm() {
+  const t = useT();
   const navigation = useNavigation<Nav>();
   // A copy to start from (Duplicate in My Events) or the event being edited (editId)
   const { params } = useRoute<RouteProp<HomeStackParamList, 'CreateEvent'>>();
@@ -159,7 +161,7 @@ function CreateEventForm() {
     if (!venue.trim()) next.venue = 'Please enter the venue.';
     setErrors(next);
     if (Object.keys(next).length) {
-      showToast('Add the title, category, date, time and venue to save a draft');
+      showToast(t('Add the title, category, date, time and venue to save a draft'));
       return;
     }
     setSaving(true);
@@ -168,7 +170,7 @@ function CreateEventForm() {
       showToast(message);
       navigation.navigate('MyEvents');
     } catch (e) {
-      Alert.alert('Could not save the draft', e instanceof Error ? e.message : 'Please try again.');
+      Alert.alert(t('Could not save the draft'), e instanceof Error ? e.message : t('Please try again.'));
     } finally {
       setSaving(false);
     }
@@ -176,7 +178,7 @@ function CreateEventForm() {
 
   const onNext = () => {
     if (!validate()) {
-      showToast('Please fill all required fields');
+      showToast(t('Please fill all required fields'));
       return;
     }
     navigation.navigate('EventPreview', { event: buildDraft(), editId });
@@ -187,8 +189,8 @@ function CreateEventForm() {
       <AppHeader leftType="back" rightIcons={['bell', 'avatar']} />
       <KeyboardAvoid>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Text style={common.heading}>{editId ? 'Edit Event' : 'Create New Event'}</Text>
-          <Text style={styles.subtext}>Fill in the event details. Event will be visible to members after publishing.</Text>
+          <Text style={common.heading}>{t(editId ? 'Edit Event' : 'Create New Event')}</Text>
+          <Text style={styles.subtext}>{t('Fill in the event details. Event will be visible to members after publishing.')}</Text>
 
           <FormField label="Event Title" error={errors.title}>
             <InputField placeholder="e.g. Navratri Garba Mahotsav" value={title} {...fieldProps('title', setTitle)} />
@@ -281,7 +283,7 @@ function CreateEventForm() {
           ) : (
             <Pressable onPress={() => setShowEndDate(true)} hitSlop={8} style={styles.addEnd}>
               <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
-              <Text style={styles.addEndText}>Add end date (multi-day event)</Text>
+              <Text style={styles.addEndText}>{t('Add end date (multi-day event)')}</Text>
             </Pressable>
           )}
 

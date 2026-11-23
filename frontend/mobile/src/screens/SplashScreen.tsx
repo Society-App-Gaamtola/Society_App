@@ -3,7 +3,8 @@ import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
-import { LOGO, SOCIETY_NAME_GU_TWO_LINES } from '../config';
+import { LOGO } from '../config';
+import { twoLines, useAppInfo } from '../services/appInfo';
 import { common } from '../styles/common';
 import { colors, fonts, spacing, themedStyles } from '../theme';
 import { useAuth } from '../context/AuthContext';
@@ -34,6 +35,7 @@ const riseStyle = (value: Animated.Value) => ({
 
 export default function SplashScreen({ navigation }: Props) {
   const t = useT();
+  const { society_name_gu: societyName } = useAppInfo();
   const { user } = useAuth();
   const ornaments = useRef(new Animated.Value(0)).current;
   const logo = useRef(new Animated.Value(0)).current;
@@ -110,7 +112,7 @@ export default function SplashScreen({ navigation }: Props) {
             />
           </View>
 
-          <Animated.Text style={[styles.title, riseStyle(title)]}>{SOCIETY_NAME_GU_TWO_LINES}</Animated.Text>
+          <Animated.Text style={[styles.title, riseStyle(title)]}>{twoLines(societyName)}</Animated.Text>
           <Animated.Text style={[styles.subtitle, riseStyle(subtitle)]}>{t('Society Cultural Activity App')}</Animated.Text>
           <Animated.View style={[styles.divider, riseStyle(divider)]}>
             <GoldDivider />

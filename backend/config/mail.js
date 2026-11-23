@@ -83,4 +83,71 @@ const createOtpWmailTemplate = ({ userName = "there", otp, otpType = constant.OT
 `.trim();
 };
 
-export { createOtpWmailTemplate };
+// Text typed by people goes into the HTML as text, never as markup
+const escapeHtml = (text) => String(text ?? "")
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+// "Publish and Share (email)": a new event or notice, mailed to the members (common.emailMembers).
+//   heading  "New Event" / "New Notice";  details  [[label, value]] rows (date, venue…), empty values left out
+const createContentMailTemplate = ({ societyName, heading, title, details = [], body = "" }) => {
+  const rows = details
+    .filter(([, value]) => value)
+    .map(([label, value]) => `
+          <tr>
+            <td style="padding:4px 28px 0;font-size:14px;line-height:1.6;color:#2B1A12;">
+              <strong style="color:#7A1020;">${escapeHtml(label)}:</strong> ${escapeHtml(value)}
+            </td>
+          </tr>`)
+    .join("");
+  const text = body
+    ? `
+          <tr>
+            <td style="padding:14px 28px 0;font-size:15px;line-height:1.6;color:#2B1A12;white-space:pre-line;">${escapeHtml(body)}</td>
+          </tr>`
+    : "";
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light" />
+  <title>${escapeHtml(title)}</title>
+</head>
+<body style="margin:0;padding:0;background:#FFF8EE;font-family:Arial,Helvetica,sans-serif;color:#2B1A12;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#FFF8EE" style="background:#FFF8EE;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#FFFFFF" style="max-width:560px;background:#FFFFFF;border:1px solid #EADFCF;border-radius:12px;border-collapse:separate;">
+          <tr>
+            <td align="center" bgcolor="#7A1020" style="background:#7A1020;border-radius:11px 11px 0 0;border-bottom:3px solid #C9A24A;padding:22px 24px;font-size:20px;font-weight:700;color:#FFFFFF;">
+              ${escapeHtml(societyName)}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 28px 0;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#C9A24A;">${escapeHtml(heading)}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 28px 8px;font-size:21px;font-weight:700;color:#2B1A12;">${escapeHtml(title)}</td>
+          </tr>${rows}${text}
+          <tr>
+            <td style="padding:22px 28px 26px;font-size:13px;line-height:1.6;color:#7A6A5E;">Open the society app for the details.</td>
+          </tr>
+        </table>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;">
+          <tr>
+            <td align="center" style="padding:16px 12px 0;font-size:12px;line-height:1.5;color:#7A6A5E;">
+              You get this email as a member of ${escapeHtml(societyName)}. Please do not reply.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`.trim();
+};
+
+export { createOtpWmailTemplate, createContentMailTemplate };

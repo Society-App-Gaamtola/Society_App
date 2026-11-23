@@ -6,7 +6,7 @@ import { api, type Pagination } from './core/backend';
 type BackendDashboard = {
   counts: { total_members: number; executives: number; active_events: number; total_notices: number };
   money: { total_donations: number; total_expenses: number; balance: number; donation_trend: number | null; expense_trend: number | null };
-  pending: { donations: number; executive_requests: number; media: number; total: number };
+  pending: { donations: number; expenses: number; executive_requests: number; media: number; total: number };
   monthly: { month: string; donations: number; expenses: number }[];
   recent_activities: BackendActivity[];
 };
@@ -18,10 +18,37 @@ export type BackendActivity = {
   text: string;
   target: string | null;
   actor_name: string | null;
+  actor_role: 'super_admin' | 'executive' | 'member' | null;
   table_name: string;
   record_id: number | null;
+  ip_address: string | null;
+  /** Logins: the platform and device model ("android · Pixel 7", "web") */
+  device: string | null;
   created_at: string;
 };
+
+/** GET /admin/activities filters: the Audit Logs screen */
+export type AuditLogQuery = {
+  page: number;
+  limit: number;
+  type: 'changes' | 'logins';
+  area?: string;
+  search?: string;
+  from_date?: string;
+  to_date?: string;
+};
+
+/** The areas the backend can filter by (constant.ACTIVITY_AREAS) */
+export const AUDIT_AREAS = [
+  { value: 'events', label: 'Events & Plans' },
+  { value: 'notices', label: 'Notices' },
+  { value: 'members', label: 'Members & Executives' },
+  { value: 'donations', label: 'Donations' },
+  { value: 'expenses', label: 'Expenses' },
+  { value: 'reports', label: 'Reports' },
+  { value: 'media', label: 'Media' },
+  { value: 'settings', label: 'Settings' },
+];
 
 /** The activity in the shape the dashboard's list shows ("Created event · Diwali Mela · by Kartik") */
 const toAuditLog = (a: BackendActivity): AuditLog => {
@@ -64,7 +91,7 @@ export const dashboardService = {
       monthly: toMonths(data.monthly),
       pendingApprovals: data.pending.total,
       pendingDonations: data.pending.donations,
-      pendingExpenses: 0, // expenses have no approval step in the backend yet
+      pendingExpenses: data.pending.expenses, // cash-book entries waiting for verification
       pendingRequests: data.pending.executive_requests,
       pendingMedia: data.pending.media,
       activities: data.recent_activities.map(toAuditLog),
@@ -75,5 +102,11 @@ export const dashboardService = {
   async listActivities(page: number, pageSize: number) {
     const { data } = await api<{ activities: BackendActivity[]; pagination: Pagination }>('GET', '/admin/activities', { query: { page, limit: pageSize } });
     return { data: data.activities.map(toAuditLog), total: data.pagination.total };
+  },
+
+  /** The Audit Logs screen: changes or logins with filters, times in local time */
+  async auditLogs(query: AuditLogQuery) {
+    const { data } = await api<{ activities: BackendActivity[]; pagination: Pagination }>('GET', '/admin/activities', { query });
+    return { ...data, activities: data.activities.map((a) => ({ ...a, created_at: fromUtc(a.created_at) ?? a.created_at })) };
   },
 };

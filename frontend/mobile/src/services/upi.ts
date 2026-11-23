@@ -1,4 +1,4 @@
-import { SOCIETY_NAME } from '../config';
+import { getSocietyInfo } from './appInfo';
 import type { DonationSettings } from '../api/member';
 
 /** The society's UPI details from the backend (upi_settings); null until the admin adds them. */
@@ -10,7 +10,7 @@ export type UpiDetails = DonationSettings['upi'];
  */
 export const upiPayUrl = (upi: UpiDetails, amount: number, note: string) =>
   upi
-    ? `upi://pay?pa=${encodeURIComponent(upi.upi_id)}&pn=${encodeURIComponent(upi.payee_name || SOCIETY_NAME)}` +
+    ? `upi://pay?pa=${encodeURIComponent(upi.upi_id)}&pn=${encodeURIComponent(upi.payee_name || getSocietyInfo().society_name)}` +
       `&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`
     : null;
 

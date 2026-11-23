@@ -7,9 +7,9 @@ export const MIN_EXECUTIVE_DONATION = 10000;
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5020/api/v1';
 export const API_KEY = process.env.EXPO_PUBLIC_API_KEY ?? '';
 
+/** Defaults until App Settings' names arrive (services/appInfo.ts → useAppInfo / getSocietyInfo) */
 export const SOCIETY_NAME = 'Shri Gamtola Yuvak Mitra Mandal';
 export const SOCIETY_NAME_GU = 'શ્રી ગામટોળા યુવક મિત્ર મંડળ';
-export const SOCIETY_NAME_GU_TWO_LINES = 'શ્રી ગામટોળા\nયુવક મિત્ર મંડળ';
 
 export const LOGO = require('../../assets/logo.png');
 
@@ -51,6 +51,7 @@ export const MAX_PAGE_SIZE = 50;
 
 export const STORAGE_KEYS = {
   language: 'app_language',
+  appInfo: 'app_info', // the society's details from App Settings (services/appInfo.ts)
   deviceId: 'device_id',
 } as const;
 

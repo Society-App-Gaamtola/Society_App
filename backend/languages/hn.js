@@ -52,6 +52,7 @@ const hi = {
 	// Events / notices
 	rest_event_not_found: "कार्यक्रम नहीं मिला",
 	rest_notice_not_found: "सूचना नहीं मिली",
+	rest_notice_tag_invalid: "कृपया सूची में से सूचना की श्रेणी चुनें",
 
 	// Media
 	rest_invalid_media_folder: "यह फ़ाइल सही जगह पर अपलोड नहीं हुई। कृपया फिर से अपलोड करें",
@@ -88,6 +89,7 @@ const hi = {
 
 	// Roles and Executive Requests
 	rest_member_updated: "सदस्य की जानकारी अपडेट हो गई",
+	rest_member_added: "सदस्य जोड़ा गया",
 	rest_member_activated: "सदस्य सक्रिय किया गया",
 	rest_member_deactivated: "सदस्य निष्क्रिय किया गया। वे ऐप से लॉग आउट हो गए हैं",
 	rest_member_deleted: "सदस्य हटा दिया गया",
@@ -128,6 +130,7 @@ const hi = {
 	activity_media_approved: "फ़ोटो / वीडियो स्वीकृत किया",
 	activity_media_rejected: "फ़ोटो / वीडियो अस्वीकार किया",
 	activity_member_joined: "नया सदस्य जुड़ा",
+	activity_member_added: "सदस्य जोड़ा",
 	activity_member_updated: "सदस्य अपडेट किया",
 	activity_member_activated: "सदस्य सक्रिय किया",
 	activity_member_deactivated: "सदस्य निष्क्रिय किया",
@@ -153,6 +156,7 @@ const hi = {
 	activity_report_generated: "रिपोर्ट बनाई",
 	activity_settings_updated: "ऐप सेटिंग्स बदलीं",
 	activity_backup_downloaded: "डेटाबेस बैकअप डाउनलोड किया",
+	activity_login: "लॉग इन किया",
 	rest_donation_saved: "दान सहेजा गया",
 	rest_donation_updated: "दान अपडेट हुआ",
 	rest_donation_deleted: "दान हटाया गया",
@@ -178,6 +182,7 @@ const hi = {
 	notify_admin_donation: "जाँच के लिए नया दान",
 	notify_admin_executive_request: "नया कार्यकारी अनुरोध",
 	notify_admin_media_upload: "स्वीकृति के लिए नया फ़ोटो / वीडियो",
+	notify_admin_expense: "जाँच के लिए नया खर्च",
 	rest_executive_donation_too_low: "दान कम से कम कार्यकारी न्यूनतम राशि होना चाहिए",
 	rest_member_not_found: "सदस्य नहीं मिला",
 	rest_role_updated: "भूमिका अपडेट हो गई",

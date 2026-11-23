@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -6,7 +6,8 @@ import type { HomeStackParamList } from '../navigation/types';
 import { common, surface } from '../styles/common';
 import { colors, fonts, themedStyles } from '../theme';
 import { LIST_PERFORMANCE_PROPS } from '../config/list';
-import { getNotices, toNotice, type ApiNotice } from '../api/user';
+import { getNotices, toNotice } from '../api/user';
+import { noticeTagLabel, refreshAppInfo, useAppInfo } from '../services/appInfo';
 import { usePagedList } from '../hooks/usePagedList';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { Ionicons } from '../icons';
@@ -17,22 +18,21 @@ import { AppHeader, DateRangeButton, EmptyState, FilterChips, IconCircle, Search
 import DateRangeSheet from '../components/sheets/DateRangeSheet';
 import { useT } from '../i18n';
 
-// Chip → the notice tag the API filters on
-const FILTERS = ['All', 'Important', 'General', 'Event'] as const;
-type Filter = (typeof FILTERS)[number];
-const FILTER_TAG: Record<Filter, ApiNotice['tag'] | undefined> = {
-  All: undefined,
-  Important: 'important',
-  General: 'general',
-  Event: 'event',
-};
+const ALL = 'All';
 
 const Separator = () => <View style={styles.separator} />;
 
 export default function NoticeBoardScreen() {
   const t = useT();
   const navigation = useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
-  const [filter, setFilter] = useState<Filter>('All');
+  // Chips: All + App Settings' notice categories; a chip's label → the tag the API filters on
+  const tags = useAppInfo().notice_tags;
+  const filters = useMemo(() => [ALL, ...tags.map(noticeTagLabel)], [tags]);
+  const [filter, setFilter] = useState(ALL);
+  const tagOf = useCallback((label: string) => tags.find((tag) => noticeTagLabel(tag) === label), [tags]);
+  useEffect(() => {
+    refreshAppInfo();
+  }, []);
   const [query, setQuery] = useState('');
   const [range, setRange] = useState<DateRange | null>(null);
   const [rangeOpen, setRangeOpen] = useState(false);
@@ -42,23 +42,23 @@ export default function NoticeBoardScreen() {
     async (page: number) => {
       const { data } = await getNotices(page, {
         search,
-        tag: FILTER_TAG[filter],
+        tag: tagOf(filter),
         from_date: range?.start,
         to_date: range?.end,
       });
       return { items: data.notices.map(toNotice), pagination: data.pagination };
     },
-    [search, filter, range],
+    [search, filter, range, tagOf],
   );
   const { items, loading, loadingMore, refreshing, error, loadMore, refresh } = usePagedList(fetchPage);
 
   // Calendar dots: the days of the shown month that have a notice (same tag filter as the list)
   const noticeDays = useCallback(
     async (month: { start: string; end: string }) => {
-      const { data } = await getNotices(1, { tag: FILTER_TAG[filter], from_date: month.start, to_date: month.end, limit: MAX_PAGE_SIZE });
+      const { data } = await getNotices(1, { tag: tagOf(filter), from_date: month.start, to_date: month.end, limit: MAX_PAGE_SIZE });
       return [...new Set(data.notices.map((n) => toIsoDay(new Date(n.published_at))))];
     },
-    [filter],
+    [filter, tagOf],
   );
 
   const openNotice = useCallback(
@@ -95,7 +95,7 @@ export default function NoticeBoardScreen() {
               onPress={() => setRangeOpen(true)}
               style={styles.range}
             />
-            <FilterChips options={FILTERS} selected={filter} onSelect={setFilter} style={styles.chips} />
+            <FilterChips options={filters} selected={filter} onSelect={setFilter} style={styles.chips} />
           </View>
         }
         ListEmptyComponent={

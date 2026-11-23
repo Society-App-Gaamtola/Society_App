@@ -16,7 +16,8 @@ export const EVENT_STATUS_LABEL: Record<EventStatusCode, string> = {
   cancelled: 'Cancelled',
 };
 export const NOTICE_STATUS_LABEL: Record<NoticeStatusCode, string> = { draft: 'Draft', published: 'Published' };
-export const NOTICE_TAG_LABEL: Record<NoticeTag, string> = { important: 'Important', general: 'General', event: 'Event' };
+/** A notice category (App Settings' notice_tags, stored lowercase) as shown: "garba prasad" → "Garba Prasad" */
+export const noticeTagLabel = (tag: NoticeTag) => tag.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
 
 /** "18:30:00" → "6:30 PM" */
 export function timeLabel(time: string | null) {
@@ -70,6 +71,8 @@ export type EventBody = {
   longitude: number | null;
   action: 'draft' | 'post' | 'schedule';
   publish_at?: string;
+  /** Publish and Share: also email it to every member when it goes live */
+  email_members?: boolean;
 };
 
 export const eventsApi = {
@@ -99,7 +102,8 @@ export type NoticeQuery = {
   to_date?: string;
 };
 
-export type NoticeBody = { title: string; body: string; tag: NoticeTag; action: 'draft' | 'publish' };
+/** email_members: Publish and Share, also email it to the members when it goes live */
+export type NoticeBody = { title: string; body: string; tag: NoticeTag; action: 'draft' | 'publish'; email_members?: boolean };
 
 export const noticesApi = {
   list: async (query: NoticeQuery) => {

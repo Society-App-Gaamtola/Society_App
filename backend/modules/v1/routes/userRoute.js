@@ -8,7 +8,7 @@ import constant from "../../../config/constant.js";
 
 const {
   eventListSchema, noticeListSchema, saveMediaSchema, mediaListSchema, editMediaSchema,
-  notificationListSchema, memberListSchema, donationListSchema, donationSchema, executiveRequestSchema,
+  notificationListSchema, notificationSettingsSchema, memberListSchema, donationListSchema, donationSchema, executiveRequestSchema,
 } = schemas;
 const {
   eventSchema, noticeSchema, reviewSchema, eventStatusSchema, eventFeaturedSchema, noticeStatusSchema, eventPlanSchema, eventPlanListSchema,
@@ -83,6 +83,9 @@ userRoutes.put("/media/:id/review", executives, mediaSection, middleware.validat
 userRoutes.get("/notifications", allUsers, middleware.validateJoi(notificationListSchema, true), userController.getNotifications);
 userRoutes.put("/notifications/read-all", allUsers, userController.readAllNotifications);
 userRoutes.put("/notifications/:id/read", allUsers, userController.readNotification);
+// The app's Settings → Notifications switches (events / notices / payments), saved per user
+userRoutes.get("/notification-settings", allUsers, userController.getNotificationSettings);
+userRoutes.put("/notification-settings", allUsers, middleware.validateJoi(notificationSettingsSchema), userController.saveNotificationSettings);
 
 // Member directory: ?page=&limit=&search=&role=
 userRoutes.get("/members", allUsers, middleware.validateJoi(memberListSchema, true), userController.getMembers);

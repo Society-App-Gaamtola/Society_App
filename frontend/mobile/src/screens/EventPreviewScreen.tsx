@@ -10,7 +10,8 @@ import { Ionicons, type IoniconName } from '../icons';
 import { submitEvent } from '../services/eventSubmit';
 import type { EventBody } from '../api/executive';
 import { formatDate, formatDateTime, formatTime, fromIsoDay, isoDayCount } from '../utils/date';
-import { AppHeader, OutlineButton, PermissionGate, PrimaryButton } from '../components';
+import { AppHeader, Checkbox, OutlineButton, PermissionGate, PrimaryButton } from '../components';
+import { useT } from '../i18n';
 import DatePickerSheet from '../components/sheets/DatePickerSheet';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'EventPreview'>;
@@ -24,17 +25,19 @@ export default function EventPreviewScreen() {
 }
 
 function EventPreview() {
+  const t = useT();
   const navigation = useNavigation<Nav>();
   const { params } = useRoute<RouteProp<HomeStackParamList, 'EventPreview'>>();
   const { event, editId } = params;
   const createdOn = useMemo(() => formatDateTime(new Date()), []);
   const [iosPickerValue, setIosPickerValue] = useState<Date | null>(null);
   const [saving, setSaving] = useState<EventBody['action'] | null>(null);
+  const [emailMembers, setEmailMembers] = useState(false);
 
   const days = event.endDay ? isoDayCount(event.day, event.endDay) : 1;
   const startText = formatDate(fromIsoDay(event.day));
   const dateText = event.endDay
-    ? `${startText} - ${formatDate(fromIsoDay(event.endDay))}${days > 1 ? ` (${days} Days)` : ''}`
+    ? `${startText} - ${formatDate(fromIsoDay(event.endDay))}${days > 1 ? ` (${t('{n} Days', { n: days })})` : ''}`
     : startText;
   const [hour, minute] = event.time.split(':').map(Number);
   const timeText = formatTime(new Date(2000, 0, 1, hour, minute));
@@ -43,10 +46,10 @@ function EventPreview() {
   const finish = async (action: EventBody['action'], publishAt?: Date) => {
     setSaving(action);
     try {
-      const { message } = await submitEvent(event, action, { editId, publishAt });
-      Alert.alert(action === 'schedule' ? 'Event Scheduled' : 'Event', message, [
+      const { message } = await submitEvent(event, action, { editId, publishAt, emailMembers });
+      Alert.alert(t(action === 'schedule' ? 'Event Scheduled' : 'Event'), message, [
         {
-          text: 'OK',
+          text: t('OK'),
           onPress: () => {
             navigation.popToTop();
             navigation.navigate('MyEvents');
@@ -54,7 +57,7 @@ function EventPreview() {
         },
       ]);
     } catch (e) {
-      Alert.alert('Could not save the event', e instanceof Error ? e.message : 'Please try again.');
+      Alert.alert(t('Could not save the event'), e instanceof Error ? e.message : t('Please try again.'));
     } finally {
       setSaving(null);
     }
@@ -64,7 +67,7 @@ function EventPreview() {
 
   const onScheduled = (when: Date) => {
     if (when.getTime() <= Date.now()) {
-      Alert.alert('Invalid time', 'Please choose a time in the future.');
+      Alert.alert(t('Invalid time'), t('Please choose a time in the future.'));
       return;
     }
     finish('schedule', when);
@@ -104,11 +107,11 @@ function EventPreview() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.titleRow}>
           <View style={common.flex}>
-            <Text style={common.heading}>Event Preview</Text>
-            <Text style={common.subtext}>Review event details before posting.</Text>
+            <Text style={common.heading}>{t('Event Preview')}</Text>
+            <Text style={common.subtext}>{t('Review event details before posting.')}</Text>
           </View>
           <View style={styles.readyPill}>
-            <Text style={styles.readyText}>● Ready to Post</Text>
+            <Text style={styles.readyText}>● {t('Ready to Post')}</Text>
           </View>
         </View>
 
@@ -125,7 +128,7 @@ function EventPreview() {
         <InfoRow icon="time-outline" text={timeText} />
         <InfoRow icon="location-outline" text={event.venue} />
 
-        <Text style={styles.section}>About This Event</Text>
+        <Text style={styles.section}>{t('About This Event')}</Text>
         <Text style={styles.description}>{event.description}</Text>
 
         <View style={styles.card}>
@@ -134,16 +137,24 @@ function EventPreview() {
           <DetailRow icon={<Ionicons name="call-outline" size={16} color={colors.primary} />} label="Contact" value={event.contact} />
         </View>
 
-        <Text style={styles.subSection}>Additional Information</Text>
+        <Text style={styles.subSection}>{t('Additional Information')}</Text>
         <View style={styles.card}>
           <DetailRow label="Category" value={event.categoryName} />
           <View style={common.divider} />
           <DetailRow label="Created On" value={createdOn} />
         </View>
 
+        {/* Publish and Share (email): the members get the event by email when it goes live */}
+        <Checkbox
+          checked={emailMembers}
+          onChange={setEmailMembers}
+          label="Also share by email: every member gets this event in their inbox when it goes live"
+          style={styles.emailShare}
+        />
+
         <View style={styles.buttonRow}>
           <OutlineButton title="Edit Event" icon="pencil-outline" onPress={() => navigation.goBack()} style={styles.half} />
-          <PrimaryButton title="Post Event" icon="send" onPress={onPost} loading={saving === 'post'} disabled={!!saving} style={styles.half} />
+          <PrimaryButton title={emailMembers ? 'Post & Share' : 'Post Event'} icon="send" onPress={onPost} loading={saving === 'post'} disabled={!!saving} style={styles.half} />
         </View>
         <OutlineButton title="Schedule for Later" icon="time-outline" onPress={saving ? () => {} : onSchedule} style={styles.schedule} />
       </ScrollView>
@@ -178,10 +189,11 @@ function InfoRow({ icon, text }: { icon: IoniconName; text?: string }) {
 }
 
 function DetailRow({ icon, label, value }: { icon?: ReactNode; label: string; value?: string }) {
+  const t = useT();
   return (
     <View style={styles.detailRow}>
       {icon}
-      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.detailLabel}>{t(label)}</Text>
       <Text style={styles.detailValue}>{value || '—'}</Text>
     </View>
   );
@@ -218,4 +230,5 @@ const styles = themedStyles(() => ({
   buttonRow: { flexDirection: 'row', gap: 10, marginTop: 18 },
   half: { flex: 1, width: 'auto' },
   schedule: { marginTop: 10 },
+  emailShare: { marginTop: 18 },
 }));

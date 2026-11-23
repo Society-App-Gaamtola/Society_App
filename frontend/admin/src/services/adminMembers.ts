@@ -26,6 +26,19 @@ export type MemberChanges = Partial<{
   member_code: string;
 }>;
 
+/** POST /admin/members: a member added by hand. They log in with this email / mobile and password */
+export type NewMember = {
+  username: string;
+  email: string;
+  country_code: string;
+  mobile_number: string;
+  password: string;
+  address?: string;
+  /** Empty = the next GM code */
+  member_code?: string;
+  role: Exclude<MemberRole, 'super_admin'>;
+};
+
 type MemberPage = { members: AdminMember[]; pagination: Pagination };
 
 /** Join and last-login times come as UTC: show them in local time */
@@ -49,6 +62,7 @@ export const adminMembersApi = {
     const { data } = await api<AdminMemberDetails>('GET', `/admin/members/${id}`);
     return { ...data, member: local(data.member) };
   },
+  create: (member: NewMember) => api<{ member: AdminMember }>('POST', '/admin/members', { body: member }),
   edit: (id: number, changes: MemberChanges) => api<{ member: AdminMember }>('PUT', `/admin/members/${id}`, { body: changes }),
   setStatus: (id: number, status: AdminMember['status']) =>
     api<{ member: AdminMember }>('PUT', `/admin/members/${id}/status`, { body: { status } }),

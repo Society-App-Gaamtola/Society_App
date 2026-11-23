@@ -86,7 +86,8 @@ export type Notice = {
   description: string;
   /** The event the notice is about, if any (its venue and map link go into a shared notice) */
   eventId?: string | null;
-  tag: BadgeStatus;
+  /** Important / General / Event, or a category the society added (shown as typed) */
+  tag: BadgeStatus | (string & {});
   icon: IoniconName;
 };
 
@@ -194,7 +195,7 @@ export type Donation = {
 // --- Reports
 
 export type ReportFormat = 'PDF' | 'Excel';
-export type ReportType = 'Donation Summary' | 'Transaction History' | 'Member-wise Report';
+export type ReportType = 'Donation Summary' | 'Transaction History' | 'Member-wise Report' | 'Expense Report' | 'Income & Expense Summary';
 
 /** A report someone generated (GET /admin/reports): the file is built again on the phone when opened */
 export type Report = {

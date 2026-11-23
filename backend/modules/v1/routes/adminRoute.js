@@ -5,7 +5,7 @@ import schemas from "../validation_rules/adminValidation.js";
 import constant from "../../../config/constant.js";
 
 const {
-  loginSchema, dashboardSchema, memberListSchema, memberEditSchema, memberStatusSchema, executiveListSchema, executivePermissionsSchema,
+  loginSchema, dashboardSchema, memberListSchema, memberEditSchema, memberCreateSchema, memberStatusSchema, executiveListSchema, executivePermissionsSchema,
   activityListSchema, donationListSchema, donationSchema, donationStatusSchema, expenseListSchema, expenseSchema, expenseStatusSchema,
   financeSchema, reportDataSchema, reportListSchema, reportSaveSchema, settingsSchema,
 } = schemas;
@@ -28,7 +28,8 @@ adminRoutes.post("/login", middleware.authLimits.ip, middleware.authLimits.login
 
 // Cards, pending counts and the monthly chart. ?from_date=&to_date= (optional)
 adminRoutes.get("/dashboard", superAdmin, middleware.validateJoi(dashboardSchema, true), adminController.getDashboard);
-// The activity log (audit_logs), newest first: ?page=&limit= (the dashboard shows the latest ACTIVITY_DASHBOARD_LIMIT)
+// The activity log (audit_logs), newest first: ?page=&limit=&type=changes|logins&area=&search=&from_date=&to_date=
+// (the Audit Logs screen; the dashboard shows the latest ACTIVITY_DASHBOARD_LIMIT changes)
 adminRoutes.get("/activities", superAdmin, middleware.validateJoi(activityListSchema, true), adminController.getActivities);
 
 // ---------- Members ----------
@@ -36,6 +37,8 @@ adminRoutes.get("/activities", superAdmin, middleware.validateJoi(activityListSc
 adminRoutes.get("/members", superAdmin, middleware.validateJoi(memberListSchema, true), adminController.getMembers);
 // The member + donation summary and latest donations
 adminRoutes.get("/members/:id", superAdmin, adminController.getMemberDetails);
+// Add a member by hand (sign-up already completed, with a password the Super Admin gives them)
+adminRoutes.post("/members", superAdmin, middleware.validateJoi(memberCreateSchema), adminController.createMember);
 // Only the fields sent: username, email, country_code + mobile_number, address, member_code
 adminRoutes.put("/members/:id", superAdmin, middleware.validateJoi(memberEditSchema), adminController.editMember);
 // Body: status (active | suspended). Deactivate / activate

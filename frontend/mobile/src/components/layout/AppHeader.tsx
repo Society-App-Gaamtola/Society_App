@@ -4,7 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/types';
-import { LOGO, SOCIETY_NAME_GU_TWO_LINES } from '../../config';
+import { LOGO } from '../../config';
+import { twoLines, useAppInfo } from '../../services/appInfo';
 import { colors, fonts, setThemeMode, themedStyles, useThemeMode } from '../../theme';
 import { Ionicons } from '../../icons';
 import { useSideDrawer } from './SideDrawer';
@@ -27,6 +28,8 @@ const iconNames = {
 } as const;
 
 export default function AppHeader({ leftType = 'menu', rightIcons = [], onRightPress }: Props) {
+  // App Settings' Gujarati name (saved on the phone, refreshed from the server)
+  const { society_name_gu: societyName } = useAppInfo();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const isFocused = useIsFocused();
@@ -61,7 +64,7 @@ export default function AppHeader({ leftType = 'menu', rightIcons = [], onRightP
             <Image source={LOGO} style={styles.logo} resizeMode="contain" />
           </View>
           <Text style={styles.title} numberOfLines={2}>
-            {SOCIETY_NAME_GU_TWO_LINES}
+            {twoLines(societyName)}
           </Text>
         </View>
 

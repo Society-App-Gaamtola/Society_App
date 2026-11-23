@@ -259,6 +259,8 @@ export const financeApi = {
 
 export type AppSettings = {
   society_name: string;
+  /** The name in Gujarati script (shown above the English one) */
+  society_name_gu: string;
   contact_email: string;
   phone: string;
   address: string;
@@ -273,8 +275,11 @@ export type AppSettings = {
   notify_donation: boolean;
   notify_executive_request: boolean;
   notify_media_upload: boolean;
+  notify_expense: boolean;
   donation_purposes: string[];
   expense_categories: string[];
+  /** Notice categories, lowercase (important / general / event + the society's own) */
+  notice_tags: string[];
   /** Page links opened from the app; "" = not shown */
   social_links: SocialLinks;
   /** When the last database backup was downloaded (set by the backend, not saved from here) */
@@ -291,7 +296,6 @@ export type UpiDetails = { payee_name: string; upi_id: string; qr_image_url: str
 export type SettingsData = {
   settings: AppSettings;
   event_categories: { id: number; code: string; name: string; color: string }[];
-  notice_tags: string[];
   upi: UpiDetails | null;
 };
 export type SettingsChanges = Partial<AppSettings> & { event_categories?: { id?: number; name: string }[]; upi?: UpiDetails | null };

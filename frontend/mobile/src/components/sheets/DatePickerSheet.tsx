@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors, fonts, themedStyles } from '../../theme';
 import ModalSheet from './ModalSheet';
+import { useT } from '../../i18n';
 
 type Props = {
   mode: 'date' | 'time' | 'datetime';
@@ -16,14 +17,15 @@ type Props = {
 
 /** iOS date and time picker in a bottom sheet; Android uses its native dialog instead. */
 export default function DatePickerSheet({ mode, value, minimumDate, maximumDate, doneLabel = 'Done', onChange, onCancel, onDone }: Props) {
+  const t = useT();
   return (
     <ModalSheet visible animationType="slide" onClose={onCancel} style={styles.sheet}>
       <View style={styles.header}>
         <Pressable onPress={onCancel} hitSlop={8}>
-          <Text style={styles.cancel}>Cancel</Text>
+          <Text style={styles.cancel}>{t('Cancel')}</Text>
         </Pressable>
         <Pressable onPress={onDone} hitSlop={8}>
-          <Text style={styles.done}>{doneLabel}</Text>
+          <Text style={styles.done}>{t(doneLabel)}</Text>
         </Pressable>
       </View>
       <DateTimePicker

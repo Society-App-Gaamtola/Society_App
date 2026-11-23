@@ -128,7 +128,7 @@ const userModule = {
                 CASE WHEN e.event_date > CURRENT_DATE THEN 'upcoming'
                      WHEN ${EVENT_LAST_DAY} >= CURRENT_DATE THEN 'ongoing'
                      ELSE 'completed' END AS event_status
-                ${executiveView ? `, e.status, e.publish_at, e.posted_at, e.approved_by, e.approved_at,
+                ${executiveView ? `, e.status, e.publish_at, e.posted_at, e.approved_by, e.approved_at, e.email_members,
                     e.created_by, cu.full_name AS created_by_name, e.created_at, e.updated_at` : ""}
              FROM events e
              JOIN event_categories c ON c.id = e.category_id
@@ -202,7 +202,7 @@ const userModule = {
         const whereSql = where.join(" AND ");
         const { rows, pagination } = await query.fetchPage(
             executiveView
-                ? `SELECT n.id, n.title, n.body, n.tag, n.event_id, n.status, n.audience, n.published_at,
+                ? `SELECT n.id, n.title, n.body, n.tag, n.event_id, n.status, n.audience, n.published_at, n.email_members,
                        (SELECT COUNT(*) FROM notice_recipients r WHERE r.notice_id = n.id) AS recipient_count,
                        n.created_by, cu.full_name AS created_by_name, n.created_at, n.updated_at
                    FROM notices n
@@ -731,6 +731,9 @@ const userModule = {
                 .filter((link) => link.url);
             return middleware.sendSuccess(res, "rest_keywords_success", {
                 society_name: settings.society_name,
+                society_name_gu: settings.society_name_gu,
+                show_gujarati_name: settings.show_gujarati_name,
+                notice_tags: settings.notice_tags, // the notice categories (Post Notice, notice board filter)
                 contact_email: settings.contact_email,
                 phone: settings.phone,
                 address: settings.address,
@@ -739,6 +742,41 @@ const userModule = {
             });
         } catch (error) {
             return middleware.sendServerError(res, "getAppInfo", error);
+        }
+    },
+
+    // ---------- Notification settings (the app's Settings → Notifications) ----------
+
+    // GET /user/notification-settings: { settings: { events, notices, payments } } (true = delivered, the default)
+    async getNotificationSettings(request, res) {
+        try {
+            const [rows] = await db.query(
+                "SELECT notify_events, notify_notices, notify_payments FROM user_profiles WHERE user_id = ?",
+                [request.loginUser.id],
+            );
+            const p = rows[0] ?? { notify_events: 1, notify_notices: 1, notify_payments: 1 };
+            return middleware.sendSuccess(res, "rest_keywords_success", {
+                settings: { events: p.notify_events === 1, notices: p.notify_notices === 1, payments: p.notify_payments === 1 },
+            });
+        } catch (error) {
+            return middleware.sendServerError(res, "getNotificationSettings", error);
+        }
+    },
+
+    // PUT /user/notification-settings: only the switches sent. A switched-off type is no longer delivered to this
+    // user (common.sendNotification); general notices from the society (role changes…) always are
+    async saveNotificationSettings(request, res) {
+        try {
+            const { events, notices, payments } = request.body;
+            const changes = {
+                ...(events !== undefined ? { notify_events: events ? 1 : 0 } : {}),
+                ...(notices !== undefined ? { notify_notices: notices ? 1 : 0 } : {}),
+                ...(payments !== undefined ? { notify_payments: payments ? 1 : 0 } : {}),
+            };
+            await query.upsertQuery("user_profiles", { user_id: request.loginUser.id, ...changes }, ["user_id"]);
+            return this.getNotificationSettings(request, res);
+        } catch (error) {
+            return middleware.sendServerError(res, "saveNotificationSettings", error);
         }
     },
 

@@ -21,7 +21,11 @@ export const toEventDraft = (e: ApiExecEvent): EventDraft => ({
  * Saves the event: a photo picked on the phone is uploaded to Cloudinary first (events/<yyyy>/<mm>), then the event
  * goes to POST /user/events (or PUT for an edit). There is no approval: post = live now, schedule = live later.
  */
-export async function submitEvent(draft: EventDraft, action: EventBody['action'], options: { editId?: number; publishAt?: Date } = {}) {
+export async function submitEvent(
+  draft: EventDraft,
+  action: EventBody['action'],
+  options: { editId?: number; publishAt?: Date; emailMembers?: boolean } = {},
+) {
   let poster: string | null = null;
   if (draft.imageUri) {
     poster = /^https?:\/\//.test(draft.imageUri)
@@ -42,6 +46,8 @@ export async function submitEvent(draft: EventDraft, action: EventBody['action']
     images: poster ? [poster] : [],
     action,
     publish_at: options.publishAt?.toISOString(),
+    // Publish and Share: the members are emailed when it goes live (now, or at the scheduled time)
+    email_members: action !== 'draft' && !!options.emailMembers,
     // A new event made from an Event Planning plan
     plan_id: options.editId ? undefined : draft.planId,
   };

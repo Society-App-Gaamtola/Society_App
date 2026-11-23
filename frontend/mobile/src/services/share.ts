@@ -1,5 +1,5 @@
 import { Linking, Share } from 'react-native';
-import { SOCIETY_NAME } from '../config';
+import { getSocietyInfo } from './appInfo';
 import { googleMapsUrl } from '../components/events/EventMapCard';
 import { t } from '../i18n';
 import type { Notice, SocietyEvent } from '../types';
@@ -31,7 +31,7 @@ export function eventShareText(event: SocietyEvent) {
     event.contact ? `📞 ${t('Contact')}: ${event.contact}` : null,
     event.description ? `\n${clip(event.description)}` : null,
     '',
-    `— ${SOCIETY_NAME}`,
+    `— ${getSocietyInfo().society_name}`,
   ];
   return lines.filter((line) => line !== null).join('\n');
 }
@@ -49,6 +49,6 @@ export function noticeShareText(notice: Notice, event?: SocietyEvent | null) {
       `🗺️ ${googleMapsUrl({ coords: event.coords, venueName: event.venueName ?? event.venue, address: event.address, mapLink: event.mapLink })}`,
     );
   }
-  lines.push('', `— ${SOCIETY_NAME}`);
+  lines.push('', `— ${getSocietyInfo().society_name}`);
   return lines.filter((line, i, all) => !(line === '' && all[i - 1] === '')).join('\n');
 }

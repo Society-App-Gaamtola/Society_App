@@ -99,12 +99,13 @@ function withRange(path: string, params: Record<string, string>, range: { from?:
   return text ? `${path}?${text}` : path;
 }
 
-type PendingCounts = { donations: number; requests: number; media: number };
+type PendingCounts = { donations: number; expenses: number; requests: number; media: number };
 
-/** "Pending Approvals" card: what is waiting, each row opening its approval queue */
+/** "Pending Approvals" card: what is waiting, each row opening its approval queue (the rows add up to the card) */
 function PendingDialog({ open, onOpenChange, counts }: { open: boolean; onOpenChange: (open: boolean) => void; counts: PendingCounts }) {
   const rows: { label: string; count: number; href: string; icon: LucideIcon }[] = [
     { label: 'Donations to verify', count: counts.donations, href: '/donations?status=pending', icon: HandCoins },
+    { label: 'Expenses / cash entries to verify', count: counts.expenses, href: '/expenses?status=pending', icon: ReceiptText },
     { label: 'Executive requests', count: counts.requests, href: '/executives?status=pending', icon: Crown },
     { label: 'Photos / videos to approve', count: counts.media, href: '/media?tab=pending', icon: ImageIcon },
   ];
@@ -182,7 +183,7 @@ export default function DashboardPage() {
           <PendingDialog
             open={showPending}
             onOpenChange={setShowPending}
-            counts={{ donations: data.pendingDonations, requests: data.pendingRequests, media: data.pendingMedia }}
+            counts={{ donations: data.pendingDonations, expenses: data.pendingExpenses, requests: data.pendingRequests, media: data.pendingMedia }}
           />
         </>
       ) : null}

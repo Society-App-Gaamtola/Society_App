@@ -4,6 +4,7 @@ import * as authApi from '../api/auth';
 import type { ApiUser, AuthData } from '../api/auth';
 import { mediaUrl, setSessionExpiredHandler } from '../api/client';
 import { resetToLogin } from '../navigation/navigationRef';
+import { refreshAppInfo } from '../services/appInfo';
 import { endSession, startSession, updateSessionUser } from '../services/session';
 import type { AuthUser, Permission, Permissions } from '../types';
 
@@ -80,6 +81,7 @@ export function AuthProvider({ initialUser = null, children }: { initialUser?: A
     const signedIn = toAuthUser(data.userData);
     await startSession(data.token, signedIn, remember);
     setUser(signedIn);
+    refreshAppInfo(); // the society's names and notice categories (App Settings)
     return signedIn;
   }, []);
 
@@ -92,6 +94,7 @@ export function AuthProvider({ initialUser = null, children }: { initialUser?: A
   const refreshUser = useCallback(async () => {
     const { data } = await authApi.getProfile();
     await updateUser(data.userData);
+    refreshAppInfo();
   }, [updateUser]);
 
   // The saved copy may be out of date (changed on another device, or the admin changed the role), so reload it on

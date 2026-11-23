@@ -1,7 +1,7 @@
 import Joi from "joi";
 import constant from "../../../config/constant.js";
 import { pagination, mediaUrl } from "./userValidation.js";
-import { deviceFields, mobileNumber, email, username, address } from "./authValidation.js";
+import { deviceFields, mobileNumber, email, username, address, newPassword } from "./authValidation.js";
 
 // yyyy-mm-dd, kept as text so no time zone shifts the day
 const day = Joi.date().iso().raw();
@@ -46,6 +46,18 @@ const memberEditSchema = Joi.object({
   .min(1)
   .and("country_code", "mobile_number");
 
+// Add a member by hand (people who don't sign up in the app). They log in with this email / mobile and password
+const memberCreateSchema = Joi.object({
+  username: username.required(),
+  email: email.required(),
+  country_code: Joi.string().trim().pattern(/^\+\d{1,4}$/).default(constant.DEFAULT_COUNTRY_CODE),
+  mobile_number: mobileNumber.required(),
+  password: newPassword.required(),
+  address: address.allow("", null),
+  member_code: Joi.string().trim().max(constant.MEMBER_CODE_MAX_LENGTH).allow("", null), // empty = the next GM code
+  role: Joi.string().valid(...constant.ASSIGNABLE_ROLES).default(constant.ROLES.MEMBER),
+});
+
 // ---------- Executives ----------
 const executiveListSchema = Joi.object({
   ...pagination,
@@ -59,7 +71,14 @@ const executivePermissionsSchema = Joi.object({
   sections: Joi.array().items(Joi.string().valid(...constant.PERMISSION_SECTIONS)).unique().required(),
 });
 
-const activityListSchema = Joi.object({ ...pagination });
+// The Audit Logs screen: changes or logins, one area, who (name / email), dates
+const activityListSchema = Joi.object({
+  ...pagination,
+  ...dateRange,
+  type: Joi.string().valid(...constant.ACTIVITY_TYPES).default("changes"),
+  area: Joi.string().valid(...Object.keys(constant.ACTIVITY_AREAS)),
+  search: Joi.string().trim().max(constant.SEARCH_MAX_LENGTH).allow(""),
+});
 
 // ---------- Donations / expenses ----------
 const id = Joi.number().integer().min(1);
@@ -149,6 +168,7 @@ const nameList = Joi.array()
   .max(constant.SETTING_LIST_MAX_ITEMS);
 const settingsSchema = Joi.object({
   society_name: text.min(2),
+  society_name_gu: text.allow(""),
   contact_email: Joi.string().trim().lowercase().email().allow(""),
   phone: Joi.string().trim().pattern(/^\+?[\d\s-]{7,20}$/).allow("").messages({ "string.pattern.base": "phone must be a phone number" }),
   address: Joi.string().trim().max(512).allow(""),
@@ -163,8 +183,15 @@ const settingsSchema = Joi.object({
   notify_donation: Joi.boolean(),
   notify_executive_request: Joi.boolean(),
   notify_media_upload: Joi.boolean(),
+  notify_expense: Joi.boolean(),
   donation_purposes: nameList,
   expense_categories: nameList,
+  // Notice categories, stored lowercase (notices.tag)
+  notice_tags: Joi.array()
+    .items(Joi.string().trim().lowercase().min(1).max(constant.NOTICE_TAG_MAX_LENGTH))
+    .unique()
+    .min(1)
+    .max(constant.SETTING_LIST_MAX_ITEMS),
   // Page links (https://…); "" hides that network in the app
   social_links: Joi.object(Object.fromEntries(constant.SOCIAL_NETWORKS.map((network) => [
     network,
@@ -192,6 +219,7 @@ export default {
   dashboardSchema,
   memberListSchema,
   memberEditSchema,
+  memberCreateSchema,
   memberStatusSchema,
   executiveListSchema,
   executivePermissionsSchema,

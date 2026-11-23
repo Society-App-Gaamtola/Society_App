@@ -17,6 +17,7 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { loadSavedLanguage } from './src/i18n';
 import { loadSavedTheme, useThemeMode } from './src/theme';
 import { restoreSession } from './src/services/session';
+import { loadSavedAppInfo } from './src/services/appInfo';
 import type { AuthUser } from './src/types';
 import { AuthProvider } from './src/context/AuthContext';
 import { common } from './src/styles/common';
@@ -41,7 +42,7 @@ export default function App() {
   const [savedUser, setSavedUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
-    Promise.all([loadSavedLanguage(), loadSavedTheme(), restoreSession()])
+    Promise.all([loadSavedLanguage(), loadSavedTheme(), restoreSession(), loadSavedAppInfo()])
       .then(([, , user]) => setSavedUser(user))
       .finally(() => setSavedDataReady(true));
   }, []);

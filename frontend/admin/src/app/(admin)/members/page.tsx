@@ -2,11 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Trash2, UserCheck, UserX } from 'lucide-react';
+import { Trash2, UserCheck, UserPlus, UserX } from 'lucide-react';
 import { Avatar, ConfirmDialog, ExportButton, PageHeader, RowActions, StatusBadge } from '@/components/common';
 import { DataTable, type Column } from '@/components/DataTable';
 import { FilterBar, type FilterSelect } from '@/components/FilterBar';
+import { AddMemberForm } from '@/components/forms/AddMemberForm';
 import { MemberForm } from '@/components/forms/MemberForm';
+import { Button } from '@/components/ui/primitives';
 import { DEFAULT_PAGE_SIZE } from '@/config';
 import { useDeleteMember, useMemberStatus, useMembersPage } from '@/hooks/useAdminMembers';
 import { useUrlState } from '@/hooks/useUrlState';
@@ -59,6 +61,7 @@ export default function MembersPage() {
   // Picked rows are remembered with their data, so exporting them needs no extra API call
   const [picked, setPicked] = useState<Map<Id, AdminMember>>(new Map());
   const [editing, setEditing] = useState<AdminMember | null>(null);
+  const [adding, setAdding] = useState(false);
   const [deactivating, setDeactivating] = useState<AdminMember | null>(null);
   const [deleting, setDeleting] = useState<AdminMember | null>(null);
 
@@ -144,8 +147,15 @@ export default function MembersPage() {
     <>
       <PageHeader
         title="Manage Members"
-        subtitle="Members join through the app. Search, view and manage them here"
-        actions={<ExportButton onExport={onExport} disabled={!list.data?.pagination.total} />}
+        subtitle="Members join through the app, or are added here. Search, view and manage them"
+        actions={
+          <>
+            <Button onClick={() => setAdding(true)}>
+              <UserPlus className="h-4 w-4" /> Add Member
+            </Button>
+            <ExportButton onExport={onExport} disabled={!list.data?.pagination.total} />
+          </>
+        }
       />
       <FilterBar searchPlaceholder="Search by name, mobile, email or member code..." selects={FILTERS} dateRange />
       {picked.size ? (
@@ -176,6 +186,7 @@ export default function MembersPage() {
       />
 
       <MemberForm open={!!editing} onOpenChange={(open) => !open && setEditing(null)} member={editing ?? undefined} />
+      <AddMemberForm open={adding} onOpenChange={setAdding} />
       <ConfirmDialog
         open={!!deactivating}
         onOpenChange={(open) => !open && setDeactivating(null)}

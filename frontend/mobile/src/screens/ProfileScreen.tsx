@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { ProfileStackParamList, RootStackParamList } from '../navigation/types';
 import { colors, fonts, PRIMARY_GRADIENT, tones, themedStyles } from '../theme';
 import { canViewExpenses, useAuth } from '../context/AuthContext';
-import { SOCIETY_NAME_GU } from '../config';
+import { useAppInfo } from '../services/appInfo';
 import { Ionicons, type IoniconName } from '../icons';
 import { surface } from '../styles/common';
 import { MONTHS } from '../utils/date';
@@ -66,6 +66,7 @@ function InfoRow({ icon, label, value, badge, locked, onPress }: InfoRowProps) {
 
 export default function ProfileScreen() {
   const t = useT();
+  const { society_name_gu: societyNameGu } = useAppInfo();
   const navigation = useNavigation<Nav>();
   const { user, signOut, refreshUser } = useAuth();
   const language = useLanguage();
@@ -278,7 +279,7 @@ export default function ProfileScreen() {
           <Text style={styles.logoutText}>{t('Logout')}</Text>
         </Pressable>
 
-        <Text style={styles.footer}>{SOCIETY_NAME_GU}</Text>
+        <Text style={styles.footer}>{societyNameGu}</Text>
 
       </ScrollView>
     </View>

@@ -270,6 +270,8 @@ export type BackendEvent = {
   status: EventStatusCode;
   publish_at: string | null;
   posted_at: string | null;
+  /** 1 = Publish and Share: emailed to the members when it went / goes live */
+  email_members: 0 | 1;
   created_by: number;
   created_by_name: string | null;
   created_at: string;
@@ -279,7 +281,8 @@ export type BackendEvent = {
 export type EventCategory = { id: number; code: string; name: string; color: string };
 
 export type NoticeStatusCode = 'draft' | 'published';
-export type NoticeTag = 'important' | 'general' | 'event';
+/** One of App Settings' notice categories (lowercase): important, general, event or the society's own */
+export type NoticeTag = string;
 
 /** A notice as GET /user/notices?manage=true returns it */
 export type BackendNotice = {
@@ -291,6 +294,7 @@ export type BackendNotice = {
   status: NoticeStatusCode;
   audience: 'all' | 'selected';
   published_at: string | null;
+  email_members: 0 | 1;
   recipient_count: number;
   recipient_ids?: number[];
   created_by: number;

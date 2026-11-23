@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { HomeStackParamList, RootStackParamList } from '../navigation/types';
 import { common } from '../styles/common';
 import { colors, fonts, tones, type Language, themedStyles } from '../theme';
-import { APP_VERSION, SOCIETY_NAME } from '../config';
+import { APP_VERSION } from '../config';
+import { useAppInfo } from '../services/appInfo';
+import { getNotificationSettings, saveNotificationSettings, type NotificationSettings } from '../api/user';
+import { showToast } from '../utils/toast';
 import { useAuth } from '../context/AuthContext';
 import { setAppLanguage, useLanguage, useT } from '../i18n';
 import { languages as LANGUAGE_LIST } from '../i18n/strings';
@@ -17,9 +20,9 @@ type Nav = NativeStackNavigationProp<HomeStackParamList & RootStackParamList>;
 
 const LANGUAGES: { code: Language; label: string }[] = LANGUAGE_LIST.map(({ code, native }) => ({ code, label: native }));
 
-type AlertKey = 'events' | 'notices' | 'payments';
+type AlertKey = keyof NotificationSettings;
 const ALERTS: { key: AlertKey; label: string; hint: string }[] = [
-  { key: 'events', label: 'Event reminders', hint: 'Before events you may attend' },
+  { key: 'events', label: 'New events', hint: 'When an event is posted' },
   { key: 'notices', label: 'New notices', hint: 'When a notice is published' },
   { key: 'payments', label: 'Payment updates', hint: 'Donation receipts and status' },
 ];
@@ -28,13 +31,29 @@ const switchColors = () => ({ trackColor: { true: colors.primary, false: colors.
 
 export default function SettingsScreen() {
   const t = useT();
+  const { society_name: societyName } = useAppInfo();
   const navigation = useNavigation<Nav>();
   const { signOut } = useAuth();
   const language = useLanguage();
-  // Sample switches until notification preferences are saved on the server.
-  const [alerts, setAlerts] = useState<Record<AlertKey, boolean>>({ events: true, notices: true, payments: true });
+  // Saved on the server (GET / PUT /user/notification-settings): a type switched off is no longer delivered
+  const [alerts, setAlerts] = useState<NotificationSettings>({ events: true, notices: true, payments: true });
+  useEffect(() => {
+    getNotificationSettings()
+      .then(({ data }) => setAlerts(data.settings))
+      .catch(() => {});
+  }, []);
 
-  const toggle = (key: AlertKey) => setAlerts((a) => ({ ...a, [key]: !a[key] }));
+  // Switches at once, then saves; put back when the save fails
+  const toggle = (key: AlertKey) => {
+    const value = !alerts[key];
+    setAlerts((a) => ({ ...a, [key]: value }));
+    saveNotificationSettings({ [key]: value })
+      .then(({ data }) => setAlerts(data.settings))
+      .catch((e) => {
+        setAlerts((a) => ({ ...a, [key]: !value }));
+        showToast(e instanceof Error ? e.message : t('Please try again.'));
+      });
+  };
 
   const chooseLanguage = (code: Language) => {
     setAppLanguage(code).catch(() => {});
@@ -89,7 +108,7 @@ export default function SettingsScreen() {
         <MenuGroup title="Notifications" items={notifications} />
 
         <View style={styles.about}>
-          <Text style={styles.aboutName}>{SOCIETY_NAME}</Text>
+          <Text style={styles.aboutName}>{societyName}</Text>
           <Text style={styles.aboutVersion}>{`Version ${APP_VERSION}`}</Text>
         </View>
 

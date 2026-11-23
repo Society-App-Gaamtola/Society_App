@@ -5,7 +5,7 @@ import { Ban, CalendarDays, EyeOff, Megaphone, Plus, Send, Star, StarOff } from 
 import { ConfirmDialog, DetailList, Field, FileUpload, FormDialog, PageHeader, RowActions, StatusBadge, Tabs, ViewDialog } from '@/components/common';
 import { DataTable, type Column } from '@/components/DataTable';
 import { FilterBar } from '@/components/FilterBar';
-import { Button, Input, NativeSelect, Textarea } from '@/components/ui/primitives';
+import { Button, Input, NativeSelect, Switch, Textarea } from '@/components/ui/primitives';
 import { DEFAULT_PAGE_SIZE } from '@/config';
 import {
   useDeleteEvent,
@@ -19,13 +19,14 @@ import {
   useSaveEvent,
   useSaveNotice,
 } from '@/hooks/useAdminContent';
+import { useAppSettings } from '@/hooks/useFinance';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useNavigate } from '@/lib/navigation';
 import { formatDate, formatDateTime, isImageUrl, todayISO } from '@/lib/utils';
 import {
   EVENT_STATUS_LABEL,
   NOTICE_STATUS_LABEL,
-  NOTICE_TAG_LABEL,
+  noticeTagLabel,
   timeLabel,
   type EventBody,
   type EventQuery,
@@ -38,7 +39,25 @@ import type { BackendEvent, BackendNotice, EventStatusCode, NoticeStatusCode, No
 type Kind = 'events' | 'notices';
 const EVENT_STATUSES = Object.entries(EVENT_STATUS_LABEL).map(([value, label]) => ({ value, label }));
 const NOTICE_STATUSES = Object.entries(NOTICE_STATUS_LABEL).map(([value, label]) => ({ value, label }));
-const NOTICE_TAGS = Object.entries(NOTICE_TAG_LABEL).map(([value, label]) => ({ value, label }));
+
+/** The notice categories of App Settings as select options (+ `keep`: a notice's category that was removed since) */
+function useNoticeTags(keep?: NoticeTag) {
+  const tags = useAppSettings().data?.settings.notice_tags ?? ['important', 'general', 'event'];
+  return [...tags, ...(keep && !tags.includes(keep) ? [keep] : [])].map((value) => ({ value, label: noticeTagLabel(value) }));
+}
+
+/** "Publish and Share (email)": a switch under the form; the members get an email when the item goes live */
+function EmailShareSwitch({ checked, onChange, what }: { checked: boolean; onChange: (checked: boolean) => void; what: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-[#FBF5EC] px-3 py-2">
+      <Switch label="Share by email" checked={checked} onCheckedChange={onChange} />
+      <span className="text-sm">
+        Share by email
+        <span className="block text-xs text-muted-foreground">Members also get this {what} by email when it goes live.</span>
+      </span>
+    </div>
+  );
+}
 
 /** "2026-11-20" + optional end → "20 Nov 2026" or "20 Nov 2026 – 22 Nov 2026" */
 const eventDates = (e: BackendEvent) => (e.end_date && e.end_date !== e.event_date ? `${formatDate(e.event_date)} – ${formatDate(e.end_date)}` : formatDate(e.event_date));
@@ -46,7 +65,11 @@ const eventTimes = (e: BackendEvent) => [timeLabel(e.start_time), timeLabel(e.en
 
 // ---------- Event form (POST / PUT /user/events) ----------
 
-type EventDraft = Omit<EventBody, 'latitude' | 'longitude' | 'images' | 'category_id'> & { category_id: string; publish_at: string };
+type EventDraft = Omit<EventBody, 'latitude' | 'longitude' | 'images' | 'category_id' | 'email_members'> & {
+  category_id: string;
+  publish_at: string;
+  email_members: boolean;
+};
 
 const emptyEvent = (categoryId: string): EventDraft => ({
   title: '',
@@ -63,6 +86,7 @@ const emptyEvent = (categoryId: string): EventDraft => ({
   poster_url: null,
   action: 'draft',
   publish_at: '',
+  email_members: false,
 });
 
 const eventToDraft = (e: BackendEvent): EventDraft => ({
@@ -81,6 +105,7 @@ const eventToDraft = (e: BackendEvent): EventDraft => ({
   // Keep it live / scheduled when it already is; otherwise saving keeps it a draft
   action: e.status === 'posted' ? 'post' : e.status === 'scheduled' ? 'schedule' : 'draft',
   publish_at: e.status === 'scheduled' && e.publish_at ? e.publish_at.slice(0, 16) : '',
+  email_members: e.email_members === 1,
 });
 
 function EventForm({ open, onOpenChange, event }: { open: boolean; onOpenChange: (open: boolean) => void; event?: BackendEvent }) {
@@ -122,6 +147,7 @@ function EventForm({ open, onOpenChange, event }: { open: boolean; onOpenChange:
       latitude: event?.latitude ?? null,
       longitude: event?.longitude ?? null,
       ...(draft.action === 'schedule' ? { publish_at: new Date(draft.publish_at).toISOString() } : { publish_at: undefined }),
+      email_members: draft.action !== 'draft' && draft.email_members,
     };
     save.mutate({ id: event?.id, body }, { onSuccess: () => onOpenChange(false) });
   };
@@ -131,7 +157,7 @@ function EventForm({ open, onOpenChange, event }: { open: boolean; onOpenChange:
       open={open}
       onOpenChange={onOpenChange}
       title={event ? 'Edit Event' : 'Create Event'}
-      submitLabel={event ? 'Save Changes' : 'Create Event'}
+      submitLabel={draft.action !== 'draft' && draft.email_members && !event?.posted_at ? 'Publish & Share' : event ? 'Save Changes' : 'Create Event'}
       pending={save.isPending}
       onSubmit={submit}
       className="max-w-2xl"
@@ -195,6 +221,10 @@ function EventForm({ open, onOpenChange, event }: { open: boolean; onOpenChange:
           </Field>
         ) : null}
       </div>
+      {/* Only before it first goes live: a posted event was already announced */}
+      {draft.action !== 'draft' && !event?.posted_at ? (
+        <EmailShareSwitch checked={draft.email_members} onChange={(v) => set('email_members', v)} what="event" />
+      ) : null}
     </FormDialog>
   );
 }
@@ -361,17 +391,24 @@ function EventsTable({ onCreate }: { onCreate: boolean }) {
 // ---------- Notice form (POST / PUT /user/notices) ----------
 
 type NoticeDraft = NoticeBody;
-const emptyNotice: NoticeDraft = { title: '', body: '', tag: 'general', action: 'draft' };
+const emptyNotice: NoticeDraft = { title: '', body: '', tag: 'general', action: 'draft', email_members: false };
 
 function NoticeForm({ open, onOpenChange, notice }: { open: boolean; onOpenChange: (open: boolean) => void; notice?: BackendNotice }) {
   const save = useSaveNotice();
   const [draft, setDraft] = useState<NoticeDraft>(emptyNotice);
+  const tags = useNoticeTags(notice?.tag);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open) return;
     setErrors({});
-    setDraft(notice ? { title: notice.title, body: notice.body, tag: notice.tag, action: notice.status === 'published' ? 'publish' : 'draft' } : emptyNotice);
+    setDraft(
+      notice
+        ? { title: notice.title, body: notice.body, tag: notice.tag, action: notice.status === 'published' ? 'publish' : 'draft', email_members: notice.email_members === 1 }
+        : { ...emptyNotice, tag: tags.some((t) => t.value === 'general') ? 'general' : (tags[0]?.value ?? 'general') },
+    );
+    // the category list only matters for a new notice's default
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, notice]);
 
   const set = <K extends keyof NoticeDraft>(key: K, value: NoticeDraft[K]) => setDraft((d) => ({ ...d, [key]: value }));
@@ -382,7 +419,8 @@ function NoticeForm({ open, onOpenChange, notice }: { open: boolean; onOpenChang
     if (!draft.body.trim()) found.body = 'Write the notice text.';
     setErrors(found);
     if (Object.keys(found).length) return;
-    save.mutate({ notice, body: { ...draft, title: draft.title.trim(), body: draft.body.trim() } }, { onSuccess: () => onOpenChange(false) });
+    const body = { ...draft, title: draft.title.trim(), body: draft.body.trim(), email_members: draft.action === 'publish' && draft.email_members };
+    save.mutate({ notice, body }, { onSuccess: () => onOpenChange(false) });
   };
 
   return (
@@ -391,7 +429,7 @@ function NoticeForm({ open, onOpenChange, notice }: { open: boolean; onOpenChang
       onOpenChange={onOpenChange}
       title={notice ? 'Edit Notice' : 'Create Notice'}
       description={notice?.audience === 'selected' ? `Sent to ${notice.recipient_count} selected members` : undefined}
-      submitLabel={notice ? 'Save Changes' : 'Create Notice'}
+      submitLabel={draft.action === 'publish' && draft.email_members && notice?.status !== 'published' ? 'Publish & Share' : notice ? 'Save Changes' : 'Create Notice'}
       pending={save.isPending}
       onSubmit={submit}
     >
@@ -401,7 +439,7 @@ function NoticeForm({ open, onOpenChange, notice }: { open: boolean; onOpenChang
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Category">
           <NativeSelect value={draft.tag} onChange={(e) => set('tag', e.target.value as NoticeTag)}>
-            {NOTICE_TAGS.map((t) => (
+            {tags.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
               </option>
@@ -418,6 +456,10 @@ function NoticeForm({ open, onOpenChange, notice }: { open: boolean; onOpenChang
       <Field label="Notice" error={errors.body}>
         <Textarea value={draft.body} onChange={(e) => set('body', e.target.value)} rows={5} />
       </Field>
+      {/* Only before it is first published: a published notice was already announced */}
+      {draft.action === 'publish' && notice?.status !== 'published' ? (
+        <EmailShareSwitch checked={!!draft.email_members} onChange={(v) => set('email_members', v)} what="notice" />
+      ) : null}
     </FormDialog>
   );
 }
@@ -440,6 +482,7 @@ function useNoticeQuery(): NoticeQuery {
 function NoticesTable({ onCreate }: { onCreate: boolean }) {
   const url = useUrlState();
   const list = useNoticesPage(useNoticeQuery());
+  const tags = useNoticeTags();
   const setStatus = useNoticeStatus();
   const remove = useDeleteNotice();
   const [form, setForm] = useState<{ open: boolean; notice?: BackendNotice }>({ open: false });
@@ -467,7 +510,7 @@ function NoticesTable({ onCreate }: { onCreate: boolean }) {
         ),
       },
       { key: 'date', header: 'Date', className: 'whitespace-nowrap px-4 py-3', render: (n) => formatDate(n.published_at ?? n.created_at) },
-      { key: 'tag', header: 'Category', render: (n) => <StatusBadge status={NOTICE_TAG_LABEL[n.tag]} /> },
+      { key: 'tag', header: 'Category', render: (n) => <StatusBadge status={noticeTagLabel(n.tag)} /> },
       { key: 'status', header: 'Status', render: (n) => <StatusBadge status={NOTICE_STATUS_LABEL[n.status]} /> },
       {
         key: 'actions',
@@ -497,7 +540,7 @@ function NoticesTable({ onCreate }: { onCreate: boolean }) {
         dateRange
         selects={[
           { name: 'status', label: 'Status', options: NOTICE_STATUSES },
-          { name: 'tag', label: 'Categories', options: NOTICE_TAGS },
+          { name: 'tag', label: 'Categories', options: tags },
         ]}
       />
       <DataTable
@@ -539,7 +582,7 @@ function NoticesTable({ onCreate }: { onCreate: boolean }) {
             <DetailList
               items={[
                 ['Date', formatDateTime(viewing.published_at ?? viewing.created_at)],
-                ['Category', NOTICE_TAG_LABEL[viewing.tag]],
+                ['Category', noticeTagLabel(viewing.tag)],
                 ['Status', <StatusBadge key="s" status={NOTICE_STATUS_LABEL[viewing.status]} />],
                 ['Sent to', viewing.audience === 'selected' ? `${viewing.recipient_count} selected members` : 'All members'],
                 ['Created by', viewing.created_by_name || '—'],

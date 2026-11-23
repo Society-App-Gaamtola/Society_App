@@ -80,6 +80,8 @@ export default {
     // ---------- Email ----------
     // Give up on a mail server after this long, so the app gets an answer instead of waiting minutes
     MAIL_TIMEOUT_MS: 10000,
+    // Publish and Share (email): members are emailed in groups of this many (Bcc), one mail per group
+    MAIL_BATCH_SIZE: 50,
     BREVO_API_URL: "https://api.brevo.com/v3/smtp/email",
     // Error code for "the OTP email could not be sent"; the app is told so instead of a general error
     OTP_MAIL_FAILED: "OTP_MAIL_FAILED",
@@ -124,7 +126,8 @@ export default {
         CANCELLED: "cancelled",
     },
     NOTICE_STATUS: { DRAFT: "draft", PUBLISHED: "published" },
-    NOTICE_TAGS: ["important", "general", "event"],
+    // Notice categories are edited in App Settings (DEFAULT_SETTINGS.notice_tags), stored lowercase
+    NOTICE_TAG_MAX_LENGTH: 64,
     NOTICE_AUDIENCE: { ALL: "all", SELECTED: "selected" },
     MAX_NOTICE_RECIPIENTS: 500,
 
@@ -213,6 +216,7 @@ export default {
         MEDIA_APPROVED: "media_approved",
         MEDIA_REJECTED: "media_rejected",
         MEMBER_JOINED: "member_joined",
+        MEMBER_ADDED: "member_added", // added by the Super Admin in the panel
         MEMBER_UPDATED: "member_updated",
         MEMBER_ACTIVATED: "member_activated",
         MEMBER_DEACTIVATED: "member_deactivated",
@@ -238,7 +242,22 @@ export default {
         REPORT_GENERATED: "report_generated",
         SETTINGS_UPDATED: "settings_updated",
         BACKUP_DOWNLOADED: "backup_downloaded",
+        // Every login (app and panel), table user_devices = the session. The Audit Logs screen's Login History
+        LOGIN: "login",
     },
+    // GET /admin/activities?area= : the tables of each area (audit_logs.table_name)
+    ACTIVITY_AREAS: {
+        events: ["events", "future_event_plans"],
+        notices: ["notices"],
+        members: ["users", "executive_applications"],
+        donations: ["donations"],
+        expenses: ["society_transactions"],
+        reports: ["generated_reports"],
+        media: ["media_items"],
+        settings: ["app_settings"],
+    },
+    // GET /admin/activities?type= : changes (every action but login) or logins
+    ACTIVITY_TYPES: ["changes", "logins"],
     ACTIVITY_DASHBOARD_LIMIT: 5,
 
     // ---------- Executive permissions (table executive_permissions, one row per allowed section) ----------
@@ -287,6 +306,9 @@ export default {
     // The values used until the Super Admin saves something else. Lists are edited in the panel
     DEFAULT_SETTINGS: {
         society_name: "Shri Gamtola Yuvak Mitra Mandal",
+        // The name in Gujarati script, shown above the English one (app header, splash, panel). A setting, not a
+        // translation row: there is one society name, edited in App Settings
+        society_name_gu: "શ્રી ગામટોળા યુવક મિત્ર મંડળ",
         contact_email: "",
         phone: "",
         address: "",
@@ -301,6 +323,7 @@ export default {
         notify_donation: true,
         notify_executive_request: true,
         notify_media_upload: true,
+        notify_expense: true, // an executive's expense waiting for verification
         donation_purposes: [
             "Garba", "Sandhya Aarti", "Prasad Vitaran", "Volunteer Activities", "Other Society Events", "Batuk Bhojan",
             "Garba Prasad", "Aarti Prasad", "Prasad Distribution", "Festival", "Aarti", "Cultural", "General Fund", "Other",
@@ -309,6 +332,8 @@ export default {
             "Garba", "Sandhya Aarti", "Prasad Vitaran", "Volunteer Activities", "Other Society Events", "Batuk Bhojan",
             "Decoration", "Food", "Sound & Light", "Printing", "Maintenance", "Other",
         ],
+        // Notice categories (notices.tag), lowercase. important / general / event have their own look in the app
+        notice_tags: ["important", "general", "event"],
         // Society pages, opened from the app (App Settings → Social Networking). Empty = not shown
         social_links: { facebook: "", instagram: "", x: "", youtube: "" },
         // Set by GET /admin/backup (not editable through PUT /admin/settings)
@@ -331,6 +356,9 @@ export default {
     // receiver_ids value for common.sendNotification: every active member who finished sign-up
     NOTIFY_EVERYONE: "all",
     NOTIFICATION_BODY_MAX_LENGTH: 512,
+    // The app's Settings → Notifications switches: notification type → user_profiles column. A type not listed
+    // (general: role changes, admin alerts) is always delivered
+    NOTIFICATION_PREF_COLUMNS: { event: "notify_events", notice: "notify_notices", donation: "notify_payments" },
 
     // ---------- Cron jobs (node-cron syntax) ----------
     // Every day at midnight

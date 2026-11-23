@@ -42,7 +42,7 @@ function changesOf(before: Draft, after: Draft): MemberChanges {
   return changes;
 }
 
-/** Edit a member's details (members join through the app, so there is no "add" here) */
+/** Edit a member's details (adding one by hand is AddMemberForm) */
 export function MemberForm({ open, onOpenChange, member }: { open: boolean; onOpenChange: (open: boolean) => void; member?: AdminMember }) {
   const edit = useEditMember();
   const [draft, setDraft] = useState<Draft | null>(null);

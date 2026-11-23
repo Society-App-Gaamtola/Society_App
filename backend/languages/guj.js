@@ -52,6 +52,7 @@ const gu = {
 	// Events / notices
 	rest_event_not_found: "કાર્યક્રમ મળ્યો નથી",
 	rest_notice_not_found: "સૂચના મળી નથી",
+	rest_notice_tag_invalid: "કૃપા કરીને યાદીમાંથી સૂચનાની શ્રેણી પસંદ કરો",
 
 	// Media
 	rest_invalid_media_folder: "આ ફાઇલ સાચી જગ્યાએ અપલોડ થઈ નથી. કૃપા કરીને ફરી અપલોડ કરો",
@@ -88,6 +89,7 @@ const gu = {
 
 	// Roles and Executive Requests
 	rest_member_updated: "સભ્યની વિગતો અપડેટ થઈ",
+	rest_member_added: "સભ્ય ઉમેરાયા",
 	rest_member_activated: "સભ્ય સક્રિય કરાયા",
 	rest_member_deactivated: "સભ્ય નિષ્ક્રિય કરાયા. તેઓ એપમાંથી લૉગ આઉટ થયા છે",
 	rest_member_deleted: "સભ્ય દૂર કરાયા",
@@ -128,6 +130,7 @@ const gu = {
 	activity_media_approved: "ફોટો / વિડિયો મંજૂર કર્યો",
 	activity_media_rejected: "ફોટો / વિડિયો નામંજૂર કર્યો",
 	activity_member_joined: "નવા સભ્ય જોડાયા",
+	activity_member_added: "સભ્ય ઉમેર્યા",
 	activity_member_updated: "સભ્ય અપડેટ કર્યા",
 	activity_member_activated: "સભ્ય સક્રિય કર્યા",
 	activity_member_deactivated: "સભ્ય નિષ્ક્રિય કર્યા",
@@ -153,6 +156,7 @@ const gu = {
 	activity_report_generated: "રિપોર્ટ બનાવ્યો",
 	activity_settings_updated: "એપ સેટિંગ્સ બદલી",
 	activity_backup_downloaded: "ડેટાબેઝ બેકઅપ ડાઉનલોડ કર્યો",
+	activity_login: "લૉગ ઇન કર્યું",
 	rest_donation_saved: "દાન સાચવ્યું",
 	rest_donation_updated: "દાન અપડેટ થયું",
 	rest_donation_deleted: "દાન દૂર કર્યું",
@@ -178,6 +182,7 @@ const gu = {
 	notify_admin_donation: "ચકાસવા માટે નવું દાન",
 	notify_admin_executive_request: "નવી કારોબારી વિનંતી",
 	notify_admin_media_upload: "મંજૂરી માટે નવો ફોટો / વિડિયો",
+	notify_admin_expense: "ચકાસવા માટે નવો ખર્ચ",
 	rest_executive_donation_too_low: "દાન ઓછામાં ઓછું કારોબારી લઘુત્તમ રકમ જેટલું હોવું જોઈએ",
 	rest_member_not_found: "સભ્ય મળ્યો નથી",
 	rest_role_updated: "ભૂમિકા અપડેટ થઈ",

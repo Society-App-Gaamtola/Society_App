@@ -7,7 +7,7 @@ project without scanning every folder. Keep it up to date when you add an API, a
 | --- | --- |
 | `backend/` | Node.js (ES modules) + Express 5 + **PostgreSQL** API. Port 5020 |
 | `frontend/mobile/` | Expo / React Native app for members and executives (Android) |
-| `frontend/admin/` | Next.js 14 Super Admin panel. **Every screen uses the backend** (Login, Dashboard, Members, Events & Notices, Executives, Media Approval, Donations, Expenses, Financial Reports, App Settings, My Profile). There is no demo data in the panel any more |
+| `frontend/admin/` | Next.js 14 Super Admin panel. **Every screen uses the backend** (Login, Dashboard, Members, Events & Notices, Executives, Media Approval, Donations, Expenses, Financial Reports, Audit Logs, App Settings, My Profile). There is no demo data in the panel any more |
 
 ## Rules to always follow
 
@@ -24,6 +24,8 @@ project without scanning every folder. Keep it up to date when you add an API, a
      a language with no row shows the original text.
    - Never add `title_gu` / `name_hi`-style columns. To translate a new kind of content, add it to `TRANSLATABLE` and use
      `translatedColumns()` / `translationJoin()` in its list query.
+   - One exception: the society's Gujarati name is the setting `society_name_gu` (App Settings → General). There is one
+     society name, not a table of rows; the app and the panel header show it.
 4. **There is no mobile-number verification.** Only the email is verified, by OTP (`users.email_verified_at`). Don't add
    `mobile_verified_at` or any mobile OTP flow. The mobile number is only stored and must be unique.
 5. **Write PostgreSQL SQL** (see "Database"). The project moved from MySQL on 2026-11-16.
@@ -43,10 +45,11 @@ project without scanning every folder. Keep it up to date when you add an API, a
    - Never translate data from the database (event titles, names).
    - Dates come from `formatDate` / `timeAgo` in the app language. `setAppLanguage()` (picker, Settings, Profile →
      Language) switches the whole app live, and `usePagedList` reloads in the new language.
-   - Executive screens are connected to the backend. My Events, Post Notice, Event Planning, Donation Entries and
-     Financial Reports wrap their text in `t()`, but most of their Gujarati / Hindi lines are not in `translations.ts`
-     yet (they show English). Create Event, Event Preview, Add Donation and Export Reports still have plain English
-     text to wrap.
+   - Every screen wraps its text in `t()` and every line has its Gujarati / Hindi copy (checked 2026-11-23). To find
+     text without a line, scan the `t('…')` calls and the shared components' text props against `translations.ts`.
+   - The society's names, notice categories and social links come from `services/appInfo.ts` (`useAppInfo()` in
+     components, `getSocietyInfo()` in services such as receipts, reports and share text). It is saved on the phone and
+     refreshed after login, on profile reload and when the side menu opens. Never hard-code the society name.
    - **Dark theme**: `src/theme.ts` has a light and a dark palette (black background, near-black cards, off-white text,
      brighter accents).
      - `colors.x` / `tones.x` always return the active theme's value. Build styles with
@@ -84,7 +87,8 @@ cd frontend\admin; npm run dev     # http://localhost:3000 (needs the backend ru
 - **Everything you run touches real data.** Never run `demo_data.sql`, `sample_events_notices.sql` or load tests on it;
   delete any test row you create. Schema changes: run the SQL on Neon (psql with the `DATABASE_URL`) and add it to `schema.sql`.
 - View the data in the Neon console (Tables) or pgAdmin 4 with the Neon host, user `neondb_owner`, SSL required.
-- Super Admin (panel login): `superadmin@gaamtola.com` (placeholder mobile `0000000000`). The live data came from the old
+- Super Admin (panel login): `superadmin@gaamtoda.com` (renamed from `…@gaamtola.com` on 2026-11-23, client review R2;
+  placeholder mobile `0000000000`). The live data came from the old
   Aiven MySQL on 2026-11-19 (`copy_mysql_to_postgres.js`, then `seed.sql` for the newer categories / modules).
 - Outside `NODE_ENV=production` every OTP is **`123456`** (`constant.DEV_OTP`), also for live accounts when the backend
   runs on this PC. Mail is still sent when `.env` has SMTP / Brevo settings; start with
@@ -309,12 +313,12 @@ Media/photo fields go through `common.mediaUrl()` (a Cloudinary link stays as it
 
 | Area | Tables |
 | --- | --- |
-| Users | `roles` (1 super_admin, 2 executive, 3 member, 4 guest), `users`, `user_profiles` (1 per user), `user_devices` (login sessions), `otp_codes`, `declaration_acceptances` |
+| Users | `roles` (1 super_admin, 2 executive, 3 member, 4 guest), `users`, `user_profiles` (1 per user, + the notify_events / notify_notices / notify_payments switches), `user_devices` (login sessions), `otp_codes`, `declaration_acceptances` |
 | Access | `modules` (events, notices, donations, media, transactions, settings), `executive_permissions` (per user × module: can_view/create/edit/approve) |
 | Content | `event_categories` (code, English `name`, color, sort_order), `events` (+ `latitude`/`longitude` pin), `event_images` (several images per event, `sort_order`), `event_volunteers`, `future_event_plans`, `notices`, `notice_recipients`, `media_items` |
 | Notifications | `notifications`, `notification_recipients` (per user/device, FCM status) |
 | Money | `donations` (+ `donor_name` for non-members, `donated_on`, `proof_url`, `verified_by`), `payments` (gateway), `executive_applications`, `society_transactions` (cash book; `paid` rows = expenses with `category`, `paid_to`, `status`, `bill_url`, `verified_by`), `upi_settings`, `generated_reports` |
-| Other | `app_settings` (key/value), `audit_logs` (the activity log: who did what to which record) |
+| Other | `app_settings` (key/value), `audit_logs` (the activity log: who did what to which record, and every login) |
 
 Key statuses:
 - `events.status`: draft | scheduled | posted | cancelled. Users only see `posted`. **Events and notices need no approval**; only gallery media is approved.
@@ -375,6 +379,13 @@ API field ↔ column:
   - `society_app/<env>/events/<yyyy>/<mm>/` (event posters)
 
   Executive and super_admin uploads are approved at once (`MEDIA_AUTO_APPROVE_ROLES`); member uploads wait for approval.
+  PDFs (payment proofs, bills, `finance/` and `proofs/`) need `pdf` in the Cloudinary upload preset's **Allowed
+  formats** (and "Allow delivery of PDF and ZIP files" in the account's Security settings). Without it Cloudinary
+  answers "Image file format pdf not allowed" and the panel / app show "This file type is not supported" (checked
+  2026-11-23: the preset did not allow pdf yet).
+- **Login history**: every login (app and panel) saves an `audit_logs` row, action `login`, table `user_devices`
+  (the session, for the platform and model), with the IP the server saw (`common.logLogin`, called by
+  `generateToken`). The app's `/auth/login` and `/verify-otp` get the IP from the controller (`request.ip`).
 - **Roles** (all decided in the routes, rule 8):
   - `/user/*` (events, notices, gallery and the rest):
     - list / details, own gallery items: `allUsers` = member + executive + super_admin;
@@ -399,7 +410,7 @@ API field ↔ column:
     - A new executive (role API or approved request) gets `DEFAULT_EXECUTIVE_SECTIONS` (events, notices). Back to
       member → every permission removed (`changeRole` → `common.savePermissions`).
 
-## All APIs (80) – base `/api/v1`
+## All APIs (83) – base `/api/v1`
 
 Headers on every call:
 - `api-key` (always)
@@ -448,9 +459,9 @@ super_admin) unless the row says **executives** (super_admin + executive) or **s
 | PUT `/events/:id/status` | **superAdmin**. `status`: `posted` \| `draft` \| `cancelled` | `{ event }`. Posted = live now (announced); draft = hidden |
 | PUT `/events/:id/featured` | **superAdmin**. `is_featured`: true \| false | `{ event }`. Featured events come first in the home slider (`events.is_featured`) |
 | GET `/event-categories` | – | `{ categories: [{ id, code, name (translated), color }] }` |
-| GET `/notices` | `page, limit, search, tag (important\|general\|event), from_date, to_date`. Executive / Super Admin only: `mine=true`, `manage=true` (every status), `status` (draft\|published) | `{ notices, pagination }`. Without `mine` / `status`: the notice board. With them: the executive view |
+| GET `/notices` | `page, limit, search, tag (one of App Settings' notice_tags, lowercase), from_date, to_date`. Executive / Super Admin only: `mine=true`, `manage=true` (every status), `status` (draft\|published) | `{ notices, pagination }`. Without `mine` / `status`: the notice board. With them: the executive view |
 | GET `/notices/:id` | – | `{ notice }`. The owner and the Super Admin get any status with `recipient_ids`; others what the notice board shows them (code 0 `rest_notice_not_found`) |
-| POST `/notices` | **executives**. `title, body, tag?, event_id?, audience? (all\|selected), recipient_ids (selected), action (draft\|publish), publish_at?` (future = scheduled) | `{ notice }` |
+| POST `/notices` | **executives**. `title, body, tag?, event_id?, audience? (all\|selected), recipient_ids (selected), action (draft\|publish), publish_at? (future = scheduled), email_members?` (Publish and Share, below). `tag` must be one of `notice_tags` (left out = the first), else `rest_notice_tag_invalid` | `{ notice }` |
 | PUT `/notices/:id` | **executives** (owner or Super Admin). The same body as POST (full replace; the recipient list is replaced) | `{ notice }` |
 | DELETE `/notices/:id` | **executives** (owner or Super Admin). Soft delete | – |
 | PUT `/notices/:id/status` | **executives** + Notices permission (owner or Super Admin). `status`: `published` \| `draft` | `{ notice }`. Published = live now (announced) |
@@ -463,8 +474,10 @@ super_admin) unless the row says **executives** (super_admin + executive) or **s
 | GET `/notifications` | `page, limit, type (event\|notice\|donation\|general)` | `{ notifications: [{ id, type, priority, title, body, ref_type (event\|notice\|media), ref_id, created_at, is_read, read_at }], unread_count, pagination }`. System titles (`notify_*` keys) are translated |
 | PUT `/notifications/:id/read` | – (only the user's own copy) | – |
 | PUT `/notifications/read-all` | – | – |
+| GET `/notification-settings` | – | `{ settings: { events, notices, payments } }` (the app's Settings → Notifications; all on by default) |
+| PUT `/notification-settings` | only the switches that change: `events, notices, payments` (booleans) | same as GET. A type switched off is no longer delivered to this user (`user_profiles.notify_*`, applied in `common.sendNotification`); `general` always is |
 | GET `/members` | `page, limit, search (name / member code), role (super_admin\|executive\|member)` | `{ members: [{ id, name, member_code, role, photo_url, mobile, email }], pagination }`. Only completed, active members with `directory_visible`. `mobile` / `email` are null unless the member allows it (`mobile_visible` / `email_visible`), it's the viewer, or the viewer is in `CONTACT_VISIBLE_ROLES` |
-| GET `/app-info` | – | `{ society_name, contact_email, phone, address, logo_url, social_links: [{ network (facebook\|instagram\|x\|youtube), url }] }`. Only filled links, in `SOCIAL_NETWORKS` order (App Settings → Social Networking); the app's side menu shows them |
+| GET `/app-info` | – | `{ society_name, society_name_gu, show_gujarati_name, notice_tags, contact_email, phone, address, logo_url, social_links: [{ network (facebook\|instagram\|x\|youtube), url }] }`. Only filled links, in `SOCIAL_NETWORKS` order (App Settings → Social Networking); the app's side menu shows them |
 | GET `/event-plans` | **executives** + Events permission. `page, limit, status (idea\|planning\|approved\|dropped\|converted), search` | `{ plans: [{ id, title, notes, tentative_date, status, created_by, created_by_name, created_at, can_edit (own or Super Admin) }], pagination }`. One shared board (`future_event_plans`), soonest date first |
 | POST `/event-plans`, PUT `/event-plans/:id` | **executives** + Events permission (edit: owner or Super Admin). `title, notes?, tentative_date?, status` | `{ plan }` |
 | DELETE `/event-plans/:id` | **executives** + Events permission (owner or Super Admin). Soft delete | – |
@@ -475,8 +488,8 @@ super_admin) unless the row says **executives** (super_admin + executive) or **s
 | POST `/executive-request` | **members only** (route). `donation_amount (>= the settings' `executive_min_donation`), reference_no, reason, payment_proof_url?` (Cloudinary `proofs/user_<id>/`) | `{ application }`. One pending request at a time (`rest_executive_request_pending`); linked to the member's donation with the same `reference_no` |
 
 Executive view (`executiveView: true` in `userModule.listEvents / listNotices / listMedia`) adds these fields:
-- **events** (`mine` / `status`, or the owner's / Super Admin's detail): `status, publish_at, posted_at, approved_by (who posted it), approved_at, created_by, created_by_name, created_at, updated_at`.
-- **notices** (same): `status, audience, published_at, recipient_count, created_by, created_by_name, created_at, updated_at` (detail: `recipient_ids`).
+- **events** (`mine` / `status`, or the owner's / Super Admin's detail): `status, publish_at, posted_at, approved_by (who posted it), approved_at, email_members, created_by, created_by_name, created_at, updated_at`.
+- **notices** (same): `status, audience, published_at, email_members, recipient_count, created_by, created_by_name, created_at, updated_at` (detail: `recipient_ids`).
 - **media** (`status` sent, or the Super Admin's detail): `privacy, cloudinary_public_id, file_size_bytes, moderated_by, moderated_at, uploaded_by`.
 
 Item shapes:
@@ -507,6 +520,15 @@ Notifications (in-app; FCM push comes later):
 - New events and notices: `common.notifyNewContent()` announces every posted event and published notice whose
   `notified_at` is NULL, and sets `notified_at` in the same UPDATE (never twice). It runs right after an executive saves
   (so items posted / published now are announced at once) and in the daily cron job (scheduled ones). A `selected` notice notifies only its recipients.
+- **Notification switches**: `sendNotification` leaves out receivers who switched that type off
+  (`constant.NOTIFICATION_PREF_COLUMNS`: event → `notify_events`, notice → `notify_notices`, donation → `notify_payments`).
+- **Publish and Share (email)**: `email_members: true` on POST / PUT `/user/events` and `/user/notices` (the panel's
+  "Share by email" switch, the app's checkbox) is saved in `events.email_members` / `notices.email_members`. When
+  `notifyNewContent` announces the item it also calls `common.emailMembers()`: one HTML mail (`createContentMailTemplate`
+  in `mail.js`, typed text escaped) to every active member (a `selected` notice: its recipients), in Bcc groups of
+  `MAIL_BATCH_SIZE` (50) through `sendOtpMail({ bccEmails })`. It is sent once, when the item first goes live (a
+  scheduled one at the cron run), and skipped when the server has no `MAIL_FROM` / `SMTP_USER`. Brevo's free plan sends
+  300 mails a day and Gmail about 500, so a large society needs a paid mail plan.
 - Reviews: approving or rejecting a photo tells its uploader (`notify_media_*`, the reason in `message`). The old
   `notify_event_approved / _rejected` and `activity_event_approved / _rejected` keys stay only for rows saved before
   events stopped needing approval (2026-11-19).
@@ -532,11 +554,12 @@ The panel logs in here, then uses the same token on every shared API (`/user/eve
 | --- | --- | --- | --- |
 | POST `/login` | Public | `email, password`, device fields (e.g. `uuid`, `device_type: "web"`) | `{ userData, token }`. Wrong email / password → code 0 `rest_invalid_login_credentials`; any role but `super_admin` → code 0 `rest_admin_only`; inactive → `rest_account_inactive` |
 | GET `/dashboard` | superAdmin | `from_date?, to_date?` (yyyy-mm-dd, the panel's date picker) | `{ counts: { total_members, executives, active_events, total_notices }, money: { total_donations, total_expenses, balance, donation_trend, expense_trend }, pending: { donations, expenses, executive_requests, media, total }, monthly: [{ month: "YYYY-MM", donations, expenses }], recent_activities (latest `ACTIVITY_DASHBOARD_LIMIT` 5) }` |
-| GET `/activities` | superAdmin | `page, limit` | `{ activities: [{ id, action, text (translated), target (the record's name), actor_name, table_name, record_id, created_at }], pagination }`, newest first |
+| GET `/activities` | superAdmin | `page, limit, type (changes\|logins, default changes), area (events\|notices\|members\|donations\|expenses\|reports\|media\|settings: `ACTIVITY_AREAS`), search (who: name / email), from_date, to_date` | `{ activities: [{ id, action, text (translated), target (the record's name), actor_name, actor_role, table_name, record_id, ip_address, device (logins: "android · Pixel 7"), created_at }], pagination }`, newest first. The panel's Audit Logs screen (Activity / Login History tabs) and the dashboard's Recent Activities (changes only) |
 | GET `/backup` | superAdmin | – | `{ file_name, tables, sql }`: every row of every table as SQL (`INSERT … json_populate_record`, parents first, then the id sequences and `member_code_seq`); the panel saves it as a `.sql` file (App Settings → Backup & Data). Sets `last_backup_at`. Restore: an empty database + `schema.sql` (not seed.sql), then `psql -f` the file |
 
 | GET `/members` | superAdmin | `page, limit, search (name / mobile / email / member code), role (member\|executive), status (active\|suspended), signup (completed\|pending), from_date, to_date (join date), sort (name\|joined\|member_code), order (asc\|desc)` | `{ members: [{ id, member_code, name, email, country_code, mobile, role, status, signup, is_verified, address, photo_url, joined_on, last_login_at }], pagination }`. Every member / executive that isn't deleted, any status / sign-up step. **The Super Admin is not listed** (nor counted in the dashboard's `total_members`) |
 | GET `/members/:id` | superAdmin | – | `{ member, donations: { confirmed_count, confirmed_total, recent (5) } }` |
+| POST `/members` | superAdmin | `username, email, country_code? (+91), mobile_number, password, address?, member_code? (empty = the next GM code), role? (member\|executive)` | `{ member }`. Added by hand for people who don't sign up in the app: sign-up `completed`, email counted as verified, an executive gets `DEFAULT_EXECUTIVE_SECTIONS`. They log in with that email / mobile and password. Taken email / mobile / code → the same errors as PUT |
 | PUT `/members/:id` | superAdmin | only what changes: `username, email, country_code + mobile_number (together), address, member_code` | `{ member }`. Taken email / mobile / member code → code 0 (`rest_email_already_exists`, `rest_mobile_used_by_other`, `rest_member_code_already_exists`) |
 | PUT `/members/:id/status` | superAdmin | `status`: `active` \| `suspended` | `{ member }`. Suspended = deactivated: tokenMiddleware refuses them on the next request (HTTP 401) |
 | DELETE `/members/:id` | superAdmin | – | – . Soft delete + every device logged out. Their donations stay. The email / mobile stay taken |
@@ -560,7 +583,7 @@ Dashboard rules:
   up to `DAILY_CHART_MAX_DAYS` (31, e.g. one month) comes back **per day** instead (`month` = `'YYYY-MM-DD'`); the
   panel's chart shows day bars then. Same for `GET /admin/finance`. Without `from_date` it starts at the first confirmed donation / expense; without `to_date` it runs to
   this month. Each month only counts the days inside the period, so the chart always adds up to the cards.
-- **Super Admin**: `superadmin@gaamtola.com` exists in the live database. Another one: sign up in the app, then
+- **Super Admin**: `superadmin@gaamtoda.com` exists in the live database. Another one: sign up in the app, then
   `UPDATE users SET role_id = 1 WHERE email = '…';` on Neon.
   (the API can never make anyone `super_admin`).
 - **Activity log** (`audit_logs`): every admin / executive change and a few member actions call
@@ -586,7 +609,7 @@ Routes: the Super Admin, or an executive with that permission section (`requireP
 | GET `/finance` | `from_date?, to_date?` | `{ totals: { donations, expenses, balance, transactions, donation_trend, expense_trend }, monthly, recent (5 transactions) }` (the Financial Overview) |
 | GET `/reports/data/:type` | `summary\|donation\|expense\|category\|monthly\|custom` + `from_date, to_date, category, mode, page, limit` | `{ rows, pagination }`. Lists are paged; summary / category / monthly are totals added up by the database |
 | GET `/reports`, POST `/reports`, DELETE `/reports/:id` | POST: `report_type, from_date?, to_date?, category?, mode?` | the "Generated Reports" history (`generated_reports`). The panel builds the file in the browser |
-| GET `/settings` | – | `{ settings: { society_name, contact_email, phone, address, logo_url, show_gujarati_name, executive_min_donation, allow_registration, allow_uploads, require_media_approval, event_notifications, notify_new_member, notify_donation, notify_executive_request, notify_media_upload, donation_purposes, expense_categories, social_links: { facebook, instagram, x, youtube }, last_backup_at }, event_categories, notice_tags, upi }` |
+| GET `/settings` | – | `{ settings: { society_name, society_name_gu, contact_email, phone, address, logo_url, show_gujarati_name, executive_min_donation, allow_registration, allow_uploads, require_media_approval, event_notifications, notify_new_member, notify_donation, notify_executive_request, notify_media_upload, notify_expense, donation_purposes, expense_categories, notice_tags (lowercase), social_links: { facebook, instagram, x, youtube }, last_backup_at }, event_categories, upi }` |
 | PUT `/settings` | only what changes (not `last_backup_at`); `social_links` (https links, "" = hidden); `event_categories: [{ id?, name }]` (the full list: no id = add, left out = hidden), `upi: { payee_name, upi_id, qr_image_url?, display_note? } \| null` | same as GET |
 
 Money rules:
@@ -604,12 +627,18 @@ rows (JSON values); cached in memory, `common.saveSettings()` clears it). They a
   (`GET /user/donation-settings` returns both, plus the UPI details);
 - `event_notifications` off → no "new event" notifications;
 - `notify_*` → in-app alerts to every Super Admin (`common.notifyAdmins`) for a new member, a member's donation, an
-  executive request, a member's upload waiting for approval.
+  executive request, a member's upload waiting for approval, and an executive's donation entry (`notify_donation`) or
+  expense (`notify_expense`) saved as pending (the Super Admin's own entries don't alert);
+- `notice_tags` → the notice categories (`notices.tag`, lowercase; the CHECK was dropped on 2026-11-23). important /
+  general / event are translated in the app; the society's own show as typed (Title Case). Removing one leaves old
+  notices as they are;
+- `society_name` / `society_name_gu` → the panel header and PDFs (`lib/exporters.ts` `setSocietyName`), the app's
+  header, splash, menu, receipts, reports and share text (`GET /user/app-info`).
 - With several backend servers, the cache would only clear on the one that saved (one server today).
 
 Event body fields:
 - **Required**: `category_id, title, event_date (yyyy-mm-dd), start_time (HH:mm), venue_name, action`.
-- **Optional**: `description, end_date (>= event_date), end_time, venue_address, map_link, organizer_name, contact_number, poster_url, images (max `EVENT_MAX_IMAGES` links, replaces the list on edit), latitude + longitude (both or neither), plan_id (create only: the Event Planning plan it comes from, own or any for the Super Admin; the plan becomes `converted` with `converted_event_id`, in the same transaction)`. The poster and the images must be in the `events/` Cloudinary folder. The event and its images are saved in one transaction.
+- **Optional**: `email_members (Publish and Share), description, end_date (>= event_date), end_time, venue_address, map_link, organizer_name, contact_number, poster_url, images (max `EVENT_MAX_IMAGES` links, replaces the list on edit), latitude + longitude (both or neither), plan_id (create only: the Event Planning plan it comes from, own or any for the Super Admin; the plan becomes `converted` with `converted_event_id`, in the same transaction)`. The poster and the images must be in the `events/` Cloudinary folder. The event and its images are saved in one transaction.
 
 Event status flow:
 - `draft`: saved, not shown to members.
@@ -628,10 +657,8 @@ Notice flow:
 
 ## Not built yet (planned)
 
-- **Admin panel**: every screen is connected. Still missing: an Audit Logs screen (the data is in `audit_logs`,
-  `GET /admin/activities`).
-- Payment gateway (card / net banking) and push notifications (FCM; tables exist).
-- "Publish and Share (to email)" for events and notices (client review R1).
+- Payment gateway (card / net banking) and push notifications (FCM; tables exist). SMS / WhatsApp API alerts.
+- RFP items not started: Ads Campaign panel, admin theme panel, admin 2FA, family members (5A).
 - Settings the client asked about (executive minimum donation, society name) are now in App Settings; `cash_entry_mode` in `app_settings` is still an open question.
 
 ## Frontends (short)
@@ -659,8 +686,12 @@ Notice flow:
   - **Donation Entries / Add Donation** (`/admin/donations`, Donations permission): member code or donor name, proof
     to Cloudinary `finance/`, Submit (pending) or Save & Verify.
   - **Financial Reports** (`GET /admin/finance`, chart per day for a month) and **Export Reports**: the PDF / Excel is
-    built on the phone (`services/reportExport.ts → makeDonationReport`) from `GET /admin/reports/data/donation`, and
-    recorded in `POST /admin/reports`; Recent Reports rebuild the file when opened.
+    built on the phone (`services/reportExport.ts → makeReport`): Donation Summary / Transaction History / Member-wise
+    from `GET /admin/reports/data/donation`, Expense Report from `…/data/expense`, Income & Expense Summary from
+    `…/data/summary` + `category` + `monthly`. Each is recorded in `POST /admin/reports`; Recent Reports rebuild the file
+    when opened.
+  - **Publish and Share (email)**: Event Preview and Post Notice have an "Also share by email" checkbox
+    (`email_members`); the primary button then reads Post & Share / Publish & Share.
 - **Sharing**: events and notices go to WhatsApp with the venue and a Google Maps link (`services/share.ts`, `wa.me`);
   a verified donation's receipt PDF and the My Donations summary (PDF / Excel) open the share sheet
   (`services/receipt.ts`, expo-print + expo-sharing).
@@ -671,8 +702,10 @@ Notice flow:
   - PDFs (payment proof) are sent as they are.
 - **Admin** (`frontend/admin/src`): Next.js app router `app/(admin)/<screen>`, TanStack Query and Tailwind.
   - **Connected to the backend**: login (`POST /admin/login`, token in `lib/session.ts`, logout calls `DELETE /auth/logout`)
-    , Members (list, detail, edit, deactivate, delete), **Events & Notices** (`components/EventsNotices.tsx`: list with
-    `manage=true`, create / edit / delete, post / draft / cancel, featured; posters upload straight
+    , Members (list, detail, **Add Member** `components/forms/AddMemberForm.tsx`, edit, deactivate, delete), **Audit Logs**
+    (`app/(admin)/audit-logs`: Activity / Login History tabs, user search, area, dates, Excel / PDF), **Events & Notices** (`components/EventsNotices.tsx`: list with
+    `manage=true`, create / edit / delete, post / draft / cancel, featured, a "Share by email" switch (Publish & Share),
+    notice categories from App Settings (`noticeTagLabel`); posters upload straight
     to Cloudinary `events/<yyyy>/<mm>` via `services/cloudinary.ts`, env `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`,
     `_UPLOAD_PRESET`, `_ENV_FOLDER`), **Executives** (requests with counts + review; executives with permission
     switches, add / remove executive), **Media Approval** (`app/(admin)/media`: tabs All / Photos / Videos / Pending / Approved /

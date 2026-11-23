@@ -268,7 +268,7 @@ const adminModule = {
             }
 
             // A token for the Super Admin role (saved in user_devices with the role and device details)
-            const token = await common.generateToken(user, request.body, ROLES.SUPER_ADMIN);
+            const token = await common.generateToken(user, request, ROLES.SUPER_ADMIN);
             return middleware.sendSuccess(res, "rest_login_successful", { userData: common.sanitizeUser(user), token });
         } catch (error) {
             return middleware.sendServerError(res, "adminLogin", error);
@@ -314,7 +314,7 @@ const adminModule = {
                 before ? moneyTotals(before.from_date, before.to_date) : null,
                 monthlyTotals(from_date, to_date),
                 // 4. the latest activities (audit_logs)
-                this.listActivities({ limit: constant.ACTIVITY_DASHBOARD_LIMIT, lang: request.lang, withTotal: false }),
+                this.listActivities({ limit: constant.ACTIVITY_DASHBOARD_LIMIT, lang: request.lang, withTotal: false }), // changes, not logins
             ]);
 
             const pending = {
@@ -446,6 +446,45 @@ const adminModule = {
         }
     },
 
+    // POST /admin/members: a member added by hand (people who don't sign up in the app). Sign-up is already
+    // completed: they log in with this email / mobile and password, and get the next member code unless one is typed.
+    // The email counts as verified (the Super Admin entered it). role executive → the default sections too
+    async createMember(request, res) {
+        try {
+            const { username, email, country_code, mobile_number, password, address, member_code, role } = request.body;
+            const id = await db.transaction(async (tx) => {
+                const [result] = await query.insertQuery("users", {
+                    full_name: username,
+                    email,
+                    country_code,
+                    mobile: mobile_number,
+                    password_hash: await bcrypt.hash(password, constant.BCRYPT_ROUNDS),
+                    member_code: member_code || null,
+                    email_verified_at: new Date(),
+                    signup_step: "completed",
+                    created_by: request.loginUser.id,
+                }, "", tx);
+                const user_id = result.insertId;
+                await tx.query("UPDATE users SET role_id = (SELECT id FROM roles WHERE code = ?) WHERE id = ?", [role, user_id]);
+                await query.insertQuery("user_profiles", { user_id, address_line1: address || null }, "", tx);
+                if (role === ROLES.EXECUTIVE) {
+                    await common.savePermissions(user_id, constant.DEFAULT_EXECUTIVE_SECTIONS, request.loginUser.id, tx);
+                }
+                return user_id;
+            });
+            if (!member_code) await common.assignMemberCode(id);
+
+            common.logActivity(request, ACTIVITY.MEMBER_ADDED, "users", id);
+            const { members } = await this.listMembers({ filters: { id }, limit: 1, withTotal: false });
+            return middleware.sendSuccess(res, "rest_member_added", { member: members[0] });
+        } catch (error) {
+            if (error.code === DB_ERROR.UNIQUE_VIOLATION && UNIQUE_MESSAGES[error.constraint]) {
+                return middleware.sendError(res, UNIQUE_MESSAGES[error.constraint]);
+            }
+            return middleware.sendServerError(res, "adminCreateMember", error);
+        }
+    },
+
     // Changes only the fields sent: name, email, mobile (+ country code), address, member code
     async editMember(request, res) {
         try {
@@ -520,12 +559,36 @@ const adminModule = {
 
     // ---------- Activity log (audit_logs) ----------
 
-    // Newest first, one page: { activities: [{ id, action, text, target, actor_name, table_name, record_id, created_at }] }.
-    // text = the action in the user's language; target = the record's name (event / notice title, member, amount)
-    async listActivities({ page = 1, limit = constant.DEFAULT_PAGE_SIZE, lang = constant.DEFAULT_LANGUAGE, withTotal = true }) {
+    // Newest first, one page: { activities: [{ id, action, text, target, actor_name, actor_role, table_name, record_id,
+    // ip_address, device, created_at }] }. text = the action in the user's language; target = the record's name (event /
+    // notice title, member, amount; for a login the device). filters: { type (changes | logins), area
+    // (constant.ACTIVITY_AREAS), search (who: name / email), from_date, to_date }
+    async listActivities({ filters = {}, page = 1, limit = constant.DEFAULT_PAGE_SIZE, lang = constant.DEFAULT_LANGUAGE, withTotal = true }) {
+        const where = [filters.type === "logins" ? "a.action = ?" : "a.action <> ?"];
+        const params = [ACTIVITY.LOGIN];
+        if (filters.area) {
+            where.push("a.table_name = ANY(?::text[])");
+            params.push(constant.ACTIVITY_AREAS[filters.area]);
+        }
+        if (filters.from_date) {
+            where.push("a.created_at::date >= CAST(? AS date)");
+            params.push(filters.from_date);
+        }
+        if (filters.to_date) {
+            where.push("a.created_at::date <= CAST(? AS date)");
+            params.push(filters.to_date);
+        }
+        if (filters.search) {
+            const like = common.likeText(filters.search);
+            where.push("(actor.full_name ILIKE ? OR actor.email ILIKE ?)");
+            params.push(like, like);
+        }
+        const whereSql = `WHERE ${where.join(" AND ")}`;
+
         const { rows, pagination } = await query.fetchPage(
-            `SELECT a.id, a.action, a.table_name, a.record_id, a.created_at,
-                COALESCE(actor.full_name, actor.email) AS actor_name,
+            `SELECT a.id, a.action, a.table_name, a.record_id, a.ip_address, a.created_at,
+                COALESCE(actor.full_name, actor.email) AS actor_name, ar.code AS actor_role,
+                dv.platform AS device_platform, dv.device_model,
                 CASE a.table_name
                     WHEN 'events' THEN ev.title
                     WHEN 'notices' THEN nt.title
@@ -537,6 +600,8 @@ const adminModule = {
                 dn.amount AS donation_amount
              FROM audit_logs a
              LEFT JOIN users actor ON actor.id = a.user_id
+             LEFT JOIN roles ar ON ar.id = actor.role_id
+             LEFT JOIN user_devices dv ON a.table_name = 'user_devices' AND dv.id = a.record_id
              LEFT JOIN events ev ON a.table_name = 'events' AND ev.id = a.record_id
              LEFT JOIN notices nt ON a.table_name = 'notices' AND nt.id = a.record_id
              LEFT JOIN users tu ON a.table_name = 'users' AND tu.id = a.record_id
@@ -545,29 +610,34 @@ const adminModule = {
              LEFT JOIN future_event_plans pl ON a.table_name = 'future_event_plans' AND pl.id = a.record_id
              LEFT JOIN executive_applications ea ON a.table_name = 'executive_applications' AND ea.id = a.record_id
              LEFT JOIN users au ON au.id = ea.user_id
+             ${whereSql}
              ORDER BY a.created_at DESC, a.id DESC`,
-            "SELECT COUNT(*) AS total FROM audit_logs a",
-            [],
+            `SELECT COUNT(*) AS total FROM audit_logs a LEFT JOIN users actor ON actor.id = a.user_id ${whereSql}`,
+            params,
             { page, limit, withTotal },
         );
-        const activities = rows.map(({ target_name, donation_amount, ...row }) => ({
+        const activities = rows.map(({ target_name, donation_amount, device_platform, device_model, ...row }) => ({
             id: row.id,
             action: row.action,
             text: common.translate(lang, `activity_${row.action}`, row.action),
             target: activityTarget({ ...row, target_name, donation_amount }),
             actor_name: row.actor_name,
+            actor_role: row.actor_role,
             table_name: row.table_name,
             record_id: row.record_id,
+            ip_address: row.ip_address,
+            device: [device_platform, device_model].filter(Boolean).join(" · ") || null,
             created_at: row.created_at,
         }));
         return { activities, pagination };
     },
 
-    // GET /admin/activities?page=&limit= : the whole log, for the dashboard's "View All"
+    // GET /admin/activities?page=&limit=&type=&area=&search=&from_date=&to_date= : the Audit Logs screen (changes or
+    // logins) and the dashboard's "View All"
     async getActivities(request, res) {
         try {
-            const { page, limit } = request.body;
-            return middleware.sendSuccess(res, "rest_keywords_success", await this.listActivities({ page, limit, lang: request.lang }));
+            const { page, limit, ...filters } = request.body;
+            return middleware.sendSuccess(res, "rest_keywords_success", await this.listActivities({ filters, page, limit, lang: request.lang }));
         } catch (error) {
             return middleware.sendServerError(res, "getActivities", error);
         }
@@ -751,6 +821,10 @@ const adminModule = {
             } else {
                 const [result] = await query.insertQuery("donations", { ...data, entered_by: request.loginUser.id });
                 donationId = result.insertId;
+                // An executive's entry waiting for verification: the Super Admin is told (as for a member's donation)
+                if (body.status === DONATION_STATUS.PENDING && !common.hasRole(request.loginUser, constant.SEE_ALL_ROLES)) {
+                    common.notifyAdmins("notify_donation", "notify_admin_donation", `₹${Number(body.amount).toLocaleString("en-IN")} · ${body.purpose}`, "donation", donationId);
+                }
             }
             common.logActivity(request, id ? ACTIVITY.DONATION_UPDATED : ACTIVITY.DONATION_RECORDED, "donations", donationId);
             if (id && statusChanged) tellDonor(donationId, body.status, request.loginUser.id);
@@ -941,6 +1015,10 @@ const adminModule = {
             } else {
                 const [result] = await query.insertQuery("society_transactions", { ...data, entry_type: TRANSACTION_TYPE.PAID, entered_by: request.loginUser.id });
                 expenseId = result.insertId;
+                // An executive's expense waiting for verification: the Super Admin is told
+                if (body.status === EXPENSE_STATUS.PENDING && !common.hasRole(request.loginUser, constant.SEE_ALL_ROLES)) {
+                    common.notifyAdmins("notify_expense", "notify_admin_expense", `₹${Number(body.amount).toLocaleString("en-IN")} · ${body.description}`, "expense", expenseId);
+                }
             }
             common.logActivity(request, id ? ACTIVITY.EXPENSE_UPDATED : ACTIVITY.EXPENSE_CREATED, "society_transactions", expenseId);
             const { expenses } = await this.listExpenses({ filters: { id: expenseId }, limit: 1, withTotal: false });
@@ -1152,7 +1230,8 @@ const adminModule = {
 
     // ---------- App settings ----------
 
-    // Everything the Settings screen shows: the settings, the event categories, the notice tags and the UPI details
+    // Everything the Settings screen shows: the settings (with notice_tags, the notice categories), the event
+    // categories and the UPI details
     async settingsData(lang) {
         const [settings, [categories], [upiRows]] = await Promise.all([
             common.getSettings(),
@@ -1165,7 +1244,6 @@ const adminModule = {
         return {
             settings: { ...settings, logo_url: common.mediaUrl(settings.logo_url) },
             event_categories: categories.map((c) => ({ ...c, name: common.translate(lang, `category_${c.code}`, c.name) })),
-            notice_tags: constant.NOTICE_TAGS, // fixed in the app (translated there)
             upi: upiRows[0] ? { ...upiRows[0], qr_image_url: common.mediaUrl(upiRows[0].qr_image_url) } : null,
         };
     },

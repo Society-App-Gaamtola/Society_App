@@ -3,7 +3,8 @@ import { tones, type Tone, themedStyles } from '../../theme';
 import type { BadgeStatus } from '../../types';
 import Pill from './Pill';
 
-const palette: Record<BadgeStatus, Tone> = {
+// A function, so the tones follow the active theme (light / dark)
+const palette = (): Record<BadgeStatus, Tone> => ({
   Upcoming: tones.success,
   Ongoing: tones.warning,
   Completed: tones.neutral,
@@ -15,12 +16,13 @@ const palette: Record<BadgeStatus, Tone> = {
   Other: tones.neutral,
   Open: tones.info,
   Confirmed: tones.success,
-};
+});
 
-type Props = { status: BadgeStatus; style?: StyleProp<ViewStyle> };
+/** status: a known badge, or any text (e.g. a notice category the society added), shown in the neutral tone */
+type Props = { status: BadgeStatus | (string & {}); style?: StyleProp<ViewStyle> };
 
 export default function StatusBadge({ status, style }: Props) {
-  return <Pill label={status} tone={palette[status]} style={[styles.badge, style]} />;
+  return <Pill label={status} tone={palette()[status as BadgeStatus] ?? tones.neutral} style={[styles.badge, style]} />;
 }
 
 const styles = themedStyles(() => ({

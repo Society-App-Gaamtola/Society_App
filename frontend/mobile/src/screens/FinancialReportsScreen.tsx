@@ -8,7 +8,7 @@ import { common, surface } from '../styles/common';
 import { colors, fonts, PRIMARY_GRADIENT, tones, type Tone, themedStyles } from '../theme';
 import { deleteReportRecord, getFinance, getSavedReports, type ApiFinance } from '../api/executive';
 import { Ionicons, MaterialCommunityIcons, type McIconName } from '../icons';
-import { makeDonationReport, reportTypeOf } from '../services/reportExport';
+import { makeReport, reportTypeOf } from '../services/reportExport';
 import { shareFile } from '../services/receipt';
 import type { DateRange, Report, ReportFormat } from '../types';
 import { MONTHS, formatDateTime, formatRange, fromIsoDay } from '../utils/date';
@@ -90,7 +90,7 @@ function FinancialReports() {
   const openReport = async (r: Report, format: ReportFormat) => {
     setOpening(r.id);
     try {
-      const { uri } = await makeDonationReport(r.type, r.range ?? range, format);
+      const { uri } = await makeReport(r.type, r.range ?? range, format);
       await shareFile(uri, format, r.type);
     } catch (e) {
       Alert.alert(t('Could not open report'), e instanceof Error ? e.message : t('Please try again.'));

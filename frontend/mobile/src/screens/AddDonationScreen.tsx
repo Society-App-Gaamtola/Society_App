@@ -17,6 +17,7 @@ import { Ionicons } from '../icons';
 import type { PaymentMode } from '../types';
 import { formatDate, fromIsoDay, toIsoDay } from '../utils/date';
 import { showToast } from '../utils/toast';
+import { useT } from '../i18n';
 import {
   AppHeader,
   FormActionBar,
@@ -51,6 +52,7 @@ export default function AddDonationScreen() {
 }
 
 function AddDonationForm() {
+  const t = useT();
   const navigation = useNavigation<Nav>();
   const { params } = useRoute<RouteProp<HomeStackParamList, 'AddDonation'>>();
   const { user } = useAuth();
@@ -87,7 +89,7 @@ function AddDonationForm() {
         setReceipt(d.proofUrl ? { name: 'Saved proof', uri: d.proofUrl } : null);
         setStatus(data.donation.status);
       })
-      .catch((e) => Alert.alert('Could not load the entry', e instanceof Error ? e.message : 'Please try again.'))
+      .catch((e) => Alert.alert(t('Could not load the entry'), e instanceof Error ? e.message : t('Please try again.')))
       .finally(() => setLoadingEntry(false));
   }, [editId]);
   const { errors, setErrors, clearError, setError, fieldProps } = useFormErrors<Field>();
@@ -146,7 +148,7 @@ function AddDonationForm() {
   // New entries wait for verification; "Save & Verify" counts them at once (only verified entries count in totals)
   const save = async (nextStatus: ApiEntryStatus) => {
     if (!validate()) {
-      showToast('Please fill all required fields');
+      showToast(t('Please fill all required fields'));
       return;
     }
     setSaving(true);
@@ -175,7 +177,7 @@ function AddDonationForm() {
       showToast(message);
       navigation.goBack();
     } catch (e) {
-      Alert.alert('Could not save the entry', e instanceof Error ? e.message : 'Please try again.');
+      Alert.alert(t('Could not save the entry'), e instanceof Error ? e.message : t('Please try again.'));
     } finally {
       setSaving(false);
     }
@@ -195,8 +197,8 @@ function AddDonationForm() {
       <AppHeader leftType="back" rightIcons={['bell', 'avatar']} />
       <KeyboardAvoid>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Text style={common.heading}>{editId ? 'Edit Donation Entry' : 'Add Donation Entry'}</Text>
-          <Text style={styles.subtext}>Fill in the donation details below.</Text>
+          <Text style={common.heading}>{t(editId ? 'Edit Donation Entry' : 'Add Donation Entry')}</Text>
+          <Text style={styles.subtext}>{t('Fill in the donation details below.')}</Text>
 
           <FormField label="Donor Name" required={!memberId.trim()} error={errors.donorName}>
             <InputField

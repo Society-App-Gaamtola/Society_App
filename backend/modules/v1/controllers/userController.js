@@ -57,6 +57,12 @@ const userController = {
         return userModule.getMembers(request, res);
     },
 
+    async getNotificationSettings(request, res) {
+        return userModule.getNotificationSettings(request, res);
+    },
+    async saveNotificationSettings(request, res) {
+        return userModule.saveNotificationSettings(request, res);
+    },
     async getAppInfo(request, res) {
         return userModule.getAppInfo(request, res);
     },

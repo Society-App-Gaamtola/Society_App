@@ -1,4 +1,4 @@
-import { adminMembersApi, type MemberChanges, type MemberQuery } from '@/services/adminMembers';
+import { adminMembersApi, type MemberChanges, type MemberQuery, type NewMember } from '@/services/adminMembers';
 import type { AdminMember, MemberRole } from '@/types';
 import { useBackendAction, useBackendList, useBackendOne } from './useBackend';
 
@@ -10,6 +10,8 @@ const EXECUTIVES = 'adminExecutives';
 export const useMembersPage = (query: MemberQuery) => useBackendList(KEY, query, adminMembersApi.list);
 
 export const useMemberDetails = (id: string | number | undefined) => useBackendOne(KEY, id, adminMembersApi.get);
+
+export const useAddMember = () => useBackendAction([KEY, EXECUTIVES], (member: NewMember) => adminMembersApi.create(member));
 
 export const useEditMember = () =>
   // Saves the changed fields, then the role if it changed (the role has its own API). Shows the first message

@@ -7,7 +7,7 @@ import type { HomeStackParamList, MainTabParamList } from '../navigation/types';
 import { common, surface } from '../styles/common';
 import { useAuth } from '../context/AuthContext';
 import { colors, fonts, themedStyles } from '../theme';
-import { SOCIETY_NAME } from '../config';
+import { useAppInfo } from '../services/appInfo';
 import { getHome, toNotice, toSocietyEvent } from '../api/user';
 import type { Notice, SocietyEvent } from '../types';
 import { Ionicons, MaterialCommunityIcons, type IoniconName } from '../icons';
@@ -25,6 +25,7 @@ const H_PADDING = 16;
 
 export default function HomeScreen() {
   const t = useT();
+  const { society_name: societyName } = useAppInfo();
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
   const firstName = user?.name.split(' ')[0];
@@ -95,7 +96,7 @@ export default function HomeScreen() {
         }
       >
         <Text style={styles.greeting}>{`${t('Namaste')}${firstName ? `, ${firstName}` : ''} 👋`}</Text>
-        <Text style={styles.welcome}>{t('Welcome to {name}', { name: SOCIETY_NAME })}</Text>
+        <Text style={styles.welcome}>{t('Welcome to {name}', { name: societyName })}</Text>
 
         {home && home.hero.length > 0 ? (
           <FeaturedCarousel items={home.hero} onOpen={openEvent} horizontalPadding={H_PADDING} />

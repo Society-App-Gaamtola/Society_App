@@ -34,7 +34,7 @@ const eventListSchema = Joi.object({
 const noticeListSchema = Joi.object({
   ...pagination,
   ...dateRange,
-  tag: Joi.string().trim().lowercase().valid(...constant.NOTICE_TAGS),
+  tag: Joi.string().trim().lowercase().max(constant.NOTICE_TAG_MAX_LENGTH), // one of App Settings' notice_tags
   mine: Joi.boolean(),
   manage: Joi.boolean(), // every status (the admin panel's Notices tab)
   status: Joi.string().valid(...Object.values(constant.NOTICE_STATUS)),
@@ -86,6 +86,13 @@ const notificationListSchema = Joi.object({
   type: Joi.string().valid(...Object.values(constant.NOTIFICATION_TYPE)),
 });
 
+// The app's Settings → Notifications switches: send only what changes
+const notificationSettingsSchema = Joi.object({
+  events: Joi.boolean(),
+  notices: Joi.boolean(),
+  payments: Joi.boolean(),
+}).min(1);
+
 const memberListSchema = Joi.object({
   ...pagination,
   search: Joi.string().trim().max(constant.SEARCH_MAX_LENGTH).allow(""),
@@ -121,6 +128,7 @@ export default {
   mediaListSchema,
   editMediaSchema,
   notificationListSchema,
+  notificationSettingsSchema,
   memberListSchema,
   donationListSchema,
   donationSchema,

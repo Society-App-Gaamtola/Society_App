@@ -95,7 +95,11 @@ const saveEvent = async (request, res, existingId = null) => {
         if (!plan || !common.canChange(user, plan.owner_id)) return middleware.sendError(res, "rest_event_plan_not_found");
     }
 
-    const data = { ...eventFields(body), ...eventStatusFields(body.action, body.publish_at, user.id) };
+    const data = {
+        ...eventFields(body),
+        ...eventStatusFields(body.action, body.publish_at, user.id),
+        email_members: body.email_members ? 1 : 0, // Publish and Share: emailed when it goes live (notifyNewContent)
+    };
     // No separate cover: the first image is the poster (home slider, list cards)
     data.poster_url = data.poster_url ?? images[0] ?? null;
 
@@ -155,12 +159,18 @@ const saveNoticeRows = (data, recipientIds, existingId, user_id) => db.transacti
 });
 
 const saveNotice = async (request, res, existingId = null) => {
-    const { title, body, tag, event_id, audience, recipient_ids, action, publish_at } = request.body;
+    const { title, body, tag, event_id, audience, recipient_ids, action, publish_at, email_members } = request.body;
+    // The category must be one of App Settings' notice_tags; none sent = the first one
+    const { notice_tags } = await common.getSettings();
+    const noticeTag = tag ?? notice_tags[0];
+    if (!notice_tags.includes(noticeTag)) return middleware.sendError(res, "rest_notice_tag_invalid");
+
     const publishing = action === NOTICE_ACTIONS.PUBLISH;
     const data = {
         title,
         body,
-        tag,
+        tag: noticeTag,
+        email_members: email_members ? 1 : 0, // Publish and Share: emailed when it goes live (notifyNewContent)
         event_id: event_id ?? null,
         audience,
         status: publishing ? NOTICE_STATUS.PUBLISHED : NOTICE_STATUS.DRAFT,

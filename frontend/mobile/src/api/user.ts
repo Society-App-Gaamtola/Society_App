@@ -5,6 +5,9 @@ import { t } from '../i18n';
 import type { IoniconName } from '../icons';
 import { mediaUrl, request } from './client';
 
+/** "garba prasad" → "Garba Prasad" (services/appInfo has the same for screens) */
+const noticeTagLabel = (tag: string) => tag.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+
 /** An event as the backend sends it (`listEvents` in backend/modules/v1/module/userModule.js). */
 export type ApiEvent = {
   id: number;
@@ -35,7 +38,8 @@ export type ApiNotice = {
   id: number;
   title: string;
   body: string;
-  tag: 'important' | 'general' | 'event';
+  /** One of App Settings' notice categories, lowercase: important, general, event or the society's own */
+  tag: string;
   event_id: number | null;
   /** ISO date-time */
   published_at: string;
@@ -81,6 +85,11 @@ export const getNotice = (id: string) => request<{ notice: ApiNotice }>('GET', `
 export type SocialNetwork = 'facebook' | 'instagram' | 'x' | 'youtube';
 export type ApiAppInfo = {
   society_name: string;
+  /** The name in Gujarati script, and whether the header shows it (App Settings) */
+  society_name_gu: string;
+  show_gujarati_name: boolean;
+  /** Notice categories, lowercase (Post Notice, notice board filter) */
+  notice_tags: string[];
   contact_email: string;
   phone: string;
   address: string;
@@ -88,6 +97,12 @@ export type ApiAppInfo = {
   /** Only the networks the admin filled in (App Settings → Social Networking), in display order */
   social_links: { network: SocialNetwork; url: string }[];
 };
+
+/** The Settings → Notifications switches, saved per user (a type switched off is no longer delivered) */
+export type NotificationSettings = { events: boolean; notices: boolean; payments: boolean };
+export const getNotificationSettings = () => request<{ settings: NotificationSettings }>('GET', '/user/notification-settings');
+export const saveNotificationSettings = (changes: Partial<NotificationSettings>) =>
+  request<{ settings: NotificationSettings }>('PUT', '/user/notification-settings', { body: changes });
 
 /** The society's details and social pages, as set in the admin panel. */
 export const getAppInfo = () => request<ApiAppInfo>('GET', '/user/app-info');
@@ -103,7 +118,7 @@ const EVENT_BADGE: Record<ApiEvent['event_status'], BadgeStatus> = {
   completed: 'Completed',
 };
 
-const NOTICE_TAG: Record<ApiNotice['tag'], { tag: BadgeStatus; icon: IoniconName }> = {
+const NOTICE_TAG: Record<string, { tag: BadgeStatus; icon: IoniconName }> = {
   important: { tag: 'Important', icon: 'alert-circle-outline' },
   general: { tag: 'General', icon: 'megaphone-outline' },
   event: { tag: 'Event', icon: 'calendar-outline' },
@@ -156,5 +171,6 @@ export const toNotice = (n: ApiNotice): Notice => ({
   date: formatDate(new Date(n.published_at)),
   description: n.body,
   eventId: n.event_id ? String(n.event_id) : null,
-  ...NOTICE_TAG[n.tag],
+  // A category the society added in App Settings: its name as typed, with a tag icon
+  ...(NOTICE_TAG[n.tag] ?? { tag: noticeTagLabel(n.tag), icon: 'pricetag-outline' }),
 });

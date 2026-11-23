@@ -9,6 +9,7 @@ import constant from "../config/constant.js";
 import en from "../languages/en.js";
 import hi from "../languages/hn.js";
 import gu from "../languages/guj.js";
+import { createContentMailTemplate } from "./mail.js";
 
 const LANGUAGE_FILES = { en, hi, gu };
 
@@ -146,7 +147,8 @@ const common = {
     },
 
     // An alert to every Super Admin (in-app notification), when that alert is switched on in the settings
-    // (settingKey = notify_new_member / notify_donation / notify_executive_request / notify_media_upload). Never throws
+    // (settingKey = notify_new_member / notify_donation / notify_executive_request / notify_media_upload /
+    // notify_expense). Never throws
     async notifyAdmins(settingKey, title, message = "", ref_type = null, ref_id = null) {
         try {
             const settings = await common.getSettings();
@@ -183,6 +185,13 @@ const common = {
         } catch (error) {
             console.error("[activity] Could not save:", error.message);
         }
+    },
+
+    // Login history (the Audit Logs screen): one audit_logs row per login, pointing at the session (user_devices),
+    // which holds the platform and device model. `request` is the request or its body. Not awaited, never throws
+    logLogin(request, user_id, device_id) {
+        const ip = request?.ip ?? request?.body?.ip ?? request?.ip_address ?? null;
+        common.logActivity({ loginUser: { id: user_id }, ip }, constant.ACTIVITY.LOGIN, "user_devices", device_id);
     },
 
     // ---------- Executive permissions (one executive_permissions row per allowed section) ----------
@@ -350,10 +359,12 @@ const common = {
                 // Logging in again must not lift a block placed on this device
                 const status = deviceExists[0].status === DEVICE_STATUS.BLOCKED ? DEVICE_STATUS.BLOCKED : DEVICE_STATUS.ACTIVE;
                 await query.updateQuery("user_devices", { ...devicePayload, status }, "id = ?", [deviceExists[0].id]);
+                common.logLogin(request, user_id, deviceExists[0].id);
                 return token;
             }
 
-            await query.insertQuery("user_devices", { ...devicePayload, user_id, device_uid, status: DEVICE_STATUS.ACTIVE });
+            const [added] = await query.insertQuery("user_devices", { ...devicePayload, user_id, device_uid, status: DEVICE_STATUS.ACTIVE });
+            common.logLogin(request, user_id, added.insertId);
             return token;
         } catch (error) {
             console.error("Error generating token: ", error);
@@ -390,12 +401,16 @@ const common = {
                 sent_at: new Date(),
             });
 
-            // 2. One row per receiver, so each user has their own read / unread state (active, signed-up users only)
+            // 2. One row per receiver, so each user has their own read / unread state (active, signed-up users only).
+            // Users who switched this type off in the app's Settings are left out (the column name comes from code)
+            const pref = constant.NOTIFICATION_PREF_COLUMNS[type];
             await db.query(
                 `INSERT INTO notification_recipients (notification_id, user_id)
-                 SELECT ?, id FROM users
-                 WHERE is_deleted = 0 AND is_active = 1 AND status = 'active' AND signup_step = 'completed'
-                 ${toEveryone ? "" : "AND id = ANY(?::bigint[])"}`,
+                 SELECT ?, u.id FROM users u
+                 ${pref ? "LEFT JOIN user_profiles p ON p.user_id = u.id" : ""}
+                 WHERE u.is_deleted = 0 AND u.is_active = 1 AND u.status = 'active' AND u.signup_step = 'completed'
+                 ${pref ? `AND COALESCE(p.${pref}, 1) = 1` : ""}
+                 ${toEveryone ? "" : "AND u.id = ANY(?::bigint[])"}`,
                 toEveryone ? [result.insertId] : [result.insertId, receiver_ids],
             );
 
@@ -415,39 +430,55 @@ const common = {
             const [events] = await db.query(
                 `UPDATE events SET notified_at = NOW()
                  WHERE status = 'posted' AND notified_at IS NULL AND is_deleted = 0 AND is_active = 1
-                 RETURNING id, title, TO_CHAR(event_date, 'DD Mon YYYY') AS day, venue_name, created_by`,
+                 RETURNING id, title, description, TO_CHAR(event_date, 'DD Mon YYYY') AS day, TO_CHAR(event_date + start_time, 'HH12:MI AM') AS time,
+                    venue_name, venue_address, created_by, email_members`,
             );
-            for (const e of event_notifications ? events.rows : []) {
-                await common.sendNotification({
-                    sender_id: e.created_by,
-                    receiver_ids: constant.NOTIFY_EVERYONE,
-                    type: constant.NOTIFICATION_TYPE.EVENT,
-                    title: e.title,
-                    message: `${e.day} · ${e.venue_name}`,
-                    ref_type: "event",
-                    ref_id: e.id,
-                });
+            for (const e of events.rows) {
+                if (event_notifications) {
+                    await common.sendNotification({
+                        sender_id: e.created_by,
+                        receiver_ids: constant.NOTIFY_EVERYONE,
+                        type: constant.NOTIFICATION_TYPE.EVENT,
+                        title: e.title,
+                        message: `${e.day} · ${e.venue_name}`,
+                        ref_type: "event",
+                        ref_id: e.id,
+                    });
+                }
+                // Publish and Share (email): asked for by whoever posted it, so sent even with notifications off
+                if (e.email_members) {
+                    await common.emailMembers(constant.NOTIFY_EVERYONE, {
+                        heading: "New Event",
+                        title: e.title,
+                        details: [["Date", e.day], ["Time", e.time], ["Venue", [e.venue_name, e.venue_address].filter(Boolean).join(", ")]],
+                        body: e.description,
+                    });
+                }
             }
 
             const [notices] = await db.query(
                 `UPDATE notices SET notified_at = NOW()
                  WHERE status = 'published' AND (published_at IS NULL OR published_at <= NOW())
                    AND notified_at IS NULL AND is_deleted = 0 AND is_active = 1
-                 RETURNING id, title, body, audience, created_by`,
+                 RETURNING id, title, body, audience, created_by, email_members`,
             );
             for (const n of notices.rows) {
                 const [recipients] = n.audience === "all"
                     ? [[]]
                     : await db.query("SELECT user_id FROM notice_recipients WHERE notice_id = ?", [n.id]);
+                const receiver_ids = n.audience === constant.NOTICE_AUDIENCE.ALL ? constant.NOTIFY_EVERYONE : recipients.map((r) => r.user_id);
                 await common.sendNotification({
                     sender_id: n.created_by,
-                    receiver_ids: n.audience === constant.NOTICE_AUDIENCE.ALL ? constant.NOTIFY_EVERYONE : recipients.map((r) => r.user_id),
+                    receiver_ids,
                     type: constant.NOTIFICATION_TYPE.NOTICE,
                     title: n.title,
                     message: n.body,
                     ref_type: "notice",
                     ref_id: n.id,
                 });
+                if (n.email_members) {
+                    await common.emailMembers(receiver_ids, { heading: "Notice", title: n.title, body: n.body });
+                }
             }
             return events.rows.length + notices.rows.length;
         } catch (error) {
@@ -456,9 +487,38 @@ const common = {
         }
     },
 
+    // "Publish and Share (email)": one event / notice mailed to its members (receiver_ids, or constant.NOTIFY_EVERYONE
+    // for every active member who finished sign-up). Members go in Bcc, MAIL_BATCH_SIZE per mail, so nobody sees the
+    // others' addresses. mail = { heading, title, details, body } (config/mail.js). Never throws
+    async emailMembers(receiver_ids, mail) {
+        try {
+            const toEveryone = receiver_ids === constant.NOTIFY_EVERYONE;
+            if (!toEveryone && !receiver_ids?.length) return;
+            const sender = process.env.MAIL_FROM || process.env.SMTP_USER;
+            if (!sender) return; // mail is not set up on this server
+
+            const [rows] = await db.query(
+                `SELECT DISTINCT email FROM users
+                 WHERE is_deleted = 0 AND is_active = 1 AND status = 'active' AND signup_step = 'completed' AND email <> ''
+                 ${toEveryone ? "" : "AND id = ANY(?::bigint[])"}`,
+                toEveryone ? [] : [receiver_ids],
+            );
+            const { society_name } = await common.getSettings();
+            const htmlMessage = createContentMailTemplate({ societyName: society_name, ...mail });
+            const subject = `${mail.heading}: ${mail.title}`.slice(0, constant.TITLE_MAX_LENGTH);
+            const emails = rows.map((r) => r.email);
+            for (let i = 0; i < emails.length; i += constant.MAIL_BATCH_SIZE) {
+                await common.sendOtpMail({ toEmail: sender, bccEmails: emails.slice(i, i + constant.MAIL_BATCH_SIZE), subject, htmlMessage });
+            }
+        } catch (error) {
+            console.error("[emailMembers]", error.message);
+        }
+    },
+
+    // Sends one email (OTP mails, and the members' Publish and Share mails with bccEmails).
     // With BREVO_API_KEY the mail goes through Brevo's HTTPS API, which works where email ports are blocked
     // (Render's free plan blocks 25 / 465 / 587). Without it, Gmail SMTP is used as before
-    async sendOtpMail({ toEmail, subject, htmlMessage }) {
+    async sendOtpMail({ toEmail, subject, htmlMessage, bccEmails = [] }) {
         if (!toEmail || !subject || !htmlMessage) {
             return { skipped: true, reason: "Missing toEmail/subject/htmlMessage" };
         }
@@ -474,6 +534,7 @@ const common = {
                 body: JSON.stringify({
                     sender: { email: mailFrom, name: process.env.APP_NAME || "Society App" },
                     to: [{ email: toEmail }],
+                    ...(bccEmails.length ? { bcc: bccEmails.map((email) => ({ email })) } : {}),
                     subject,
                     htmlContent: htmlMessage,
                 }),
@@ -512,6 +573,7 @@ const common = {
         const info = await transporter.sendMail({
             from: mailFrom,
             to: toEmail,
+            ...(bccEmails.length ? { bcc: bccEmails } : {}),
             subject,
             html: htmlMessage,
         });

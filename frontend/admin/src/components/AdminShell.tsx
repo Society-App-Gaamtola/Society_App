@@ -20,6 +20,7 @@ import {
   Menu,
   ReceiptText,
   Search,
+  ScrollText,
   Settings,
   User,
   Users,
@@ -31,6 +32,7 @@ import { getSession } from '@/lib/session';
 import { ChangePasswordDialog } from './forms/ChangePasswordDialog';
 import { useMyProfile } from '@/hooks/useAccount';
 import { useLogout } from '@/hooks/useLogout';
+import { setSocietyName } from '@/lib/exporters';
 import { cn } from '@/lib/utils';
 import { PageSkeleton } from './common';
 import { LoadingBar } from './LoadingBar';
@@ -46,10 +48,11 @@ const NAV = [
   { href: '/expenses', label: 'Expenses', icon: ReceiptText },
   { href: '/reports', label: 'Financial Reports', icon: BarChart3 },
   { href: '/media', label: 'Media Approval', icon: ImageIcon },
+  { href: '/audit-logs', label: 'Audit Logs', icon: ScrollText },
   { href: '/settings', label: 'App Settings', icon: Settings },
 ];
 
-const GUJARATI_NAME = 'શ્રી ગામટોળા યુવક મિત્ર મંડળ';
+const DEFAULT_GUJARATI_NAME = 'શ્રી ગામટોળા યુવક મિત્ર મંડળ';
 const DEFAULT_NAME = 'Shri Gamtola Yuvak Mitra Mandal';
 
 function Notifications() {
@@ -57,9 +60,9 @@ function Notifications() {
   const { data } = useDashboardStats();
   const items = data
     ? [
-        { count: data.pendingRequests, label: 'executive requests to review', href: '/executives' },
-        { count: data.pendingDonations, label: 'donations to verify', href: '/donations?status=Pending' },
-        { count: data.pendingExpenses, label: 'expenses to verify', href: '/expenses?status=Pending' },
+        { count: data.pendingRequests, label: 'executive requests to review', href: '/executives?status=pending' },
+        { count: data.pendingDonations, label: 'donations to verify', href: '/donations?status=pending' },
+        { count: data.pendingExpenses, label: 'expenses / cash entries to verify', href: '/expenses?status=pending' },
         { count: data.pendingMedia, label: 'photos/videos to approve', href: '/media?tab=pending' },
       ].filter((i) => i.count > 0)
     : [];
@@ -102,11 +105,19 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
   const { data: profile } = useMyProfile();
   const { data } = useAppSettings();
   const settings = data?.settings;
+  // PDFs (tables, reports, receipts) carry the name saved in App Settings
+  useEffect(() => setSocietyName(settings?.society_name), [settings?.society_name]);
 
+  // Searches the list on screen: keeps the open tab and filters (?tab=…), goes back to page 1
   const onSearch = (e: FormEvent) => {
     e.preventDefault();
     const q = query.trim();
-    router.push(q ? `${pathname}?search=${encodeURIComponent(q)}` : pathname);
+    const params = new URLSearchParams(window.location.search);
+    params.delete('page');
+    if (q) params.set('search', q);
+    else params.delete('search');
+    const next = params.toString();
+    router.push(next ? `${pathname}?${next}` : pathname);
   };
 
   return (
@@ -124,7 +135,7 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
         )}
       </span>
       <div className="hidden min-w-0 leading-tight sm:block">
-        {settings?.show_gujarati_name !== false ? <div className="truncate font-gujarati text-lg font-bold">{GUJARATI_NAME}</div> : null}
+        {settings?.show_gujarati_name !== false ? <div className="truncate font-gujarati text-lg font-bold">{settings?.society_name_gu || DEFAULT_GUJARATI_NAME}</div> : null}
         <div className={cn('truncate', settings?.show_gujarati_name !== false ? 'text-sm text-white/90' : 'text-lg font-bold')}>
           {settings?.society_name || DEFAULT_NAME}
         </div>

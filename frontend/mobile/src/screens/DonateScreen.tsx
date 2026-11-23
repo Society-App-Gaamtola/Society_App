@@ -41,6 +41,35 @@ function InfoBox({ icon, text }: { icon: IoniconName; text: string }) {
   );
 }
 
+/** UPI safety notice and the donor's declaration, shown with the UPI methods (client review: RFP item) */
+const UPI_SAFETY_TIPS = [
+  'Pay only to the society UPI ID shown here, and check the payee name before you pay.',
+  'Never share your UPI PIN or OTP with anyone. The society will never ask for it.',
+  'You never need your UPI PIN to receive money. Ignore calls or messages that ask for it.',
+  'Enter the UTR only after your payment app shows the payment as successful.',
+];
+
+function UpiSafetyNotice({ upiId }: { upiId?: string }) {
+  const t = useT();
+  return (
+    <View style={styles.safety} accessibilityRole="summary">
+      <View style={styles.safetyHeader}>
+        <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
+        <Text style={styles.safetyTitle}>{t('Pay safely with UPI')}</Text>
+      </View>
+      {upiId ? <Text style={styles.safetyLine}>{t('Society UPI ID: {id}', { id: upiId })}</Text> : null}
+      {UPI_SAFETY_TIPS.map((tip) => (
+        <Text key={tip} style={styles.safetyLine}>
+          • {t(tip)}
+        </Text>
+      ))}
+      <Text style={styles.declaration}>
+        {t("By submitting, you confirm that this is a voluntary donation from your own funds for the society's activities.")}
+      </Text>
+    </View>
+  );
+}
+
 function ReceiptRow({ label, value }: { label: string; value: string }) {
   const t = useT();
   return (
@@ -235,6 +264,7 @@ export default function DonateScreen() {
 
               {NEEDS_UTR.includes(method) ? (
                 <>
+                  <UpiSafetyNotice upiId={upi?.upi_id} />
                   <FieldLabel text="UPI Transaction ID (UTR)" />
                   <InputField
                     icon="receipt-outline"
@@ -349,6 +379,11 @@ const styles = themedStyles(() => ({
   sectionTitle: { fontFamily: fonts.bold, fontSize: 15, color: colors.textDark, marginTop: 20, marginBottom: 10 },
   panel: { gap: 12, marginTop: 16 },
   info: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: colors.noteBackground, borderRadius: 12, padding: 12 },
+  safety: { gap: 6, backgroundColor: colors.noteBackground, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: colors.border },
+  safetyHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  safetyTitle: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textDark },
+  safetyLine: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, color: colors.textDark },
+  declaration: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16, color: colors.textMuted, marginTop: 4 },
   infoText: { flex: 1, fontFamily: fonts.regular, fontSize: 12, lineHeight: 18, color: colors.textDark },
   error: { fontFamily: fonts.regular, fontSize: 11, color: colors.danger, marginTop: -6, marginLeft: 2 },
   success: { alignItems: 'center', gap: 8, marginTop: 20 },

@@ -10,6 +10,7 @@ import { useAppSettings, useDownloadBackup, useSaveSettings } from '@/hooks/useF
 import { useUrlState } from '@/hooks/useUrlState';
 import { cn, formatDateTime, fromUtc } from '@/lib/utils';
 import { uploadBrandingImage } from '@/services/cloudinary';
+import { noticeTagLabel } from '@/services/adminEvents';
 import { SOCIAL_NETWORKS, type AppSettings, type SettingsChanges, type SettingsData, type SocialLinks, type UpiDetails } from '@/services/finance';
 
 type BoolKey = { [K in keyof AppSettings]: AppSettings[K] extends boolean ? K : never }[keyof AppSettings];
@@ -30,7 +31,6 @@ const SECTIONS: { value: string; label: string; icon: LucideIcon }[] = [
   { value: 'backup', label: 'Backup & Data', icon: Database },
   { value: 'about', label: 'About', icon: Info },
 ];
-const NOTICE_TAG_LABEL: Record<string, string> = { important: 'Important', general: 'General', event: 'Event' };
 const EMPTY_UPI: UpiDetails = { payee_name: '', upi_id: '', qr_image_url: null, display_note: '' };
 
 const toDraft = (d: SettingsData): Draft => ({ settings: d.settings, categories: d.event_categories.map(({ id, name }) => ({ id, name })), upi: d.upi });
@@ -207,6 +207,9 @@ export default function SettingsPage() {
                     <Field label="Society Name" error={nameError}>
                       <Input value={s.society_name} onChange={(e) => set('society_name', e.target.value)} />
                     </Field>
+                    <Field label="Society Name (Gujarati)">
+                      <Input className="font-gujarati" value={s.society_name_gu} onChange={(e) => set('society_name_gu', e.target.value)} placeholder="શ્રી ગામટોળા યુવક મિત્ર મંડળ" />
+                    </Field>
                     <Field label="Contact Email" error={emailError}>
                       <Input type="email" value={s.contact_email} onChange={(e) => set('contact_email', e.target.value)} />
                     </Field>
@@ -269,8 +272,10 @@ export default function SettingsPage() {
             {section === 'notice-categories' ? (
               <>
                 <h2 className="text-lg font-bold">Notice Categories</h2>
-                <p className="mb-4 text-sm text-muted-foreground">These are fixed in the app (translated into Gujarati and Hindi there).</p>
-                <ListEditor items={data.notice_tags.map((t) => NOTICE_TAG_LABEL[t] ?? t)} readOnly />
+                <p className="mb-4 text-sm text-muted-foreground">
+                  Shown when posting a notice and in the app&apos;s notice board filter. Important, General and Event are translated in the app; new ones show as typed.
+                </p>
+                <ListEditor items={s.notice_tags.map(noticeTagLabel)} onChange={(items) => set('notice_tags', items.map((t) => t.toLowerCase()))} />
               </>
             ) : null}
 
@@ -345,6 +350,7 @@ export default function SettingsPage() {
                 <ToggleRow draft={s} field="notify_donation" label="Donation received" onChange={set} />
                 <ToggleRow draft={s} field="notify_executive_request" label="New executive request" onChange={set} />
                 <ToggleRow draft={s} field="notify_media_upload" label="New photo or video uploaded" onChange={set} />
+                <ToggleRow draft={s} field="notify_expense" label="Expense or cash entry waiting for verification" hint="Entered by an executive in the app or the panel." onChange={set} />
                 <ToggleRow draft={s} field="event_notifications" label="Send new event notifications to members" onChange={set} />
               </>
             ) : null}
@@ -352,10 +358,10 @@ export default function SettingsPage() {
             {section === 'appearance' ? (
               <>
                 <h2 className="text-lg font-bold">Appearance</h2>
-                <p className="mb-4 text-sm text-muted-foreground">How the society name appears in the admin panel header</p>
+                <p className="mb-4 text-sm text-muted-foreground">How the society name appears in the admin panel header. The app always shows the Gujarati name (set in General Settings).</p>
                 <ToggleRow draft={s} field="show_gujarati_name" label="Show the Gujarati name in the header" hint="When off, only the English society name is shown." onChange={set} />
                 <div className="mt-3 rounded-lg bg-maroon px-4 py-3 text-white">
-                  {s.show_gujarati_name ? <div className="font-gujarati text-lg font-bold">શ્રી ગામટોળા યુવક મિત્ર મંડળ</div> : null}
+                  {s.show_gujarati_name ? <div className="font-gujarati text-lg font-bold">{s.society_name_gu || 'શ્રી ગામટોળા યુવક મિત્ર મંડળ'}</div> : null}
                   <div className={s.show_gujarati_name ? 'text-sm text-white/90' : 'text-lg font-bold'}>{s.society_name}</div>
                 </div>
               </>
@@ -416,7 +422,7 @@ export default function SettingsPage() {
               </>
             ) : null}
 
-            {!['backup', 'about', 'notice-categories'].includes(section) ? (
+            {!['backup', 'about'].includes(section) ? (
               <div className="mt-6 flex items-center justify-end gap-2 border-t border-border pt-4">
                 {changed ? (
                   <Button type="button" variant="ghost" onClick={() => setDraft(toDraft(data))}>

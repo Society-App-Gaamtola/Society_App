@@ -52,6 +52,7 @@ const en = {
 	// Events / notices
 	rest_event_not_found: "Event not found",
 	rest_notice_not_found: "Notice not found",
+	rest_notice_tag_invalid: "Please choose a notice category from the list",
 
 	// Media
 	rest_invalid_media_folder: "This file was not uploaded to the right place. Please upload it again",
@@ -88,6 +89,7 @@ const en = {
 
 	// Roles and Executive Requests
 	rest_member_updated: "Member details updated",
+	rest_member_added: "Member added",
 	rest_member_activated: "Member activated",
 	rest_member_deactivated: "Member deactivated. They are logged out of the app",
 	rest_member_deleted: "Member deleted",
@@ -128,6 +130,7 @@ const en = {
 	activity_media_approved: "Approved photo / video",
 	activity_media_rejected: "Rejected photo / video",
 	activity_member_joined: "New member joined",
+	activity_member_added: "Added a member",
 	activity_member_updated: "Updated member",
 	activity_member_activated: "Activated member",
 	activity_member_deactivated: "Deactivated member",
@@ -153,6 +156,7 @@ const en = {
 	activity_report_generated: "Generated report",
 	activity_settings_updated: "Updated app settings",
 	activity_backup_downloaded: "Downloaded a database backup",
+	activity_login: "Logged in",
 	rest_donation_saved: "Donation saved",
 	rest_donation_updated: "Donation updated",
 	rest_donation_deleted: "Donation deleted",
@@ -178,6 +182,7 @@ const en = {
 	notify_admin_donation: "New donation to verify",
 	notify_admin_executive_request: "New executive request",
 	notify_admin_media_upload: "New photo / video to approve",
+	notify_admin_expense: "New expense to verify",
 	rest_executive_donation_too_low: "The donation must be at least the executive minimum amount",
 	rest_member_not_found: "Member not found",
 	rest_role_updated: "Role updated",

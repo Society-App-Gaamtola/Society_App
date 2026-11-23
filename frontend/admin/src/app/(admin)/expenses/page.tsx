@@ -188,8 +188,13 @@ export default function ExpensesPage() {
   const [deleting, setDeleting] = useState<Expense | null>(null);
   const summary = list.data?.summary;
 
-  const societyName = settings?.settings.society_name;
-  const voucher = (e: Expense) => exportExpenseVoucher(e, { societyName, modeLabel: methodLabel, statusLabel: expenseStatusLabel });
+  // Receipts carry App Settings' name, phone(s), address and logo
+  const s = settings?.settings;
+  const society = useMemo(
+    () => ({ name: s?.society_name, phone: s?.phone, address: s?.address, logoUrl: s?.logo_url }),
+    [s?.society_name, s?.phone, s?.address, s?.logo_url],
+  );
+  const voucher = (e: Expense) => exportExpenseVoucher(e, { society, modeLabel: methodLabel, statusLabel: expenseStatusLabel });
 
   const columns = useMemo<Column<Expense>[]>(
     () => [
@@ -248,7 +253,7 @@ export default function ExpensesPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [setStatus, societyName],
+    [setStatus, society],
   );
 
   const onExport = async (format: ExportFormat) => {

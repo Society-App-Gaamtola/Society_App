@@ -39,6 +39,8 @@ export type EventBody = {
   poster_url?: string | null;
   images?: string[];
   action: 'draft' | 'post' | 'schedule';
+  /** Publish and Share: also email the event to every member when it goes live */
+  email_members?: boolean;
   /** ISO date-time, for action schedule */
   publish_at?: string;
   /** Create only: the Event Planning plan this event is made from */
@@ -57,9 +59,12 @@ export const getMyEvents = (page: number, filters: { status?: ApiEventStatus; se
 export type NoticeBody = {
   title: string;
   body: string;
-  tag: 'important' | 'general' | 'event';
+  /** One of App Settings' notice categories (lowercase) */
+  tag: string;
   event_id?: number | null;
   action: 'draft' | 'publish';
+  /** Publish and Share: also email the notice to the members when it goes live */
+  email_members?: boolean;
 };
 export type ApiNoticeStatus = 'draft' | 'published';
 /** A notice in its creator's view: the board fields plus its status */
@@ -71,6 +76,7 @@ export type ApiExecNotice = {
   event_id: number | null;
   status: ApiNoticeStatus;
   published_at: string | null;
+  email_members?: 0 | 1;
   created_at: string;
   updated_at: string;
 };
@@ -255,6 +261,21 @@ export type ApiFinance = {
 };
 export const getFinance = (range: { from_date?: string; to_date?: string }) =>
   request<ApiFinance>('GET', `/admin/finance${toQuery(range)}`);
+
+/** Expense rows for a report (any status), one page */
+export const getReportExpenses = (page: number, range: { from_date: string; to_date: string }) =>
+  request<{ rows: ApiExpense[]; pagination: Pagination }>('GET', `/admin/reports/data/expense${toQuery({ page, limit: 50, ...range })}`);
+
+/** The Income & Expense Summary's totals, added up by the server (verified entries only) */
+export type ApiReportTotal = { item: 'total_donations' | 'total_expenses' | 'balance' | 'verified_transactions' | 'pending_donations' | 'pending_expenses'; value: number };
+export type ApiReportCategory = { kind: 'donation' | 'expense'; category: string; entries: number; amount: number };
+export type ApiReportMonth = { month: string; donations: number; expenses: number; balance: number };
+export const getReportTotals = (range: { from_date: string; to_date: string }) =>
+  request<{ rows: ApiReportTotal[] }>('GET', `/admin/reports/data/summary${toQuery(range)}`);
+export const getReportCategories = (range: { from_date: string; to_date: string }) =>
+  request<{ rows: ApiReportCategory[] }>('GET', `/admin/reports/data/category${toQuery(range)}`);
+export const getReportMonths = (range: { from_date: string; to_date: string }) =>
+  request<{ rows: ApiReportMonth[] }>('GET', `/admin/reports/data/monthly${toQuery(range)}`);
 
 /** Donation rows for a report (verified, pending and rejected), one page */
 export const getReportDonations = (page: number, range: { from_date: string; to_date: string }) =>

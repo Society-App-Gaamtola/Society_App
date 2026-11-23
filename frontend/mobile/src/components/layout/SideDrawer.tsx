@@ -16,10 +16,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { LOGO, SOCIETY_NAME_GU } from '../../config';
+import { LOGO } from '../../config';
+import { refreshAppInfo, useAppInfo } from '../../services/appInfo';
 import { canViewExpenses, hasPermission, useAuth } from '../../context/AuthContext';
 import { Ionicons, type IoniconName } from '../../icons';
-import { getAppInfo, type ApiAppInfo, type SocialNetwork } from '../../api/user';
+import type { SocialNetwork } from '../../api/user';
 import type { HomeStackParamList, RootStackParamList } from '../../navigation/types';
 import { colors, fonts, themedStyles } from '../../theme';
 import { useT } from '../../i18n';
@@ -93,13 +94,12 @@ const SOCIAL_LABEL: Record<SocialNetwork, string> = { facebook: 'Facebook', inst
 
 function DrawerPanel({ progress, onClose }: { progress: Animated.Value; onClose: (after?: () => void) => void }) {
   const t = useT();
-  // The society's pages (admin panel → App Settings → Social Networking), read each time the menu opens,
-  // so a changed link is used at once
-  const [social, setSocial] = useState<ApiAppInfo['social_links']>([]);
+  // The society's pages (admin panel → App Settings → Social Networking), read again each time the menu opens,
+  // so a changed link is used at once (the saved copy shows meanwhile)
+  const appInfo = useAppInfo();
+  const social = appInfo.social_links;
   useEffect(() => {
-    getAppInfo()
-      .then(({ data }) => setSocial(data.social_links))
-      .catch(() => {});
+    refreshAppInfo();
   }, []);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -220,7 +220,7 @@ function DrawerPanel({ progress, onClose }: { progress: Animated.Value; onClose:
           </Pressable>
         </ScrollView>
 
-        <Text style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>{SOCIETY_NAME_GU}</Text>
+        <Text style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>{appInfo.society_name_gu}</Text>
       </Animated.View>
     </View>
   );
