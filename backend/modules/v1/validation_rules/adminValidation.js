@@ -71,15 +71,6 @@ const executivePermissionsSchema = Joi.object({
   sections: Joi.array().items(Joi.string().valid(...constant.PERMISSION_SECTIONS)).unique().required(),
 });
 
-// The Audit Logs screen: changes or logins, one area, who (name / email), dates
-const activityListSchema = Joi.object({
-  ...pagination,
-  ...dateRange,
-  type: Joi.string().valid(...constant.ACTIVITY_TYPES).default("changes"),
-  area: Joi.string().valid(...Object.keys(constant.ACTIVITY_AREAS)),
-  search: Joi.string().trim().max(constant.SEARCH_MAX_LENGTH).allow(""),
-});
-
 // ---------- Donations / expenses ----------
 const id = Joi.number().integer().min(1);
 const amount = Joi.number().precision(2).min(constant.DONATION_MIN_AMOUNT).max(constant.AMOUNT_MAX);
@@ -223,7 +214,6 @@ export default {
   memberStatusSchema,
   executiveListSchema,
   executivePermissionsSchema,
-  activityListSchema,
   donationListSchema,
   donationSchema,
   donationStatusSchema,

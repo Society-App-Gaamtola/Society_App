@@ -7,7 +7,7 @@ project without scanning every folder. Keep it up to date when you add an API, a
 | --- | --- |
 | `backend/` | Node.js (ES modules) + Express 5 + **PostgreSQL** API. Port 5020 |
 | `frontend/mobile/` | Expo / React Native app for members and executives (Android) |
-| `frontend/admin/` | Next.js 14 Super Admin panel. **Every screen uses the backend** (Login, Dashboard, Members, Events & Notices, Executives, Media Approval, Donations, Expenses, Financial Reports, Audit Logs, App Settings, My Profile). There is no demo data in the panel any more |
+| `frontend/admin/` | Next.js 14 Super Admin panel. **Every screen uses the backend** (Login, Dashboard, Members, Events & Notices, Executives, Media Approval, Donations, Expenses, Financial Reports, App Settings, My Profile). There is no demo data in the panel any more |
 
 ## Rules to always follow
 
@@ -95,8 +95,20 @@ cd frontend\admin; npm run dev     # http://localhost:3000 (needs the backend ru
   `SMTP_USER= BREVO_API_KEY= MAIL_FROM=` to turn mail off while testing.
 - Local `api-key`: the `API_KEY` value in `backend/.env`.
 - Mobile `.env` (`EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_API_KEY`). The Render settings are saved in `.env.render-backup.local`.
-- **Render (backend hosting) still points at Aiven MySQL** in `backend/.env.production`. Before deploying, set Render's
-  `DATABASE_URL` to the Neon string, `NODE_ENV=production`, and put the Render service in the Singapore region.
+- **Render (backend hosting)**: `https://society-app-sg.onrender.com` (Singapore), on Neon (`backend/.env.production`,
+  checked 2026-11-24). The free plan sleeps: the first request after a quiet spell can take ~1 minute.
+- **Test APK (EAS Build)**, from `frontend/mobile` (EAS account `milanpatel1212`, project `@milanpatel1212/kartikmaji_gaamtoda`,
+  Android package `com.gaamtoda.society`; the keystore is kept by Expo):
+  `npx eas-cli@latest build -p android --profile preview`. The `preview` profile (`eas.json`) builds an installable APK
+  against Render: `EXPO_PUBLIC_API_URL` is in `eas.json`, `EXPO_PUBLIC_API_KEY` is an EAS `preview` variable
+  (`eas env:set`). The local `.env` is gitignored, so it never reaches the build. The build page has the APK link / QR.
+  - **R8 (code shrinking) is off** (`expo-build-properties` → `enableMinifyInReleaseBuilds: false` in `app.json`). With
+    it on, the APK closed at start-up: WorkManager (from `react-native-maps`) could not build its Room database because
+    R8 removed `WorkDatabase_Impl`'s constructor ("Failed to create an instance of class androidx.work.impl.WorkDatabase").
+    The `extraProguardRules` keep rule there fixes that if R8 is turned on again (e.g. for the Play Store); test the APK
+    on a phone before sending it.
+  - A JavaScript error in a built app shows `AppErrorBoundary` (error text + Try Again) instead of closing the app.
+    A native crash still closes it: read it with `adb logcat` (Android platform-tools, phone with USB debugging).
 
 ## Backend structure
 
@@ -114,7 +126,8 @@ backend/
     mail.js                    OTP email HTML template
     multer.js                  uploads/ disk storage (legacy profile_image file)
     cron.js                    every 24 hours (midnight) + once on start: OTP cleanup; scheduled events →
-                               posted, then common.notifyNewContent() (new event / notice notifications)
+                               posted, then common.notifyNewContent() (new event / notice notifications);
+                               1 AM: read notifications older than NOTIFICATION_READ_KEEP_DAYS (30) deleted
   middleware/middleware.js     checkApi, decryption, tokenMiddleware, allowedRoles, validateJoi,
                                sendSuccess / sendError / sendServerError / sendApiResponse, extractHeaderLanguage
   languages/en.js hn.js guj.js message keys (en / hi / gu)
@@ -127,7 +140,7 @@ backend/
     controllers/<area>Controller.js        one-line pass-through to the module
     module/<area>Module.js                 all logic + SQL
   database/
-    schema.sql                 all 24 tables (PostgreSQL)
+    schema.sql                 all 26 tables (PostgreSQL)
     seed.sql                   roles, modules, event_categories, app_settings
     sample_events_notices.sql  optional dev data (deletes + re-adds the sample rows)
     copy_mysql_to_postgres.js  one-time MySQL → PostgreSQL row copy
@@ -309,7 +322,7 @@ Media/photo fields go through `common.mediaUrl()` (a Cloudinary link stays as it
   - Add the table to `schema.sql`, and run the same SQL on the local database.
 - Table names and column names in SQL come from code, never from the request (`name_${lang}`-style building is gone; see rule 3).
 
-### Tables (25)
+### Tables (24)
 
 | Area | Tables |
 | --- | --- |
@@ -318,7 +331,7 @@ Media/photo fields go through `common.mediaUrl()` (a Cloudinary link stays as it
 | Content | `event_categories` (code, English `name`, color, sort_order), `events` (+ `latitude`/`longitude` pin), `event_images` (several images per event, `sort_order`), `event_volunteers`, `future_event_plans`, `notices`, `notice_recipients`, `media_items` |
 | Notifications | `notifications`, `notification_recipients` (per user/device, FCM status) |
 | Money | `donations` (+ `donor_name` for non-members, `donated_on`, `proof_url`, `verified_by`), `payments` (gateway), `executive_applications`, `society_transactions` (cash book; `paid` rows = expenses with `category`, `paid_to`, `status`, `bill_url`, `verified_by`), `upi_settings`, `generated_reports` |
-| Other | `app_settings` (key/value), `audit_logs` (the activity log: who did what to which record, and every login) |
+| Other | `app_settings` (key/value). There is **no activity log table** (`audit_logs` was dropped on 2026-11-25 to save space) |
 
 Key statuses:
 - `events.status`: draft | scheduled | posted | cancelled. Users only see `posted`. **Events and notices need no approval**; only gallery media is approved.
@@ -383,9 +396,8 @@ API field ↔ column:
   formats** (and "Allow delivery of PDF and ZIP files" in the account's Security settings). Without it Cloudinary
   answers "Image file format pdf not allowed" and the panel / app show "This file type is not supported" (checked
   2026-11-23: the preset did not allow pdf yet).
-- **Login history**: every login (app and panel) saves an `audit_logs` row, action `login`, table `user_devices`
-  (the session, for the platform and model), with the IP the server saw (`common.logLogin`, called by
-  `generateToken`). The app's `/auth/login` and `/verify-otp` get the IP from the controller (`request.ip`).
+- **No login history** (removed 2026-11-25 with `audit_logs`): a login only updates its `user_devices` row (platform,
+  model, `last_ip`, `last_seen_at`) and `users.last_login_at`.
 - **Roles** (all decided in the routes, rule 8):
   - `/user/*` (events, notices, gallery and the rest):
     - list / details, own gallery items: `allUsers` = member + executive + super_admin;
@@ -410,7 +422,7 @@ API field ↔ column:
     - A new executive (role API or approved request) gets `DEFAULT_EXECUTIVE_SECTIONS` (events, notices). Back to
       member → every permission removed (`changeRole` → `common.savePermissions`).
 
-## All APIs (83) – base `/api/v1`
+## All APIs (82) – base `/api/v1`
 
 Headers on every call:
 - `api-key` (always)
@@ -520,6 +532,9 @@ Notifications (in-app; FCM push comes later):
 - New events and notices: `common.notifyNewContent()` announces every posted event and published notice whose
   `notified_at` is NULL, and sets `notified_at` in the same UPDATE (never twice). It runs right after an executive saves
   (so items posted / published now are announced at once) and in the daily cron job (scheduled ones). A `selected` notice notifies only its recipients.
+- **Clean-up** (`cron.deleteOldReadNotifications`, daily at 1 AM and on start): a user's copy
+  (`notification_recipients`) is deleted `NOTIFICATION_READ_KEEP_DAYS` (30) days after they read it (`read_at`), then
+  every notification older than that with no copy left. Unread copies are never deleted.
 - **Notification switches**: `sendNotification` leaves out receivers who switched that type off
   (`constant.NOTIFICATION_PREF_COLUMNS`: event → `notify_events`, notice → `notify_notices`, donation → `notify_payments`).
 - **Publish and Share (email)**: `email_members: true` on POST / PUT `/user/events` and `/user/notices` (the panel's
@@ -530,7 +545,7 @@ Notifications (in-app; FCM push comes later):
   scheduled one at the cron run), and skipped when the server has no `MAIL_FROM` / `SMTP_USER`. Brevo's free plan sends
   300 mails a day and Gmail about 500, so a large society needs a paid mail plan.
 - Reviews: approving or rejecting a photo tells its uploader (`notify_media_*`, the reason in `message`). The old
-  `notify_event_approved / _rejected` and `activity_event_approved / _rejected` keys stay only for rows saved before
+  `notify_event_approved / _rejected` keys stay only for rows saved before
   events stopped needing approval (2026-11-19).
 - System titles are language keys stored in `notifications.title` and translated when read (rule 3). Content
   notifications use the event or notice title as it is.
@@ -553,8 +568,7 @@ The panel logs in here, then uses the same token on every shared API (`/user/eve
 | Method & path | Roles (route) | Body / query | Success `data` |
 | --- | --- | --- | --- |
 | POST `/login` | Public | `email, password`, device fields (e.g. `uuid`, `device_type: "web"`) | `{ userData, token }`. Wrong email / password → code 0 `rest_invalid_login_credentials`; any role but `super_admin` → code 0 `rest_admin_only`; inactive → `rest_account_inactive` |
-| GET `/dashboard` | superAdmin | `from_date?, to_date?` (yyyy-mm-dd, the panel's date picker) | `{ counts: { total_members, executives, active_events, total_notices }, money: { total_donations, total_expenses, balance, donation_trend, expense_trend }, pending: { donations, expenses, executive_requests, media, total }, monthly: [{ month: "YYYY-MM", donations, expenses }], recent_activities (latest `ACTIVITY_DASHBOARD_LIMIT` 5) }` |
-| GET `/activities` | superAdmin | `page, limit, type (changes\|logins, default changes), area (events\|notices\|members\|donations\|expenses\|reports\|media\|settings: `ACTIVITY_AREAS`), search (who: name / email), from_date, to_date` | `{ activities: [{ id, action, text (translated), target (the record's name), actor_name, actor_role, table_name, record_id, ip_address, device (logins: "android · Pixel 7"), created_at }], pagination }`, newest first. The panel's Audit Logs screen (Activity / Login History tabs) and the dashboard's Recent Activities (changes only) |
+| GET `/dashboard` | superAdmin | `from_date?, to_date?` (yyyy-mm-dd, the panel's date picker) | `{ counts: { total_members, executives, active_events, total_notices }, money: { total_donations, total_expenses, balance, donation_trend, expense_trend }, pending: { donations, expenses, executive_requests, media, total }, monthly: [{ month: "YYYY-MM", donations, expenses }], recent_activities: [{ id, action, text (translated), target, actor_name, record_id, created_at }] (newest `ACTIVITY_DASHBOARD_LIMIT` 6, see Recent Activities below) }` |
 | GET `/backup` | superAdmin | – | `{ file_name, tables, sql }`: every row of every table as SQL (`INSERT … json_populate_record`, parents first, then the id sequences and `member_code_seq`); the panel saves it as a `.sql` file (App Settings → Backup & Data). Sets `last_backup_at`. Restore: an empty database + `schema.sql` (not seed.sql), then `psql -f` the file |
 
 | GET `/members` | superAdmin | `page, limit, search (name / mobile / email / member code), role (member\|executive), status (active\|suspended), signup (completed\|pending), from_date, to_date (join date), sort (name\|joined\|member_code), order (asc\|desc)` | `{ members: [{ id, member_code, name, email, country_code, mobile, role, status, signup, is_verified, address, photo_url, joined_on, last_login_at }], pagination }`. Every member / executive that isn't deleted, any status / sign-up step. **The Super Admin is not listed** (nor counted in the dashboard's `total_members`) |
@@ -586,11 +600,13 @@ Dashboard rules:
 - **Super Admin**: `superadmin@gaamtoda.com` exists in the live database. Another one: sign up in the app, then
   `UPDATE users SET role_id = 1 WHERE email = '…';` on Neon.
   (the API can never make anyone `super_admin`).
-- **Activity log** (`audit_logs`): every admin / executive change and a few member actions call
-  `common.logActivity(request, constant.ACTIVITY.X, table, id)` (one INSERT, not awaited, never fails the request).
-  Only who / what / which record are stored; the record's name (event or notice title, member name, donation amount,
-  applicant) is looked up when the log is read, and the text is the language key `activity_<code>`. **When you add an
-  API that changes something, log it the same way** (add the code to `ACTIVITY` and `activity_*` to the 3 language files).
+- **Recent Activities** (dashboard only; there is **no audit log**, no activity table and no `/admin/activities` API
+  since 2026-11-25): `recentActivities()` in `adminModule.js` reads the newest rows of `events`, `notices`, `users`
+  (completed sign-ups), `media_items`, `executive_applications`, `donations` and `society_transactions` (expenses) in
+  one UNION query, newest first. `action` is a `constant.ACTIVITY` code, `text` the language key `activity_<code>`.
+  Don't add a log table or log calls back; to show a new kind of item, add a branch to that query, a code to
+  `ACTIVITY` and `activity_<code>` to the 3 language files. Executives see their own recent events in the app
+  (Executive Dashboard → Recent Activity, `GET /user/events?mine=true`).
 
 ### Admin panel – money and settings (`adminRoute.js` → `adminModule.js`)
 
@@ -599,12 +615,12 @@ Routes: the Super Admin, or an executive with that permission section (`requireP
 
 | Method & path | Body / query | Success `data` |
 | --- | --- | --- |
-| GET `/donations` | `page, limit, search (donor / member code / reference), status (success\|pending\|rejected), mode (upi\|cash\|bank\|cheque), purpose, donor_user_id (one member: Member detail → Payment History export), from_date, to_date (donated_on), sort (date\|amount), order` | `{ donations: [{ id, donor_user_id, donor_name, member_code, amount, purpose, method, status, reference_no, donated_on, proof_url, note, created_at, confirmed_at, entered_by_name, verified_by_name }], summary: { count, verified_total, highest, average }, pagination }` |
+| GET `/donations` | `page, limit, search (donor / member code / reference / receipt no DON001), status (success\|pending\|rejected), mode (upi\|cash\|bank\|cheque), purpose, donor_user_id (one member: Member detail → Payment History export), from_date, to_date (donated_on), sort (date\|amount), order` | `{ donations: [{ id, donor_user_id, donor_name, member_code, amount, purpose, method, status, reference_no, donated_on, proof_url, note, created_at, confirmed_at, entered_by_name, verified_by_name }], summary: { count, verified_total, highest, average }, pagination }` |
 | GET `/donations/:id` | – | `{ donation }` |
 | POST `/donations`, PUT `/donations/:id` | `donor_user_id` **or** `member_code` (as typed in the app; unknown → `rest_donor_not_found`) **or** `donor_name`, `amount, purpose, method (upi_app\|upi_qr\|cash\|bank\|cheque), reference_no?, donated_on (not future), status (default success), proof_url? (Cloudinary finance/), note?` | `{ donation }`. A UTR can be used once |
 | PUT `/donations/:id/status` | `status`: success (verified) \| pending \| rejected | `{ donation }`. A member donor gets `notify_donation_verified / _rejected` |
 | DELETE `/donations/:id` | – | soft delete |
-| GET `/expenses` | `page, limit, search (description / paid to / reference), status (verified\|pending\|rejected), mode, category, from_date, to_date, sort, order` | `{ expenses: [{ id, description, paid_to, category, amount, mode, reference_no, txn_date, status, bill_url, … }], summary: { count, verified_total, highest, average, categories: [{ category, amount }] (verified, largest first), income (verified donations in the same dates), balance (all-time verified donations − expenses) }, pagination, expense_categories (App Settings list, for the app's form) }` |
+| GET `/expenses` | `page, limit, search (description / paid to / reference / expense no EXP001), status (verified\|pending\|rejected), mode, category, from_date, to_date, sort, order` | `{ expenses: [{ id, description, paid_to, category, amount, mode, reference_no, txn_date, status, bill_url, … }], summary: { count, verified_total, highest, average, categories: [{ category, amount }] (verified, largest first), income (verified donations in the same dates), balance (all-time verified donations − expenses) }, pagination, expense_categories (App Settings list, for the app's form) }` |
 | GET `/expenses/:id`, POST `/expenses`, PUT `/expenses/:id`, PUT `/expenses/:id/status`, DELETE `/expenses/:id` | `description, paid_to, category, amount, mode (cash\|upi\|bank\|cheque), reference_no?, txn_date, status (default pending), bill_url?` | `{ expense }` |
 | GET `/finance` | `from_date?, to_date?` | `{ totals: { donations, expenses, balance, transactions, donation_trend, expense_trend }, monthly, recent (5 transactions) }` (the Financial Overview) |
 | GET `/reports/data/:type` | `summary\|donation\|expense\|category\|monthly\|custom` + `from_date, to_date, category, mode, page, limit` | `{ rows, pagination }`. Lists are paged; summary / category / monthly are totals added up by the database |
@@ -702,14 +718,13 @@ Notice flow:
   - PDFs (payment proof) are sent as they are.
 - **Admin** (`frontend/admin/src`): Next.js app router `app/(admin)/<screen>`, TanStack Query and Tailwind.
   - **Connected to the backend**: login (`POST /admin/login`, token in `lib/session.ts`, logout calls `DELETE /auth/logout`)
-    , Members (list, detail, **Add Member** `components/forms/AddMemberForm.tsx`, edit, deactivate, delete), **Audit Logs**
-    (`app/(admin)/audit-logs`: Activity / Login History tabs, user search, area, dates, Excel / PDF), **Events & Notices** (`components/EventsNotices.tsx`: list with
+    , Members (list, detail, **Add Member** `components/forms/AddMemberForm.tsx`, edit, deactivate, delete), **Events & Notices** (`components/EventsNotices.tsx`: list with
     `manage=true`, create / edit / delete, post / draft / cancel, featured, a "Share by email" switch (Publish & Share),
     notice categories from App Settings (`noticeTagLabel`); posters upload straight
     to Cloudinary `events/<yyyy>/<mm>` via `services/cloudinary.ts`, env `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`,
     `_UPLOAD_PRESET`, `_ENV_FOLDER`), **Executives** (requests with counts + review; executives with permission
     switches, add / remove executive), **Media Approval** (`app/(admin)/media`: tabs All / Photos / Videos / Pending / Approved /
-    Rejected with counts, search, dates, approve / reject / delete), the **Dashboard** (`GET /admin/dashboard` + `/admin/activities`) and **My Profile** (`/profile`: name, address, email with OTP,
+    Rejected with counts, search, dates, approve / reject / delete), the **Dashboard** (`GET /admin/dashboard`, Recent Activities included) and **My Profile** (`/profile`: name, address, email with OTP,
     via `/auth/profile`, `/auth/edit-profile`, `/auth/verify-email-change`) + **Change Password** dialog
     (`/auth/change-password`, top bar menu and Profile). Logout: `hooks/useLogout.ts`. `.env.local`: `NEXT_PUBLIC_BACKEND_URL`,
     `NEXT_PUBLIC_BACKEND_API_KEY` (= the backend's `API_KEY`). File uploads (`FileUpload` / `useUpload`) must be given
@@ -757,4 +772,4 @@ curl -s -H "api-key: <API_KEY>" -H "Content-Type: application/json" \
   `backend/node_modules/` (nodemon ignores it, and `pg` still resolves), or test against a second server:
   `PORT=5021 SMTP_USER= BREVO_API_KEY= MAIL_FROM= node server.js` (mail off).
 - Mobile changes: `npx tsc --noEmit` in `frontend/mobile`.
-- Mobile map: `react-native-maps` (in Expo Go) in `components/events/EventMapCard.tsx`, a static preview; tapping it opens Google Maps (`googleMapsUrl`). It isn't in `components/index.ts` (native module). A production Android build needs a Google Maps key: the `react-native-maps` config plugin with `androidGoogleMapsApiKey` in `app.json`.
+- Mobile map: `react-native-maps` (in Expo Go) in `components/events/EventMapCard.tsx`, a static preview; tapping it opens Google Maps (`googleMapsUrl`). It isn't in `components/index.ts` (native module). A production Android build needs a Google Maps key: the `react-native-maps` config plugin with `androidGoogleMapsApiKey` in `app.json`. Until it has one, a built Android app (APK) shows only the "Open in Google Maps" button (`CAN_SHOW_MAP`: map only in Expo Go or on iOS); after adding the key, drop that check.

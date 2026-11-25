@@ -305,7 +305,7 @@ export default function DonationsPage() {
         </div>
       )}
       <FilterBar
-        searchPlaceholder="Search by donor, member code or reference..."
+        searchPlaceholder="Search by receipt no, donor, member code or reference..."
         dateRange
         selects={[
           { name: 'mode', label: 'Payment Modes', options: PAYMENT_MODE_OPTIONS },

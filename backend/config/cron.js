@@ -33,6 +33,32 @@ export const publishScheduledEvents = async () => {
     }
 };
 
+// Deletes each user's copy of a notification read more than NOTIFICATION_READ_KEEP_DAYS ago, then the notifications
+// nobody has a copy of any more (only ones older than the same days, so one being sent right now is never touched).
+// Unread notifications stay. Returns how many copies were removed
+export const deleteOldReadNotifications = async () => {
+    try {
+        const days = constant.NOTIFICATION_READ_KEEP_DAYS;
+        const [copies] = await db.query(
+            "DELETE FROM notification_recipients WHERE read_at < NOW() - make_interval(days => ?::int)",
+            [days],
+        );
+        const [orphans] = await db.query(
+            `DELETE FROM notifications n
+             WHERE n.created_at < NOW() - make_interval(days => ?::int)
+               AND NOT EXISTS (SELECT 1 FROM notification_recipients r WHERE r.notification_id = n.id)`,
+            [days],
+        );
+        if (copies.affectedRows > 0 || orphans.affectedRows > 0) {
+            console.log(`[cron] Notification cleanup: ${copies.affectedRows} read copy(ies), ${orphans.affectedRows} notification(s) deleted`);
+        }
+        return copies.affectedRows;
+    } catch (error) {
+        console.error("[cron] Notification cleanup failed:", error);
+        return 0;
+    }
+};
+
 const startCronJobs = () => {
     // Once on start, so a server that was off at midnight still cleans up
     deleteExpiredOtps();
@@ -49,6 +75,10 @@ const startCronJobs = () => {
     };
     publishAndNotify();
     cron.schedule(constant.EVENT_PUBLISH_SCHEDULE, publishAndNotify);
+
+    // Read notifications older than NOTIFICATION_READ_KEEP_DAYS: once on start, then every day
+    deleteOldReadNotifications();
+    cron.schedule(constant.NOTIFICATION_CLEANUP_SCHEDULE, deleteOldReadNotifications);
 };
 
 export default startCronJobs;

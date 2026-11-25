@@ -1,6 +1,6 @@
-import type { AuditLog, DashboardStats, DateRange, MonthTotals } from '@/types';
+import type { DashboardStats, DateRange, MonthTotals, RecentActivity } from '@/types';
 import { fromUtc, monthName } from '@/lib/utils';
-import { api, type Pagination } from './core/backend';
+import { api } from './core/backend';
 
 /** GET /admin/dashboard (see the backend's adminModule.getDashboard) */
 type BackendDashboard = {
@@ -11,50 +11,28 @@ type BackendDashboard = {
   recent_activities: BackendActivity[];
 };
 
-/** One line of the activity log (audit_logs): text is already in the admin's language */
-export type BackendActivity = {
-  id: number;
+/** One line of Recent Activities (built from the newest events, notices, members, uploads, requests, donations and
+ * expenses: there is no activity log). text is already in the admin's language */
+type BackendActivity = {
+  id: string;
   action: string;
   text: string;
+  /** What it was about: a title, a member, an amount */
   target: string | null;
+  /** Who did it (null for a member added by the Super Admin) */
   actor_name: string | null;
-  actor_role: 'super_admin' | 'executive' | 'member' | null;
-  table_name: string;
-  record_id: number | null;
-  ip_address: string | null;
-  /** Logins: the platform and device model ("android · Pixel 7", "web") */
-  device: string | null;
+  record_id: number;
   created_at: string;
 };
 
-/** GET /admin/activities filters: the Audit Logs screen */
-export type AuditLogQuery = {
-  page: number;
-  limit: number;
-  type: 'changes' | 'logins';
-  area?: string;
-  search?: string;
-  from_date?: string;
-  to_date?: string;
-};
-
-/** The areas the backend can filter by (constant.ACTIVITY_AREAS) */
-export const AUDIT_AREAS = [
-  { value: 'events', label: 'Events & Plans' },
-  { value: 'notices', label: 'Notices' },
-  { value: 'members', label: 'Members & Executives' },
-  { value: 'donations', label: 'Donations' },
-  { value: 'expenses', label: 'Expenses' },
-  { value: 'reports', label: 'Reports' },
-  { value: 'media', label: 'Media' },
-  { value: 'settings', label: 'Settings' },
-];
-
-/** The activity in the shape the dashboard's list shows ("Created event · Diwali Mela · by Kartik") */
-const toAuditLog = (a: BackendActivity): AuditLog => {
-  const at = fromUtc(a.created_at) ?? a.created_at;
-  return { id: a.id, action: a.text, target: a.target ?? '—', actor: a.actor_name ?? 'System', at, created_at: at, updated_at: at };
-};
+const toActivity = (a: BackendActivity): RecentActivity => ({
+  id: a.id,
+  action: a.action,
+  text: a.text,
+  target: a.target,
+  actor: a.actor_name,
+  at: fromUtc(a.created_at) ?? a.created_at,
+});
 
 /**
  * Chart labels. A month "2026-11" → "Nov" ("Nov '26" when the chart spans several years). A short period comes
@@ -94,19 +72,7 @@ export const dashboardService = {
       pendingExpenses: data.pending.expenses, // cash-book entries waiting for verification
       pendingRequests: data.pending.executive_requests,
       pendingMedia: data.pending.media,
-      activities: data.recent_activities.map(toAuditLog),
+      activities: data.recent_activities.map(toActivity),
     };
-  },
-
-  /** The whole activity log, one page at a time ("View All") */
-  async listActivities(page: number, pageSize: number) {
-    const { data } = await api<{ activities: BackendActivity[]; pagination: Pagination }>('GET', '/admin/activities', { query: { page, limit: pageSize } });
-    return { data: data.activities.map(toAuditLog), total: data.pagination.total };
-  },
-
-  /** The Audit Logs screen: changes or logins with filters, times in local time */
-  async auditLogs(query: AuditLogQuery) {
-    const { data } = await api<{ activities: BackendActivity[]; pagination: Pagination }>('GET', '/admin/activities', { query });
-    return { ...data, activities: data.activities.map((a) => ({ ...a, created_at: fromUtc(a.created_at) ?? a.created_at })) };
   },
 };

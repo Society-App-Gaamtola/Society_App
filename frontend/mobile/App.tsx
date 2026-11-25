@@ -21,6 +21,7 @@ import { loadSavedAppInfo } from './src/services/appInfo';
 import type { AuthUser } from './src/types';
 import { AuthProvider } from './src/context/AuthContext';
 import { common } from './src/styles/common';
+import AppErrorBoundary from './src/components/layout/AppErrorBoundary';
 
 ExpoSplashScreen.preventAutoHideAsync();
 
@@ -57,9 +58,11 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider initialUser={savedUser}>
-        <ThemedApp onLayout={onLayout} />
-      </AuthProvider>
+      <AppErrorBoundary>
+        <AuthProvider initialUser={savedUser}>
+          <ThemedApp onLayout={onLayout} />
+        </AuthProvider>
+      </AppErrorBoundary>
     </SafeAreaProvider>
   );
 }

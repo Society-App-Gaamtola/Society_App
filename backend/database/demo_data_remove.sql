@@ -23,17 +23,6 @@ CREATE TEMP TABLE demo_media AS SELECT id FROM media_items WHERE uploaded_by IN 
 DROP TABLE IF EXISTS demo_requests;
 CREATE TEMP TABLE demo_requests AS SELECT id FROM executive_applications WHERE user_id IN (SELECT id FROM demo_users);
 
--- Activity log lines by demo users, or about demo records
-DELETE FROM audit_logs
-WHERE user_id IN (SELECT id FROM demo_users)
-   OR (table_name = 'users' AND record_id IN (SELECT id FROM demo_users))
-   OR (table_name = 'events' AND record_id IN (SELECT id FROM demo_events))
-   OR (table_name = 'notices' AND record_id IN (SELECT id FROM demo_notices))
-   OR (table_name = 'donations' AND record_id IN (SELECT id FROM demo_donations))
-   OR (table_name = 'society_transactions' AND record_id IN (SELECT id FROM demo_expenses))
-   OR (table_name = 'media_items' AND record_id IN (SELECT id FROM demo_media))
-   OR (table_name = 'executive_applications' AND record_id IN (SELECT id FROM demo_requests));
-
 -- Notifications sent by demo users or about demo content
 DELETE FROM notifications
 WHERE created_by IN (SELECT id FROM demo_users)

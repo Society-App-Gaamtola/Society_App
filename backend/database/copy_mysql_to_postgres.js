@@ -9,7 +9,7 @@ import db from "../config/db.js";
 // Parents before children, so every foreign key already has its row
 const TABLES = [
     "roles", "users", "user_profiles", "user_devices", "otp_codes", "declaration_acceptances",
-    "modules", "executive_permissions", "app_settings", "audit_logs",
+    "modules", "executive_permissions", "app_settings",
     "event_categories", "events", "event_volunteers", "future_event_plans",
     "notices", "notice_recipients", "media_items",
     "notifications", "notification_recipients",

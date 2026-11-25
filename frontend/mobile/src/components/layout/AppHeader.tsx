@@ -37,11 +37,16 @@ export default function AppHeader({ leftType = 'menu', rightIcons = [], onRightP
   const mode = useThemeMode();
   const dark = mode === 'dark';
 
-  const handleLeft = leftType === 'back' ? () => navigation.canGoBack() && navigation.goBack() : drawer?.open;
+  // With nothing to go back to, Back opens the Home tab's first screen instead of doing nothing
+  const goBack = () =>
+    navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Main', { screen: 'Home', params: { screen: 'HomeMain' } });
+  const handleLeft = leftType === 'back' ? goBack : drawer?.open;
 
   // The bell and the avatar work the same on every screen; other icons are up to the screen.
+  // initial: false keeps the Home tab's first screen under Notifications, also when the app redraws (theme switch),
+  // so Back and the Home tab return to it.
   const handleRight = (icon: HeaderRightIcon) => {
-    if (icon === 'bell') navigation.navigate('Main', { screen: 'Home', params: { screen: 'Notifications' } });
+    if (icon === 'bell') navigation.navigate('Main', { screen: 'Home', params: { screen: 'Notifications', initial: false } });
     else if (icon === 'avatar') navigation.navigate('Main', { screen: 'Profile', params: { screen: 'ProfileMain' } });
     else onRightPress?.(icon);
   };

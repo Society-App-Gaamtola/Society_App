@@ -197,24 +197,6 @@ FROM (VALUES
   (6, 5001, '912345678904', 'I would like to join the committee.', 'rejected', 'The donation is below the executive minimum.', 30)
 ) AS x(n, amount, ref, reason, status, note, ago);
 
--- ---------- Activity log (Recent Activities on the dashboard) ----------
-INSERT INTO audit_logs (user_id, action, table_name, record_id, created_at)
-SELECT x.who, x.action, x.tbl, x.rid, NOW() - (x.mins || ' minutes')::interval
-FROM (VALUES
-  ((SELECT id FROM demo_users WHERE n = 26), 'member_joined', 'users', (SELECT id FROM demo_users WHERE n = 26), 25),
-  ((SELECT id FROM demo_users WHERE n = 11), 'donation_recorded', 'donations', (SELECT MAX(id) FROM donations WHERE donor_user_id IN (SELECT id FROM demo_users)), 70),
-  ((SELECT id FROM demo_users WHERE n = 1), 'event_created', 'events', (SELECT id FROM events WHERE title = 'Blood Donation Camp' AND created_by = (SELECT id FROM demo_creator)), 140),
-  ((SELECT id FROM demo_users WHERE n = 2), 'notice_published', 'notices', (SELECT id FROM notices WHERE title = 'Water Supply Off on Sunday' AND created_by = (SELECT id FROM demo_users WHERE n = 2)), 200),
-  ((SELECT id FROM demo_users WHERE n = 5), 'executive_request_sent', 'executive_applications', (SELECT id FROM executive_applications WHERE reference_no = '912345678902'), 300),
-  ((SELECT id FROM demo_users WHERE n = 1), 'event_featured', 'events', (SELECT id FROM events WHERE title = 'Dev Diwali Deepdaan' AND created_by = (SELECT id FROM demo_creator)), 420),
-  ((SELECT id FROM demo_users WHERE n = 2), 'notice_created', 'notices', (SELECT id FROM notices WHERE title = 'Volunteers Needed for Dev Diwali' AND created_by = (SELECT id FROM demo_users WHERE n = 2)), 1500),
-  ((SELECT id FROM demo_users WHERE n = 3), 'donation_verified', 'donations', (SELECT MIN(id) FROM donations WHERE donor_user_id IN (SELECT id FROM demo_users)), 1700),
-  ((SELECT id FROM demo_users WHERE n = 3), 'expense_created', 'society_transactions', (SELECT MAX(id) FROM society_transactions WHERE reference_no LIKE 'DEMO-%'), 1900),
-  ((SELECT id FROM demo_users WHERE n = 2), 'media_approved', 'media_items', (SELECT MIN(id) FROM media_items WHERE uploaded_by IN (SELECT id FROM demo_users)), 2900),
-  ((SELECT id FROM demo_users WHERE n = 4), 'executive_request_sent', 'executive_applications', (SELECT id FROM executive_applications WHERE reference_no = '912345678901'), 3000),
-  ((SELECT id FROM demo_users WHERE n = 1), 'event_created', 'events', (SELECT id FROM events WHERE title = 'Monthly Satyanarayan Katha' AND created_by = (SELECT id FROM demo_creator)), 4300)
-) AS x(who, action, tbl, rid, mins);
-
 -- ---------- Saved reports (Financial Reports → Generated Reports) ----------
 INSERT INTO generated_reports (report_type, from_date, to_date, category, mode, generated_by, created_at)
 VALUES
@@ -244,5 +226,4 @@ UNION ALL SELECT 'notices', COUNT(*) FROM notices WHERE created_by IN (SELECT id
 UNION ALL SELECT 'media', COUNT(*) FROM media_items WHERE uploaded_by IN (SELECT id FROM demo_users)
 UNION ALL SELECT 'donations', COUNT(*) FROM donations WHERE donor_user_id IN (SELECT id FROM demo_users) OR note = '[demo]'
 UNION ALL SELECT 'expenses', COUNT(*) FROM society_transactions WHERE reference_no LIKE 'DEMO-%'
-UNION ALL SELECT 'executive requests', COUNT(*) FROM executive_applications WHERE user_id IN (SELECT id FROM demo_users)
-UNION ALL SELECT 'activities', COUNT(*) FROM audit_logs WHERE user_id IN (SELECT id FROM demo_users);
+UNION ALL SELECT 'executive requests', COUNT(*) FROM executive_applications WHERE user_id IN (SELECT id FROM demo_users);

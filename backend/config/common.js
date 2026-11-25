@@ -171,29 +171,6 @@ const common = {
         }
     },
 
-    // Saves one line of the activity log (audit_logs): who (the logged-in user) did what (constant.ACTIVITY) to which
-    // record. Never throws and is not awaited by callers, so it can't slow down or fail the request
-    async logActivity(request, action, table_name, record_id = null) {
-        try {
-            await query.insertQuery("audit_logs", {
-                user_id: request?.loginUser?.id ?? null,
-                action,
-                table_name,
-                record_id,
-                ip_address: request?.ip ?? null,
-            });
-        } catch (error) {
-            console.error("[activity] Could not save:", error.message);
-        }
-    },
-
-    // Login history (the Audit Logs screen): one audit_logs row per login, pointing at the session (user_devices),
-    // which holds the platform and device model. `request` is the request or its body. Not awaited, never throws
-    logLogin(request, user_id, device_id) {
-        const ip = request?.ip ?? request?.body?.ip ?? request?.ip_address ?? null;
-        common.logActivity({ loginUser: { id: user_id }, ip }, constant.ACTIVITY.LOGIN, "user_devices", device_id);
-    },
-
     // ---------- Executive permissions (one executive_permissions row per allowed section) ----------
 
     // An executive's sections, e.g. { sections: ["events", "notices"] }
@@ -262,6 +239,13 @@ const common = {
     // Text for ILIKE (case-insensitive search): % and _ typed by the user are matched as plain characters
     likeText(text) {
         return `%${text.replace(/[\\%_]/g, "\\$&")}%`;
+    },
+
+    // SQL for the record number shown for a row id (EXP + id padded to RECORD_NO_DIGITS, e.g. EXP007, EXP1234),
+    // so a search for "EXP", "exp00" or "EXP007" finds it. idColumn and prefix come from code, never the request
+    recordNoSql(idColumn, prefix) {
+        const digits = constant.RECORD_NO_DIGITS;
+        return `('${prefix}' || LPAD(${idColumn}::text, GREATEST(${digits}, LENGTH(${idColumn}::text)), '0'))`;
     },
 
     isAccountInactive(user) {
@@ -359,12 +343,10 @@ const common = {
                 // Logging in again must not lift a block placed on this device
                 const status = deviceExists[0].status === DEVICE_STATUS.BLOCKED ? DEVICE_STATUS.BLOCKED : DEVICE_STATUS.ACTIVE;
                 await query.updateQuery("user_devices", { ...devicePayload, status }, "id = ?", [deviceExists[0].id]);
-                common.logLogin(request, user_id, deviceExists[0].id);
                 return token;
             }
 
-            const [added] = await query.insertQuery("user_devices", { ...devicePayload, user_id, device_uid, status: DEVICE_STATUS.ACTIVE });
-            common.logLogin(request, user_id, added.insertId);
+            await query.insertQuery("user_devices", { ...devicePayload, user_id, device_uid, status: DEVICE_STATUS.ACTIVE });
             return token;
         } catch (error) {
             console.error("Error generating token: ", error);

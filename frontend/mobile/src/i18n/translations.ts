@@ -26,6 +26,11 @@ export const translations: Record<string, Entry> = {
   'Coming soon': { gu: 'ટૂંક સમયમાં', hi: 'जल्द आ रहा है' },
   'Loading...': { gu: 'લોડ થઈ રહ્યું છે...', hi: 'लोड हो रहा है...' },
   'Something went wrong': { gu: 'કંઈક ખોટું થયું', hi: 'कुछ गलत हो गया' },
+  'Please send a screenshot of this screen to the team.': {
+    gu: 'કૃપા કરીને આ સ્ક્રીનનો સ્ક્રીનશૉટ ટીમને મોકલો.',
+    hi: 'कृपया इस स्क्रीन का स्क्रीनशॉट टीम को भेजें।',
+  },
+  'Try Again': { gu: 'ફરી પ્રયાસ કરો', hi: 'फिर से प्रयास करें' },
   'Please try again': { gu: 'કૃપા કરીને ફરી પ્રયાસ કરો', hi: 'कृपया फिर से प्रयास करें' },
   'Please try again.': { gu: 'કૃપા કરીને ફરી પ્રયાસ કરો.', hi: 'कृपया फिर से प्रयास करें।' },
   Guest: { gu: 'મહેમાન', hi: 'अतिथि' },

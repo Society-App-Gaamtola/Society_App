@@ -109,11 +109,52 @@ const saveUpi = async (upi, admin_id, tx) => {
     else await query.insertQuery("upi_settings", { ...data, created_by: admin_id }, "", tx);
 };
 
-// What an activity was about, in words: the record's current name (looked up when read, so audit_logs stays small)
-const activityTarget = (row) => {
-    if (row.table_name === "donations") return row.donation_amount == null ? null : `₹${Number(row.donation_amount).toLocaleString("en-IN")}`;
-    if (row.table_name === "media_items") return row.target_name || `#${row.record_id}`;
-    return row.target_name;
+// The dashboard's Recent Activities. There is no activity log table: this reads the newest rows of the main tables.
+// Each part takes its own newest `limit` rows, then the whole list is cut to `limit`, newest first.
+// target = what it was about (title, member, amount); actor = who did it (null for a member added by the Super Admin)
+const recentActivities = async (limit, lang) => {
+    const A = ACTIVITY;
+    const [rows] = await db.query(
+        `SELECT x.action, x.record_id, x.target, x.created_at, COALESCE(actor.full_name, actor.email) AS actor_name
+         FROM (
+            (SELECT '${A.EVENT_CREATED}' AS action, e.id AS record_id, e.title::text AS target, e.created_by AS actor_id, e.created_at
+             FROM events e WHERE e.is_deleted = 0 ORDER BY e.created_at DESC LIMIT ?)
+            UNION ALL
+            (SELECT '${A.NOTICE_CREATED}', n.id, n.title, n.created_by, n.created_at
+             FROM notices n WHERE n.is_deleted = 0 ORDER BY n.created_at DESC LIMIT ?)
+            UNION ALL
+            (SELECT '${A.MEMBER_JOINED}', u.id, COALESCE(u.full_name, u.email), NULL::bigint, u.created_at
+             FROM users u JOIN roles r ON r.id = u.role_id
+             WHERE u.is_deleted = 0 AND u.signup_step = 'completed' AND r.code <> '${ROLES.SUPER_ADMIN}'
+             ORDER BY u.created_at DESC LIMIT ?)
+            UNION ALL
+            (SELECT '${A.MEDIA_UPLOADED}', m.id, NULLIF(m.caption, ''), m.uploaded_by, m.created_at
+             FROM media_items m WHERE m.is_deleted = 0 ORDER BY m.created_at DESC LIMIT ?)
+            UNION ALL
+            (SELECT '${A.EXECUTIVE_REQUEST_SENT}', a.id, NULL::text, a.user_id, a.created_at
+             FROM executive_applications a WHERE a.is_deleted = 0 ORDER BY a.created_at DESC LIMIT ?)
+            UNION ALL
+            (SELECT '${A.DONATION_RECORDED}', d.id, d.amount::text, COALESCE(d.entered_by, d.donor_user_id), d.created_at
+             FROM donations d WHERE d.is_deleted = 0 ORDER BY d.created_at DESC LIMIT ?)
+            UNION ALL
+            (SELECT '${A.EXPENSE_CREATED}', t.id, t.description, t.entered_by, t.created_at
+             FROM society_transactions t WHERE t.is_deleted = 0 AND t.entry_type = '${TRANSACTION_TYPE.PAID}'
+             ORDER BY t.created_at DESC LIMIT ?)
+         ) x
+         LEFT JOIN users actor ON actor.id = x.actor_id
+         ORDER BY x.created_at DESC
+         LIMIT ?`,
+        Array(8).fill(limit),
+    );
+    return rows.map((row) => ({
+        id: `${row.action}-${row.record_id}`,
+        action: row.action,
+        text: common.translate(lang, `activity_${row.action}`, row.action),
+        target: row.action === A.DONATION_RECORDED ? `₹${Number(row.target).toLocaleString("en-IN")}` : row.target,
+        actor_name: row.actor_name,
+        record_id: row.record_id,
+        created_at: row.created_at,
+    }));
 };
 
 // A database row → the member the panel gets
@@ -313,8 +354,8 @@ const adminModule = {
                 moneyTotals(from_date, to_date),
                 before ? moneyTotals(before.from_date, before.to_date) : null,
                 monthlyTotals(from_date, to_date),
-                // 4. the latest activities (audit_logs)
-                this.listActivities({ limit: constant.ACTIVITY_DASHBOARD_LIMIT, lang: request.lang, withTotal: false }), // changes, not logins
+                // 4. the newest events, notices, members, uploads, requests, donations and expenses
+                recentActivities(constant.ACTIVITY_DASHBOARD_LIMIT, request.lang),
             ]);
 
             const pending = {
@@ -339,7 +380,7 @@ const adminModule = {
                 },
                 pending: { ...pending, total: Object.values(pending).reduce((sum, n) => sum + n, 0) },
                 monthly: months.map((m) => ({ month: m.month, donations: money(m.donations), expenses: money(m.expenses) })),
-                recent_activities: recent.activities,
+                recent_activities: recent,
             });
         } catch (error) {
             return middleware.sendServerError(res, "getDashboard", error);
@@ -474,7 +515,6 @@ const adminModule = {
             });
             if (!member_code) await common.assignMemberCode(id);
 
-            common.logActivity(request, ACTIVITY.MEMBER_ADDED, "users", id);
             const { members } = await this.listMembers({ filters: { id }, limit: 1, withTotal: false });
             return middleware.sendSuccess(res, "rest_member_added", { member: members[0] });
         } catch (error) {
@@ -509,7 +549,6 @@ const adminModule = {
                 }
             });
 
-            common.logActivity(request, ACTIVITY.MEMBER_UPDATED, "users", id);
             const { members } = await this.listMembers({ filters: { id }, limit: 1, withTotal: false });
             return middleware.sendSuccess(res, "rest_member_updated", { member: members[0] });
         } catch (error) {
@@ -529,7 +568,6 @@ const adminModule = {
 
             const { status } = request.body;
             await query.updateQuery("users", { status }, "id = ?", [id]);
-            common.logActivity(request, status === USER_STATUS.SUSPENDED ? ACTIVITY.MEMBER_DEACTIVATED : ACTIVITY.MEMBER_ACTIVATED, "users", id);
 
             const { members } = await this.listMembers({ filters: { id }, limit: 1, withTotal: false });
             const message = status === USER_STATUS.SUSPENDED ? "rest_member_deactivated" : "rest_member_activated";
@@ -550,96 +588,9 @@ const adminModule = {
                 await query.updateQuery("users", { is_deleted: 1 }, "id = ?", [id], tx);
                 await query.updateQuery("user_devices", constant.LOGGED_OUT_DEVICE, "user_id = ?", [id], tx);
             });
-            common.logActivity(request, ACTIVITY.MEMBER_DELETED, "users", id);
             return middleware.sendSuccess(res, "rest_member_deleted");
         } catch (error) {
             return middleware.sendServerError(res, "adminDeleteMember", error);
-        }
-    },
-
-    // ---------- Activity log (audit_logs) ----------
-
-    // Newest first, one page: { activities: [{ id, action, text, target, actor_name, actor_role, table_name, record_id,
-    // ip_address, device, created_at }] }. text = the action in the user's language; target = the record's name (event /
-    // notice title, member, amount; for a login the device). filters: { type (changes | logins), area
-    // (constant.ACTIVITY_AREAS), search (who: name / email), from_date, to_date }
-    async listActivities({ filters = {}, page = 1, limit = constant.DEFAULT_PAGE_SIZE, lang = constant.DEFAULT_LANGUAGE, withTotal = true }) {
-        const where = [filters.type === "logins" ? "a.action = ?" : "a.action <> ?"];
-        const params = [ACTIVITY.LOGIN];
-        if (filters.area) {
-            where.push("a.table_name = ANY(?::text[])");
-            params.push(constant.ACTIVITY_AREAS[filters.area]);
-        }
-        if (filters.from_date) {
-            where.push("a.created_at::date >= CAST(? AS date)");
-            params.push(filters.from_date);
-        }
-        if (filters.to_date) {
-            where.push("a.created_at::date <= CAST(? AS date)");
-            params.push(filters.to_date);
-        }
-        if (filters.search) {
-            const like = common.likeText(filters.search);
-            where.push("(actor.full_name ILIKE ? OR actor.email ILIKE ?)");
-            params.push(like, like);
-        }
-        const whereSql = `WHERE ${where.join(" AND ")}`;
-
-        const { rows, pagination } = await query.fetchPage(
-            `SELECT a.id, a.action, a.table_name, a.record_id, a.ip_address, a.created_at,
-                COALESCE(actor.full_name, actor.email) AS actor_name, ar.code AS actor_role,
-                dv.platform AS device_platform, dv.device_model,
-                CASE a.table_name
-                    WHEN 'events' THEN ev.title
-                    WHEN 'notices' THEN nt.title
-                    WHEN 'users' THEN COALESCE(tu.full_name, tu.email)
-                    WHEN 'media_items' THEN NULLIF(md.caption, '')
-                    WHEN 'executive_applications' THEN COALESCE(au.full_name, au.email)
-                    WHEN 'future_event_plans' THEN pl.title
-                END AS target_name,
-                dn.amount AS donation_amount
-             FROM audit_logs a
-             LEFT JOIN users actor ON actor.id = a.user_id
-             LEFT JOIN roles ar ON ar.id = actor.role_id
-             LEFT JOIN user_devices dv ON a.table_name = 'user_devices' AND dv.id = a.record_id
-             LEFT JOIN events ev ON a.table_name = 'events' AND ev.id = a.record_id
-             LEFT JOIN notices nt ON a.table_name = 'notices' AND nt.id = a.record_id
-             LEFT JOIN users tu ON a.table_name = 'users' AND tu.id = a.record_id
-             LEFT JOIN media_items md ON a.table_name = 'media_items' AND md.id = a.record_id
-             LEFT JOIN donations dn ON a.table_name = 'donations' AND dn.id = a.record_id
-             LEFT JOIN future_event_plans pl ON a.table_name = 'future_event_plans' AND pl.id = a.record_id
-             LEFT JOIN executive_applications ea ON a.table_name = 'executive_applications' AND ea.id = a.record_id
-             LEFT JOIN users au ON au.id = ea.user_id
-             ${whereSql}
-             ORDER BY a.created_at DESC, a.id DESC`,
-            `SELECT COUNT(*) AS total FROM audit_logs a LEFT JOIN users actor ON actor.id = a.user_id ${whereSql}`,
-            params,
-            { page, limit, withTotal },
-        );
-        const activities = rows.map(({ target_name, donation_amount, device_platform, device_model, ...row }) => ({
-            id: row.id,
-            action: row.action,
-            text: common.translate(lang, `activity_${row.action}`, row.action),
-            target: activityTarget({ ...row, target_name, donation_amount }),
-            actor_name: row.actor_name,
-            actor_role: row.actor_role,
-            table_name: row.table_name,
-            record_id: row.record_id,
-            ip_address: row.ip_address,
-            device: [device_platform, device_model].filter(Boolean).join(" · ") || null,
-            created_at: row.created_at,
-        }));
-        return { activities, pagination };
-    },
-
-    // GET /admin/activities?page=&limit=&type=&area=&search=&from_date=&to_date= : the Audit Logs screen (changes or
-    // logins) and the dashboard's "View All"
-    async getActivities(request, res) {
-        try {
-            const { page, limit, ...filters } = request.body;
-            return middleware.sendSuccess(res, "rest_keywords_success", await this.listActivities({ filters, page, limit, lang: request.lang }));
-        } catch (error) {
-            return middleware.sendServerError(res, "getActivities", error);
         }
     },
 
@@ -688,7 +639,6 @@ const adminModule = {
 
             const { sections } = request.body;
             await common.savePermissions(id, sections, request.loginUser.id);
-            common.logActivity(request, ACTIVITY.EXECUTIVE_PERMISSIONS, "users", id);
             return middleware.sendSuccess(res, "rest_permissions_updated", { permissions: await common.loadPermissions(id) });
         } catch (error) {
             return middleware.sendServerError(res, "setExecutivePermissions", error);
@@ -715,7 +665,8 @@ const adminModule = {
         if (filters.to_date) add("d.donated_on <= CAST(? AS date)", filters.to_date);
         if (filters.search) {
             const like = common.likeText(filters.search);
-            add("(COALESCE(du.full_name, d.donor_name) ILIKE ? OR du.member_code ILIKE ? OR d.reference_no ILIKE ?)", like, like, like);
+            const receiptNo = common.recordNoSql("d.id", constant.RECORD_NO_PREFIX.DONATION);
+            add(`(COALESCE(du.full_name, d.donor_name) ILIKE ? OR du.member_code ILIKE ? OR d.reference_no ILIKE ? OR ${receiptNo} ILIKE ?)`, like, like, like, like);
         }
 
         const from = `FROM donations d
@@ -826,7 +777,6 @@ const adminModule = {
                     common.notifyAdmins("notify_donation", "notify_admin_donation", `₹${Number(body.amount).toLocaleString("en-IN")} · ${body.purpose}`, "donation", donationId);
                 }
             }
-            common.logActivity(request, id ? ACTIVITY.DONATION_UPDATED : ACTIVITY.DONATION_RECORDED, "donations", donationId);
             if (id && statusChanged) tellDonor(donationId, body.status, request.loginUser.id);
 
             const { donations } = await this.listDonations({ filters: { id: donationId }, limit: 1, withTotal: false });
@@ -850,8 +800,6 @@ const adminModule = {
                 : [{ affectedRows: 0 }];
             if (!result.affectedRows) return middleware.sendError(res, "rest_donation_not_found");
 
-            const codes = { success: ACTIVITY.DONATION_VERIFIED, rejected: ACTIVITY.DONATION_REJECTED, pending: ACTIVITY.DONATION_PENDING };
-            common.logActivity(request, codes[status], "donations", id);
             tellDonor(id, status, request.loginUser.id);
             const { donations } = await this.listDonations({ filters: { id }, limit: 1, withTotal: false });
             return middleware.sendSuccess(res, "rest_donation_status_changed", { donation: donations[0] });
@@ -865,7 +813,6 @@ const adminModule = {
             const id = routeId(request);
             const [result] = id ? await query.updateQuery("donations", { is_deleted: 1 }, "id = ? AND is_deleted = 0", [id]) : [{ affectedRows: 0 }];
             if (!result.affectedRows) return middleware.sendError(res, "rest_donation_not_found");
-            common.logActivity(request, ACTIVITY.DONATION_DELETED, "donations", id);
             return middleware.sendSuccess(res, "rest_donation_deleted");
         } catch (error) {
             return middleware.sendServerError(res, "deleteDonation", error);
@@ -890,7 +837,8 @@ const adminModule = {
         if (filters.to_date) add("t.txn_date <= CAST(? AS date)", filters.to_date);
         if (filters.search) {
             const like = common.likeText(filters.search);
-            add("(t.description ILIKE ? OR t.paid_to ILIKE ? OR t.reference_no ILIKE ?)", like, like, like);
+            const expenseNo = common.recordNoSql("t.id", constant.RECORD_NO_PREFIX.EXPENSE);
+            add(`(t.description ILIKE ? OR t.paid_to ILIKE ? OR t.reference_no ILIKE ? OR ${expenseNo} ILIKE ?)`, like, like, like, like);
         }
 
         const from = `FROM society_transactions t
@@ -1020,7 +968,6 @@ const adminModule = {
                     common.notifyAdmins("notify_expense", "notify_admin_expense", `₹${Number(body.amount).toLocaleString("en-IN")} · ${body.description}`, "expense", expenseId);
                 }
             }
-            common.logActivity(request, id ? ACTIVITY.EXPENSE_UPDATED : ACTIVITY.EXPENSE_CREATED, "society_transactions", expenseId);
             const { expenses } = await this.listExpenses({ filters: { id: expenseId }, limit: 1, withTotal: false });
             return middleware.sendSuccess(res, id ? "rest_expense_updated" : "rest_expense_saved", { expense: expenses[0] });
         } catch (error) {
@@ -1043,8 +990,6 @@ const adminModule = {
                 : [{ affectedRows: 0 }];
             if (!result.affectedRows) return middleware.sendError(res, "rest_expense_not_found");
 
-            const codes = { verified: ACTIVITY.EXPENSE_VERIFIED, rejected: ACTIVITY.EXPENSE_REJECTED, pending: ACTIVITY.EXPENSE_PENDING };
-            common.logActivity(request, codes[status], "society_transactions", id);
             const { expenses } = await this.listExpenses({ filters: { id }, limit: 1, withTotal: false });
             return middleware.sendSuccess(res, "rest_expense_status_changed", { expense: expenses[0] });
         } catch (error) {
@@ -1059,7 +1004,6 @@ const adminModule = {
                 ? await query.updateQuery("society_transactions", { is_deleted: 1 }, "id = ? AND entry_type = ? AND is_deleted = 0", [id, TRANSACTION_TYPE.PAID])
                 : [{ affectedRows: 0 }];
             if (!result.affectedRows) return middleware.sendError(res, "rest_expense_not_found");
-            common.logActivity(request, ACTIVITY.EXPENSE_DELETED, "society_transactions", id);
             return middleware.sendSuccess(res, "rest_expense_deleted");
         } catch (error) {
             return middleware.sendServerError(res, "deleteExpense", error);
@@ -1210,7 +1154,6 @@ const adminModule = {
                 mode: mode || null,
                 generated_by: request.loginUser.id,
             });
-            common.logActivity(request, ACTIVITY.REPORT_GENERATED, "generated_reports", result.insertId);
             return middleware.sendSuccess(res, "rest_report_saved", { report: { id: result.insertId } });
         } catch (error) {
             return middleware.sendServerError(res, "saveReport", error);
@@ -1303,7 +1246,6 @@ const adminModule = {
             lines.push("", `SELECT setval('member_code_seq', ${Number(memberSeq.last_value)}, ${memberSeq.is_called ? "true" : "false"});`, "COMMIT;", "");
 
             await common.saveSettings({ last_backup_at: now.toISOString() });
-            common.logActivity(request, ACTIVITY.BACKUP_DOWNLOADED, "app_settings", null);
             return middleware.sendSuccess(res, "rest_keywords_success", {
                 file_name: `society_app_backup_${now.toISOString().slice(0, 10)}.sql`,
                 tables: ordered.length,
@@ -1336,7 +1278,6 @@ const adminModule = {
                 if (event_categories) await syncEventCategories(event_categories, tx);
                 if (upi !== undefined) await saveUpi(upi, request.loginUser.id, tx);
             });
-            common.logActivity(request, ACTIVITY.SETTINGS_UPDATED, "app_settings", null);
             return middleware.sendSuccess(res, "rest_settings_saved", await this.settingsData(request.lang));
         } catch (error) {
             return middleware.sendServerError(res, "saveAppSettings", error);

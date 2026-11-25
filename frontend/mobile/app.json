@@ -10,6 +10,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.gaamtoda.society",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFF8EE"
@@ -34,8 +35,23 @@
       "expo-sharing",
       "expo-asset",
       "expo-secure-store",
-      "expo-video"
+      "expo-video",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": false,
+            "extraProguardRules": "-keep class * extends androidx.room.RoomDatabase { <init>(); }"
+          }
+        }
+      ]
     ],
-    "backgroundColor": "#FFF8EE"
+    "backgroundColor": "#FFF8EE",
+    "extra": {
+      "eas": {
+        "projectId": "f9060c10-0b08-4fb1-be54-43cea532408f"
+      }
+    },
+    "owner": "milanpatel1212"
   }
 }

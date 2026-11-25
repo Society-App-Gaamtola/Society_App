@@ -128,10 +128,11 @@ function DrawerPanel({ progress, onClose }: { progress: Animated.Value; onClose:
 
   const go = (target: LinkTarget) =>
     onClose(() =>
-      // Every link lives in the Home tab's stack so the tab bar stays visible.
+      // Every link lives in the Home tab's stack so the tab bar stays visible. initial: false keeps the Home screen
+      // under it, also after the app redraws (theme switch), so Back and the Home tab return to it.
       navigation.navigate('Main', {
         screen: 'Home',
-        params: target === 'HomeMain' ? { screen: 'HomeMain' } : { screen: target as 'Settings' },
+        params: target === 'HomeMain' ? { screen: 'HomeMain' } : { screen: target as 'Settings', initial: false },
       }),
     );
 

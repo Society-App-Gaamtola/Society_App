@@ -347,7 +347,6 @@ const authModule = {
             await query.updateQuery("users", { full_name: username, signup_step: "completed" }, "id = ?", [user_id]);
             // Sign-up done: the member gets their member code (GM0001…)
             await common.assignMemberCode(user_id);
-            common.logActivity(request, constant.ACTIVITY.MEMBER_JOINED, "users", user_id);
             common.notifyAdmins("notify_new_member", "notify_admin_new_member", username, "member", user_id);
 
             const userData = await common.getUserDetails({ id: user_id });

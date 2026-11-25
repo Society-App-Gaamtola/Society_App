@@ -191,74 +191,19 @@ export default {
     // Roles the Super Admin can give in the app / panel. Nobody can be made Super Admin through the API
     ASSIGNABLE_ROLES: ["member", "executive"],
 
-    // ---------- Activity log (table audit_logs: who did what to which record) ----------
-    // Saved with common.logActivity(request, ACTIVITY.X, table, id); shown as the dashboard's Recent Activities and
-    // GET /admin/activities. The text is the language key activity_<code>; the record's name is looked up when read
+    // ---------- Recent Activities (the panel dashboard) ----------
+    // There is no activity log table: the dashboard reads the newest rows of these tables (adminModule.recentActivities).
+    // The text is the language key activity_<code>
     ACTIVITY: {
         EVENT_CREATED: "event_created",
-        EVENT_UPDATED: "event_updated",
-        EVENT_DELETED: "event_deleted",
-        EVENT_PLAN_CREATED: "event_plan_created",
-        EVENT_PLAN_UPDATED: "event_plan_updated",
-        EVENT_PLAN_DELETED: "event_plan_deleted",
-        EVENT_POSTED: "event_posted",
-        EVENT_DRAFT: "event_draft",
-        EVENT_CANCELLED: "event_cancelled",
-        EVENT_FEATURED: "event_featured",
-        EVENT_UNFEATURED: "event_unfeatured",
-        EVENT_APPROVED: "event_approved",
-        EVENT_REJECTED: "event_rejected",
         NOTICE_CREATED: "notice_created",
-        NOTICE_UPDATED: "notice_updated",
-        NOTICE_DELETED: "notice_deleted",
-        NOTICE_PUBLISHED: "notice_published",
-        NOTICE_DRAFT: "notice_draft",
-        MEDIA_APPROVED: "media_approved",
-        MEDIA_REJECTED: "media_rejected",
         MEMBER_JOINED: "member_joined",
-        MEMBER_ADDED: "member_added", // added by the Super Admin in the panel
-        MEMBER_UPDATED: "member_updated",
-        MEMBER_ACTIVATED: "member_activated",
-        MEMBER_DEACTIVATED: "member_deactivated",
-        MEMBER_DELETED: "member_deleted",
-        EXECUTIVE_ADDED: "executive_added",
-        EXECUTIVE_REMOVED: "executive_removed",
-        EXECUTIVE_PERMISSIONS: "executive_permissions",
+        MEDIA_UPLOADED: "media_uploaded",
         EXECUTIVE_REQUEST_SENT: "executive_request_sent",
-        EXECUTIVE_REQUEST_APPROVED: "executive_request_approved",
-        EXECUTIVE_REQUEST_REJECTED: "executive_request_rejected",
         DONATION_RECORDED: "donation_recorded",
-        DONATION_UPDATED: "donation_updated",
-        DONATION_DELETED: "donation_deleted",
-        DONATION_VERIFIED: "donation_verified",
-        DONATION_REJECTED: "donation_rejected",
-        DONATION_PENDING: "donation_pending",
         EXPENSE_CREATED: "expense_created",
-        EXPENSE_UPDATED: "expense_updated",
-        EXPENSE_DELETED: "expense_deleted",
-        EXPENSE_VERIFIED: "expense_verified",
-        EXPENSE_REJECTED: "expense_rejected",
-        EXPENSE_PENDING: "expense_pending",
-        REPORT_GENERATED: "report_generated",
-        SETTINGS_UPDATED: "settings_updated",
-        BACKUP_DOWNLOADED: "backup_downloaded",
-        // Every login (app and panel), table user_devices = the session. The Audit Logs screen's Login History
-        LOGIN: "login",
     },
-    // GET /admin/activities?area= : the tables of each area (audit_logs.table_name)
-    ACTIVITY_AREAS: {
-        events: ["events", "future_event_plans"],
-        notices: ["notices"],
-        members: ["users", "executive_applications"],
-        donations: ["donations"],
-        expenses: ["society_transactions"],
-        reports: ["generated_reports"],
-        media: ["media_items"],
-        settings: ["app_settings"],
-    },
-    // GET /admin/activities?type= : changes (every action but login) or logins
-    ACTIVITY_TYPES: ["changes", "logins"],
-    ACTIVITY_DASHBOARD_LIMIT: 5,
+    ACTIVITY_DASHBOARD_LIMIT: 6,
 
     // ---------- Executive permissions (table executive_permissions, one row per allowed section) ----------
     // The panel sections an executive can be given (modules.code). Checked with middleware.requirePermission(section)
@@ -273,6 +218,11 @@ export default {
     // The Super Admin gets none. The Super Admin may still change a code by hand (it must stay unique)
     MEMBER_CODE_PREFIX: "GM",
     MEMBER_CODE_DIGITS: 4,
+
+    // Record numbers the panel / app show for a row id (DON001, EXP012): never stored, but the admin search matches
+    // them (lib/utils.ts recordNo, mobile receipt.ts receiptNo use the same prefix and digits)
+    RECORD_NO_PREFIX: { DONATION: "DON", EXPENSE: "EXP" },
+    RECORD_NO_DIGITS: 3,
 
     // ---------- Admin: members ----------
     // users.status: suspended = deactivated by the Super Admin (logged out on the next request)
@@ -367,4 +317,8 @@ export default {
     // posted, and members are notified about events / notices that went live since the last run. Items posted or
     // published right away are announced at once when saved, not by this job
     EVENT_PUBLISH_SCHEDULE: "0 0 * * *",
+    // Every day at 1 AM (and once when the server starts): each user's copy of a notification they read more than
+    // NOTIFICATION_READ_KEEP_DAYS ago is deleted, then every notification nobody has a copy of any more. Unread ones stay
+    NOTIFICATION_CLEANUP_SCHEDULE: "0 1 * * *",
+    NOTIFICATION_READ_KEEP_DAYS: 30,
 };

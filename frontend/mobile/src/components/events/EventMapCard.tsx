@@ -1,5 +1,6 @@
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { colors, fonts, radius, themedStyles } from '../../theme';
 import { Ionicons } from '../../icons';
 import OutlineButton from '../ui/OutlineButton';
@@ -17,6 +18,11 @@ type Props = {
 // How much area the preview shows around the pin (about 1 km)
 const DELTA = 0.01;
 
+// Google Maps on Android needs an API key in a built app (APK); Expo Go brings its own. Until the
+// react-native-maps plugin has `androidGoogleMapsApiKey` in app.json, a built Android app shows the
+// "Open in Google Maps" button instead of the map (a map without a key would close the app).
+const CAN_SHOW_MAP = Platform.OS !== 'android' || Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
 /** Google Maps link for the pin (opens the Google Maps app when installed), or a search for the venue. */
 export const googleMapsUrl = ({ coords, venueName, address, mapLink }: Props) => {
   if (coords) return `https://www.google.com/maps/search/?api=1&query=${coords.latitude},${coords.longitude}`;
@@ -32,7 +38,7 @@ export default function EventMapCard(props: Props) {
   const t = useT();
   const open = () => Linking.openURL(googleMapsUrl(props)).catch(() => {});
 
-  if (!props.coords) {
+  if (!props.coords || !CAN_SHOW_MAP) {
     return <OutlineButton title="Open in Google Maps" icon="map-outline" onPress={open} />;
   }
 

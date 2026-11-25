@@ -11,7 +11,7 @@ import userModule from "./userModule.js";
 // Listing / details are NOT here: everyone uses GET /user/events and /user/notices (mine / status for executives)
 const {
     EVENT_STATUS, NOTICE_STATUS, MEDIA_STATUS, EVENT_ACTIONS, NOTICE_ACTIONS, REVIEW_ACTIONS,
-    NOTICE_AUDIENCE, DB_ERROR, ACTIVITY, EVENT_PLAN_STATUS,
+    NOTICE_AUDIENCE, DB_ERROR, EVENT_PLAN_STATUS,
 } = constant;
 const { routeId } = common;
 
@@ -126,7 +126,6 @@ const saveEvent = async (request, res, existingId = null) => {
     });
 
     common.notifyNewContent(); // a posted event is announced now instead of at the next cron run
-    common.logActivity(request, existingId ? ACTIVITY.EVENT_UPDATED : ACTIVITY.EVENT_CREATED, "events", id);
     return middleware.sendSuccess(res, EVENT_STATUS_MESSAGE[data.status], { event: await userModule.fullEvent(id, request.lang) });
 };
 
@@ -180,7 +179,6 @@ const saveNotice = async (request, res, existingId = null) => {
 
     const id = await saveNoticeRows(data, recipient_ids ?? [], existingId, request.loginUser.id);
     common.notifyNewContent(); // a notice published now is announced now (a scheduled one by the cron)
-    common.logActivity(request, existingId ? ACTIVITY.NOTICE_UPDATED : ACTIVITY.NOTICE_CREATED, "notices", id);
     const msgKey = !publishing ? "rest_notice_draft_saved" : publish_at ? "rest_notice_scheduled" : "rest_notice_published";
     return middleware.sendSuccess(res, msgKey, { notice: await userModule.fullNotice(id) });
 };
@@ -240,7 +238,6 @@ const executiveModule = {
             const event = await findOwnRow(request, res, "events", "rest_event_not_found");
             if (!event) return undefined;
             await query.updateQuery("events", { is_deleted: 1 }, "id = ?", [event.id]);
-            common.logActivity(request, ACTIVITY.EVENT_DELETED, "events", event.id);
             return middleware.sendSuccess(res, "rest_event_deleted");
         } catch (error) {
             return middleware.sendServerError(res, "deleteEvent", error);
@@ -272,7 +269,6 @@ const executiveModule = {
             const notice = await findOwnRow(request, res, "notices", "rest_notice_not_found");
             if (!notice) return undefined;
             await query.updateQuery("notices", { is_deleted: 1 }, "id = ?", [notice.id]);
-            common.logActivity(request, ACTIVITY.NOTICE_DELETED, "notices", notice.id);
             return middleware.sendSuccess(res, "rest_notice_deleted");
         } catch (error) {
             return middleware.sendServerError(res, "deleteNotice", error);
@@ -313,7 +309,6 @@ const executiveModule = {
                 ref_type: "media",
                 ref_id: id,
             });
-            common.logActivity(request, approving ? ACTIVITY.MEDIA_APPROVED : ACTIVITY.MEDIA_REJECTED, "media_items", id);
             return middleware.sendSuccess(res, approving ? "rest_media_approved" : "rest_media_rejected", { media: media[0] });
         } catch (error) {
             return middleware.sendServerError(res, "reviewMedia", error);
@@ -347,7 +342,6 @@ executiveModule.setMemberRole = async (request, res) => {
         if (rows[0].role !== role) {
             const tellUser = await changeRole(id, role, request.loginUser.id);
             tellUser();
-            common.logActivity(request, role === constant.ROLES.EXECUTIVE ? ACTIVITY.EXECUTIVE_ADDED : ACTIVITY.EXECUTIVE_REMOVED, "users", id);
         }
         return middleware.sendSuccess(res, "rest_role_updated", { user: common.sanitizeUser(await common.getUserDetails({ id })) });
     } catch (error) {
@@ -457,7 +451,6 @@ executiveModule.reviewExecutiveRequest = async (request, res) => {
             return middleware.sendError(res, exists.length ? "rest_executive_request_not_pending" : "rest_executive_request_not_found");
         }
         outcome.tellUser(); // after the commit, so a failed review never notifies
-        common.logActivity(request, approving ? ACTIVITY.EXECUTIVE_REQUEST_APPROVED : ACTIVITY.EXECUTIVE_REQUEST_REJECTED, "executive_applications", id);
         return middleware.sendSuccess(res, approving ? "rest_executive_request_approved" : "rest_executive_request_rejected");
     } catch (error) {
         return middleware.sendServerError(res, "reviewExecutiveRequest", error);
@@ -475,8 +468,6 @@ executiveModule.setEventStatus = async (request, res) => {
 
         await query.updateQuery("events", EVENT_STATUS_COLUMNS[request.body.status](request.loginUser.id), "id = ?", [id]);
         common.notifyNewContent();
-        const statusActivity = { posted: ACTIVITY.EVENT_POSTED, draft: ACTIVITY.EVENT_DRAFT, cancelled: ACTIVITY.EVENT_CANCELLED };
-        common.logActivity(request, statusActivity[request.body.status], "events", id);
         return middleware.sendSuccess(res, "rest_event_status_changed", { event: await userModule.fullEvent(id, request.lang) });
     } catch (error) {
         return middleware.sendServerError(res, "setEventStatus", error);
@@ -492,7 +483,6 @@ executiveModule.setEventFeatured = async (request, res) => {
 
         const { is_featured } = request.body;
         await query.updateQuery("events", { is_featured: is_featured ? 1 : 0 }, "id = ?", [id]);
-        common.logActivity(request, is_featured ? ACTIVITY.EVENT_FEATURED : ACTIVITY.EVENT_UNFEATURED, "events", id);
         return middleware.sendSuccess(res, is_featured ? "rest_event_featured" : "rest_event_unfeatured", {
             event: await userModule.fullEvent(id, request.lang),
         });
@@ -515,7 +505,6 @@ executiveModule.setNoticeStatus = async (request, res) => {
             [notice.id],
         );
         common.notifyNewContent();
-        common.logActivity(request, publishing ? ACTIVITY.NOTICE_PUBLISHED : ACTIVITY.NOTICE_DRAFT, "notices", notice.id);
         return middleware.sendSuccess(res, "rest_notice_status_changed", { notice: await userModule.fullNotice(notice.id) });
     } catch (error) {
         return middleware.sendServerError(res, "setNoticeStatus", error);
@@ -573,7 +562,6 @@ executiveModule.saveEventPlan = async (request, res) => {
             const [result] = await query.insertQuery("future_event_plans", { ...data, created_by: request.loginUser.id });
             planId = result.insertId;
         }
-        common.logActivity(request, editing ? ACTIVITY.EVENT_PLAN_UPDATED : ACTIVITY.EVENT_PLAN_CREATED, "future_event_plans", planId);
         return middleware.sendSuccess(res, editing ? "rest_event_plan_updated" : "rest_event_plan_saved", { plan: { id: planId, ...data } });
     } catch (error) {
         return middleware.sendServerError(res, "saveEventPlan", error);
@@ -586,7 +574,6 @@ executiveModule.deleteEventPlan = async (request, res) => {
         const plan = await findOwnRow(request, res, "future_event_plans", "rest_event_plan_not_found");
         if (!plan) return undefined;
         await query.updateQuery("future_event_plans", { is_deleted: 1 }, "id = ?", [plan.id]);
-        common.logActivity(request, ACTIVITY.EVENT_PLAN_DELETED, "future_event_plans", plan.id);
         return middleware.sendSuccess(res, "rest_event_plan_deleted");
     } catch (error) {
         return middleware.sendServerError(res, "deleteEventPlan", error);

@@ -817,7 +817,6 @@ const userModule = {
                 status: DONATION_STATUS.PENDING,
                 reference_no: UPI_METHODS.includes(method) ? reference_no : null,
             });
-            common.logActivity(request, constant.ACTIVITY.DONATION_RECORDED, "donations", result.insertId);
             common.notifyAdmins("notify_donation", "notify_admin_donation", `₹${Number(amount).toLocaleString("en-IN")} · ${purpose}`, "donation", result.insertId);
             const donation = await userModule.findDonation(result.insertId, request.loginUser.id);
             return middleware.sendSuccess(res, "rest_donation_recorded", { donation });
@@ -932,7 +931,6 @@ const userModule = {
                 payment_proof_url: payment_proof_url || null,
                 status: EXEC_APPLICATION_STATUS.PENDING,
             });
-            common.logActivity(request, constant.ACTIVITY.EXECUTIVE_REQUEST_SENT, "executive_applications", saved.insertId);
             common.notifyAdmins("notify_executive_request", "notify_admin_executive_request", request.loginUser.name || "", "executive_request", saved.insertId);
             return middleware.sendSuccess(res, "rest_executive_request_sent", {
                 application: await userModule.latestApplication(user_id),

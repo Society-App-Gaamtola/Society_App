@@ -6,7 +6,7 @@ import constant from "../../../config/constant.js";
 
 const {
   loginSchema, dashboardSchema, memberListSchema, memberEditSchema, memberCreateSchema, memberStatusSchema, executiveListSchema, executivePermissionsSchema,
-  activityListSchema, donationListSchema, donationSchema, donationStatusSchema, expenseListSchema, expenseSchema, expenseStatusSchema,
+  donationListSchema, donationSchema, donationStatusSchema, expenseListSchema, expenseSchema, expenseStatusSchema,
   financeSchema, reportDataSchema, reportListSchema, reportSaveSchema, settingsSchema,
 } = schemas;
 
@@ -26,11 +26,8 @@ const adminRoutes = express.Router();
 // Rate limited first, together with the app's /auth/login (constant.RATE_LIMITS, no database query)
 adminRoutes.post("/login", middleware.authLimits.ip, middleware.authLimits.login, middleware.validateJoi(loginSchema), adminController.login);
 
-// Cards, pending counts and the monthly chart. ?from_date=&to_date= (optional)
+// Cards, pending counts, the monthly chart and Recent Activities. ?from_date=&to_date= (optional)
 adminRoutes.get("/dashboard", superAdmin, middleware.validateJoi(dashboardSchema, true), adminController.getDashboard);
-// The activity log (audit_logs), newest first: ?page=&limit=&type=changes|logins&area=&search=&from_date=&to_date=
-// (the Audit Logs screen; the dashboard shows the latest ACTIVITY_DASHBOARD_LIMIT changes)
-adminRoutes.get("/activities", superAdmin, middleware.validateJoi(activityListSchema, true), adminController.getActivities);
 
 // ---------- Members ----------
 // Always paged (default 10 a page). ?page=&limit=&search=&role=&status=&signup=&from_date=&to_date=&sort=&order=

@@ -12,9 +12,6 @@ const adminController = {
     async createMember(request, res) {
         return adminModule.createMember(request, res);
     },
-    async getActivities(request, res) {
-        return adminModule.getActivities(request, res);
-    },
 
     async getMembers(request, res) {
         return adminModule.getMembers(request, res);

@@ -20,7 +20,6 @@ import {
   Menu,
   ReceiptText,
   Search,
-  ScrollText,
   Settings,
   User,
   Users,
@@ -48,7 +47,6 @@ const NAV = [
   { href: '/expenses', label: 'Expenses', icon: ReceiptText },
   { href: '/reports', label: 'Financial Reports', icon: BarChart3 },
   { href: '/media', label: 'Media Approval', icon: ImageIcon },
-  { href: '/audit-logs', label: 'Audit Logs', icon: ScrollText },
   { href: '/settings', label: 'App Settings', icon: Settings },
 ];
 

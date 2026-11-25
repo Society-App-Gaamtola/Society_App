@@ -29,6 +29,8 @@ type Action = {
 };
 
 const PADDING = 16;
+// Recent Activity shows this many of the user's latest events (one page of GET /user/events?mine=true holds 10)
+const RECENT_ACTIVITY_COUNT = 10;
 
 // What the latest change to one of the user's events was, from its status
 const activityLabel: Record<ApiEventStatus, string> = {
@@ -62,7 +64,7 @@ export default function ExecutiveDashboardScreen() {
       setUpcomingEvent(data.upcoming_events[0] ? toSocietyEvent(data.upcoming_events[0]) : null);
       if (hasPermission(user, 'events')) {
         const mine = await getMyEvents(1);
-        setRecent(mine.data.events.slice(0, 3));
+        setRecent(mine.data.events.slice(0, RECENT_ACTIVITY_COUNT));
       }
     } catch {
       // What was loaded before stays on screen; the API client already handles expired logins.
@@ -156,7 +158,7 @@ export default function ExecutiveDashboardScreen() {
           <Text style={styles.empty}>No upcoming events right now.</Text>
         )}
 
-        <SectionHeader title="Recent Activity" onViewAll={() => navigation.navigate('MyEvents')} />
+        <SectionHeader title="Recent Activity" />
         <View style={styles.activityCard}>
           {recent.length ? (
             recent.map((e, i) => (

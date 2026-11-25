@@ -131,10 +131,15 @@ export type Report = BaseRecord & {
   generatedOn: string;
 };
 
-export type AuditLog = BaseRecord & {
-  actor: string;
+/** One line of the dashboard's Recent Activities */
+export type RecentActivity = {
+  id: string;
+  /** The code: event_created, notice_created, member_joined, media_uploaded, executive_request_sent, donation_recorded, expense_created */
   action: string;
-  target: string;
+  /** The action in words, in the admin's language */
+  text: string;
+  target: string | null;
+  actor: string | null;
   at: string;
 };
 
@@ -202,7 +207,7 @@ export type DashboardStats = FinanceSummary & {
   pendingExpenses: number;
   pendingRequests: number;
   pendingMedia: number;
-  activities: AuditLog[];
+  activities: RecentActivity[];
 };
 
 // ---------- Backend (connected screens) ----------

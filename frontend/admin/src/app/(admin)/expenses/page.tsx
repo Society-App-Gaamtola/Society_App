@@ -296,7 +296,7 @@ export default function ExpensesPage() {
         </div>
       )}
       <FilterBar
-        searchPlaceholder="Search by description, vendor or reference..."
+        searchPlaceholder="Search by expense no, description, vendor or reference..."
         dateRange
         selects={[
           { name: 'category', label: 'Categories', options: settings?.settings.expense_categories ?? [] },

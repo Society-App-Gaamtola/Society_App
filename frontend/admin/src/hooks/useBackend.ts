@@ -41,8 +41,8 @@ export function useBackendAction<In, Out extends { message: string }>(keys: stri
   return useMutation({
     mutationFn: run,
     onSuccess: ({ message }) => {
-      // The dashboard (cards, Recent Activities) and the full activity log change with every save
-      for (const key of [...keys, 'dashboard', 'auditLogs']) client.invalidateQueries({ queryKey: [key] });
+      // The dashboard (cards, Recent Activities) changes with every save
+      for (const key of [...keys, 'dashboard']) client.invalidateQueries({ queryKey: [key] });
       toast.success(message);
     },
     onError: (error: Error) => toast.error(error.message),

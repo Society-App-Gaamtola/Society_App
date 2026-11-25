@@ -21,72 +21,42 @@ import {
 } from 'lucide-react';
 import { Card, EmptyState, ErrorState, PageHeader, StatCard, StatCardsSkeleton, ViewDialog } from '@/components/common';
 import { PeriodFilter, usePeriodLabel } from '@/components/PeriodFilter';
-import { Pagination } from '@/components/Pagination';
 import { Skeleton } from '@/components/ui/primitives';
-import { DEFAULT_PAGE_SIZE } from '@/config';
-import { useActivities, useDashboardStats } from '@/hooks/useDashboard';
+import { useDashboardStats } from '@/hooks/useDashboard';
 import { useUrlState } from '@/hooks/useUrlState';
-import { formatDate, formatDateTime, formatINR } from '@/lib/utils';
-import type { AuditLog } from '@/types';
+import { formatDateTime, formatINR } from '@/lib/utils';
+import type { RecentActivity } from '@/types';
 
 const IncomeExpenseChart = dynamic(() => import('@/components/IncomeExpenseChart'), {
   ssr: false,
   loading: () => <Skeleton className="h-72" />,
 });
 
-const ACTIVITY_PAGE_SIZE = DEFAULT_PAGE_SIZE;
+/** The icon of each kind of activity (the backend's ACTIVITY codes) */
+const ACTIVITY_ICONS: Record<string, LucideIcon> = {
+  event_created: CalendarDays,
+  notice_created: Megaphone,
+  member_joined: UserPlus,
+  media_uploaded: ImageIcon,
+  executive_request_sent: ShieldCheck,
+  donation_recorded: HandCoins,
+  expense_created: ReceiptText,
+};
 
-/** Picks an icon from the wording of the audit entry. */
-function activityIcon(action: string): LucideIcon {
-  const a = action.toLowerCase();
-  if (a.includes('member')) return UserPlus;
-  if (a.includes('donation')) return HandCoins;
-  if (a.includes('expense')) return ReceiptText;
-  if (a.includes('event')) return CalendarDays;
-  if (a.includes('notice')) return Megaphone;
-  if (a.includes('photo')) return ImageIcon;
-  if (a.includes('executive') || a.includes('permission')) return ShieldCheck;
-  return FileText;
-}
-
-function ActivityRow({ log }: { log: AuditLog }) {
-  const Icon = activityIcon(log.action);
+function ActivityRow({ activity }: { activity: RecentActivity }) {
+  const Icon = ACTIVITY_ICONS[activity.action] ?? FileText;
+  const detail = [activity.target, activity.actor && `by ${activity.actor}`].filter(Boolean).join(' · ');
   return (
     <li className="flex items-start gap-3 py-2.5">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#FDECEC] text-maroon">
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-semibold">{log.action}</div>
-        <div className="truncate text-xs text-muted-foreground">
-          {log.target} · by {log.actor}
-        </div>
+        <div className="text-sm font-semibold">{activity.text}</div>
+        {detail ? <div className="truncate text-xs text-muted-foreground">{detail}</div> : null}
       </div>
-      <span className="shrink-0 text-xs text-muted-foreground">{formatDate(log.at)}</span>
+      <span className="shrink-0 text-xs text-muted-foreground">{formatDateTime(activity.at)}</span>
     </li>
-  );
-}
-
-function AllActivitiesDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const [page, setPage] = useState(1);
-  const { data } = useActivities(page, ACTIVITY_PAGE_SIZE, open);
-  return (
-    <ViewDialog open={open} onOpenChange={onOpenChange} title="All Activities" className="max-w-xl">
-      <ul className="divide-y divide-border">
-        {data?.data.map((log) => (
-          <li key={log.id} className="flex items-start justify-between gap-3 py-2.5 text-sm">
-            <div className="min-w-0">
-              <div className="font-semibold">{log.action}</div>
-              <div className="truncate text-xs text-muted-foreground">
-                {log.target} · by {log.actor}
-              </div>
-            </div>
-            <span className="shrink-0 text-xs text-muted-foreground">{formatDateTime(log.at)}</span>
-          </li>
-        ))}
-      </ul>
-      <Pagination page={page} total={data?.total ?? 0} pageSize={ACTIVITY_PAGE_SIZE} onPageChange={setPage} itemLabel="activities" className="px-0" />
-    </ViewDialog>
   );
 }
 
@@ -130,7 +100,6 @@ function PendingDialog({ open, onOpenChange, counts }: { open: boolean; onOpenCh
 export default function DashboardPage() {
   const { range } = useUrlState();
   const { data, isLoading, isError, refetch } = useDashboardStats(range);
-  const [showAll, setShowAll] = useState(false);
   const [showPending, setShowPending] = useState(false);
   const periodLabel = usePeriodLabel();
 
@@ -159,19 +128,11 @@ export default function DashboardPage() {
             >
               <IncomeExpenseChart data={data.monthly} />
             </Card>
-            <Card
-              title="Recent Activities"
-              className="lg:col-span-2"
-              action={
-                <button type="button" onClick={() => setShowAll(true)} className="inline-flex items-center gap-1 text-sm font-semibold text-maroon hover:underline">
-                  View All <ArrowRight className="h-4 w-4" />
-                </button>
-              }
-            >
+            <Card title="Recent Activities" className="lg:col-span-2">
               {data.activities.length ? (
                 <ul className="divide-y divide-border">
-                  {data.activities.map((log) => (
-                    <ActivityRow key={log.id} log={log} />
+                  {data.activities.map((activity) => (
+                    <ActivityRow key={activity.id} activity={activity} />
                   ))}
                 </ul>
               ) : (
@@ -179,7 +140,6 @@ export default function DashboardPage() {
               )}
             </Card>
           </div>
-          <AllActivitiesDialog open={showAll} onOpenChange={setShowAll} />
           <PendingDialog
             open={showPending}
             onOpenChange={setShowPending}
