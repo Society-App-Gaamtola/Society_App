@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/types';
 import { common, surface } from '../styles/common';
 import { colors, fonts, tones, themedStyles } from '../theme';
 import { getMyDonations, toMyDonation } from '../api/member';
@@ -14,12 +16,12 @@ import { useAuth } from '../context/AuthContext';
 import { donationReceiptPdf, donationSummaryFile, receiptNo, shareFile, type Donor } from '../services/receipt';
 import type { ReportFormat } from '../types';
 
-/** Every donation of the member, page by page (the summary sheet covers the whole history) */
+/** Every donation of the member, page by page (the summary sheet covers the whole history; unpaid UPI ones are left out) */
 async function allMyDonations() {
   const all: MyDonation[] = [];
   for (let page = 1; ; page += 1) {
     const { data } = await getMyDonations(page, 50);
-    all.push(...data.donations.map(toMyDonation));
+    all.push(...data.donations.map(toMyDonation).filter((d) => d.status !== 'Awaiting payment'));
     if (!data.pagination.has_more) return all;
   }
 }
@@ -37,10 +39,12 @@ function StatCard({ icon, label, amount }: { icon: IoniconName; label: string; a
   );
 }
 
-function DonationCard({ donation, donor }: { donation: MyDonation; donor: Donor }) {
+/** onFinish: a UPI donation saved before paying (no UTR yet) reopens its payment step on the Donate screen */
+function DonationCard({ donation, donor, onFinish }: { donation: MyDonation; donor: Donor; onFinish: () => void }) {
   const t = useT();
   const successful = donation.status === 'Successful';
   const failed = donation.status === 'Failed';
+  const awaiting = donation.status === 'Awaiting payment';
   const [busy, setBusy] = useState(false);
 
   // A verified donation: a receipt PDF, shared through the phone's share sheet (WhatsApp, email, save …)
@@ -63,7 +67,7 @@ function DonationCard({ donation, donor }: { donation: MyDonation; donor: Donor 
         </IconCircle>
         <View style={common.flex}>
           <Text style={styles.title}>{donation.title}</Text>
-          <Text style={styles.date}>{`${formatDateTime(new Date(donation.date))} · ${donation.method}`}</Text>
+          <Text style={styles.date}>{`${receiptNo(donation.id)} · ${formatDateTime(new Date(donation.date))} · ${t(donation.method)}`}</Text>
         </View>
         <View style={styles.amountCol}>
           <Text style={styles.amount}>{formatINR(donation.amount)}</Text>
@@ -75,7 +79,9 @@ function DonationCard({ donation, donor }: { donation: MyDonation; donor: Donor 
         style={styles.receipt}
         disabled={busy}
         onPress={() =>
-          successful
+          awaiting
+            ? onFinish()
+            : successful
             ? shareReceipt()
             : failed
               ? Alert.alert(t('Not received'), t('The treasurer could not match this donation. Please contact the Mandal office.'))
@@ -83,8 +89,12 @@ function DonationCard({ donation, donor }: { donation: MyDonation; donor: Donor 
         }
         accessibilityRole="button"
       >
-        {busy ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name={successful ? 'share-social-outline' : 'download-outline'} size={18} color={colors.primary} />}
-        <Text style={styles.receiptText}>{t(successful ? 'Share Receipt (PDF)' : 'View Receipt')}</Text>
+        {busy ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <Ionicons name={awaiting ? 'qr-code-outline' : successful ? 'share-social-outline' : 'download-outline'} size={18} color={colors.primary} />
+        )}
+        <Text style={styles.receiptText}>{t(awaiting ? 'Finish Payment' : successful ? 'Share Receipt (PDF)' : 'View Receipt')}</Text>
         {successful ? <Ionicons name="logo-whatsapp" size={16} color={colors.whatsapp} /> : <Ionicons name="chevron-forward" size={16} color={colors.mutedIcon} />}
       </Pressable>
     </View>
@@ -95,6 +105,7 @@ function DonationCard({ donation, donor }: { donation: MyDonation; donor: Donor 
 // Totals count donations the treasurer has verified only; they come from the server.
 export default function MyDonationsScreen() {
   const t = useT();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user } = useAuth();
   const donor: Donor = { name: user?.name ?? '', memberId: user?.memberId };
   const [summaryMenu, setSummaryMenu] = useState(false);
@@ -180,7 +191,22 @@ export default function MyDonationsScreen() {
         ) : donations.length ? (
           <View style={styles.list}>
             {donations.map((d) => (
-              <DonationCard key={d.id} donation={d} donor={donor} />
+              <DonationCard
+                key={d.id}
+                donation={d}
+                donor={donor}
+                onFinish={() =>
+                  navigation.navigate('Main', {
+                    screen: 'Donate',
+                    params: {
+                      screen: 'DonateMain',
+                      params: {
+                        resume: { id: Number(d.id), amount: d.amount, purpose: d.purpose, method: d.method === 'UPI App' ? 'UPI App' : 'QR Code' },
+                      },
+                    },
+                  })
+                }
+              />
             ))}
           </View>
         ) : (

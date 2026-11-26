@@ -80,6 +80,8 @@ const hi = {
 	rest_notification_not_found: "सूचना नहीं मिली",
 	rest_donation_recorded: "धन्यवाद! आपका दान दर्ज हो गया है, कोषाध्यक्ष इसकी पुष्टि करेंगे",
 	rest_donation_reference_used: "यह UPI ट्रांज़ैक्शन ID पहले ही जमा की जा चुकी है",
+	rest_donation_started: "आपकी दान ID तैयार है। किसी भी UPI ऐप से भुगतान करें, फिर UTR दर्ज करें",
+	rest_donation_payment_already_sent: "इस दान के भुगतान की जानकारी पहले ही भेजी जा चुकी है",
 	rest_executive_request_sent: "आपका कार्यकारी सदस्यता अनुरोध एडमिन की समीक्षा के लिए भेजा गया है",
 	rest_executive_request_pending: "आपका एक अनुरोध पहले से समीक्षा के लिए लंबित है",
 	notify_event_approved: "आपका कार्यक्रम स्वीकृत हुआ",

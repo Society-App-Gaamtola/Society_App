@@ -59,6 +59,24 @@ export const deleteOldReadNotifications = async () => {
     }
 };
 
+// A member's UPI donation is saved before they pay (its receipt number goes in the UPI note). One that never got its
+// UTR within DONATION_UNPAID_KEEP_HOURS was not paid: it is removed (soft delete). Panel entries are never touched
+export const deleteUnpaidDonations = async () => {
+    try {
+        const [result] = await db.query(
+            `UPDATE donations SET is_deleted = 1
+             WHERE status = ? AND reference_no IS NULL AND method = ANY(?::text[]) AND entered_by IS NULL AND is_deleted = 0
+               AND created_at < NOW() - make_interval(hours => ?::int)`,
+            [constant.DONATION_STATUS.PENDING, constant.UPI_METHODS, constant.DONATION_UNPAID_KEEP_HOURS],
+        );
+        if (result.affectedRows > 0) console.log(`[cron] ${result.affectedRows} unpaid UPI donation(s) removed`);
+        return result.affectedRows;
+    } catch (error) {
+        console.error("[cron] Unpaid donation cleanup failed:", error);
+        return 0;
+    }
+};
+
 const startCronJobs = () => {
     // Once on start, so a server that was off at midnight still cleans up
     deleteExpiredOtps();
@@ -79,6 +97,10 @@ const startCronJobs = () => {
     // Read notifications older than NOTIFICATION_READ_KEEP_DAYS: once on start, then every day
     deleteOldReadNotifications();
     cron.schedule(constant.NOTIFICATION_CLEANUP_SCHEDULE, deleteOldReadNotifications);
+
+    // UPI donations that never got a UTR: once on start, then every day
+    deleteUnpaidDonations();
+    cron.schedule(constant.DONATION_CLEANUP_SCHEDULE, deleteUnpaidDonations);
 };
 
 export default startCronJobs;

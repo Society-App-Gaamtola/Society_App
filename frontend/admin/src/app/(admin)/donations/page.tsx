@@ -30,6 +30,7 @@ import { uploadFinanceFile } from '@/services/cloudinary';
 import {
   donationsApi,
   donationStatusLabel,
+  isAwaitingUtr,
   DONATION_STATUS_OPTIONS,
   methodLabel,
   PAYMENT_MODE_OPTIONS,
@@ -232,7 +233,7 @@ export default function DonationsPage() {
       { key: 'date', header: 'Date', sortable: true, className: 'whitespace-nowrap px-4 py-3', render: (d) => formatDate(d.donated_on) },
       { key: 'mode', header: 'Payment Mode', className: 'whitespace-nowrap px-4 py-3', render: (d) => methodLabel(d.method) },
       { key: 'purpose', header: 'Purpose', render: (d) => d.purpose ?? '—' },
-      { key: 'status', header: 'Status', render: (d) => <StatusBadge status={donationStatusLabel(d.status)} /> },
+      { key: 'status', header: 'Status', render: (d) => <StatusBadge status={isAwaitingUtr(d) ? 'Awaiting UTR' : donationStatusLabel(d.status)} /> },
       {
         key: 'receipt',
         header: 'Receipt',
@@ -358,9 +359,9 @@ export default function DonationsPage() {
               ['Amount', formatINR(viewing.amount)],
               ['Date', formatDate(viewing.donated_on)],
               ['Payment Mode', methodLabel(viewing.method)],
-              ['Reference', viewing.reference_no || '—'],
+              ['Reference', viewing.reference_no || (isAwaitingUtr(viewing) ? 'Awaiting UTR: the member has not sent the payment details yet' : '—')],
               ['Purpose', viewing.purpose || '—'],
-              ['Status', <StatusBadge key="s" status={donationStatusLabel(viewing.status)} />],
+              ['Status', <StatusBadge key="s" status={isAwaitingUtr(viewing) ? 'Awaiting UTR' : donationStatusLabel(viewing.status)} />],
               ['Entered By', viewing.entered_by_name ?? 'The member (app)'],
               ...(viewing.verified_by_name ? [['Reviewed By', viewing.verified_by_name] as [string, string]] : []),
               ...(viewing.confirmed_at ? [['Verified On', formatDateTime(viewing.confirmed_at)] as [string, string]] : []),

@@ -22,6 +22,12 @@ export const methodLabel = (method: string) => METHOD_LABEL[method] ?? method;
 
 /** Donations: success = Verified; failed / cancelled (online payments) show as Rejected */
 export const donationStatusLabel = (status: string) => (status === 'success' ? 'Verified' : status === 'pending' ? 'Pending' : 'Rejected');
+/**
+ * A member's UPI donation saved in the app before paying (its receipt number goes in the UPI note) and still without
+ * its UTR. Nothing to verify yet; the backend removes it after 48 hours if it was never paid.
+ */
+export const isAwaitingUtr = (d: { status: string; method: string; reference_no: string | null; entered_by_name: string | null }) =>
+  d.status === 'pending' && !d.reference_no && !d.entered_by_name && (d.method === 'upi_app' || d.method === 'upi_qr');
 export const expenseStatusLabel = (status: string) => (status === 'verified' ? 'Verified' : status === 'pending' ? 'Pending' : 'Rejected');
 export const DONATION_STATUS_OPTIONS = [
   { value: 'success', label: 'Verified' },

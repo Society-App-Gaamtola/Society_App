@@ -17,6 +17,11 @@ const MEMBER_SORT_SQL = { name: "u.full_name", joined: "u.created_at", member_co
 
 // ---------- Finance helpers ----------
 
+// A member's UPI donation still waiting for its UTR (saved before paying, removed by the cron job if never paid): not
+// something to verify yet, so the dashboard's pending count and Recent Activities leave it out
+const UNPAID_DONATION_SQL = `(d.status = '${DONATION_STATUS.PENDING}' AND d.reference_no IS NULL AND d.entered_by IS NULL
+    AND d.method IN (${constant.UPI_METHODS.map((m) => `'${m}'`).join(", ")}))`;
+
 // Columns that go with a donation status: verified → confirmed now by this admin; rejected → by this admin; pending → none
 const donationStatusColumns = (status, admin_id) => {
     if (status === DONATION_STATUS.SUCCESS) return { confirmed_at: new Date(), verified_by: admin_id };
@@ -135,7 +140,7 @@ const recentActivities = async (limit, lang) => {
              FROM executive_applications a WHERE a.is_deleted = 0 ORDER BY a.created_at DESC LIMIT ?)
             UNION ALL
             (SELECT '${A.DONATION_RECORDED}', d.id, d.amount::text, COALESCE(d.entered_by, d.donor_user_id), d.created_at
-             FROM donations d WHERE d.is_deleted = 0 ORDER BY d.created_at DESC LIMIT ?)
+             FROM donations d WHERE d.is_deleted = 0 AND NOT ${UNPAID_DONATION_SQL} ORDER BY d.created_at DESC LIMIT ?)
             UNION ALL
             (SELECT '${A.EXPENSE_CREATED}', t.id, t.description, t.entered_by, t.created_at
              FROM society_transactions t WHERE t.is_deleted = 0 AND t.entry_type = '${TRANSACTION_TYPE.PAID}'
@@ -340,7 +345,7 @@ const adminModule = {
                            AND COALESCE(e.end_date, e.event_date) >= CURRENT_DATE) AS active_events,
                         (SELECT COUNT(*) FROM notices n
                          WHERE n.is_deleted = 0 AND n.is_active = 1 AND n.status = ?) AS total_notices,
-                        (SELECT COUNT(*) FROM donations d WHERE d.is_deleted = 0 AND d.status = ?) AS pending_donations,
+                        (SELECT COUNT(*) FROM donations d WHERE d.is_deleted = 0 AND d.status = ? AND NOT ${UNPAID_DONATION_SQL}) AS pending_donations,
                         (SELECT COUNT(*) FROM society_transactions t
                          WHERE t.is_deleted = 0 AND t.entry_type = '${TRANSACTION_TYPE.PAID}'
                            AND t.status = '${constant.EXPENSE_STATUS.PENDING}') AS pending_expenses,

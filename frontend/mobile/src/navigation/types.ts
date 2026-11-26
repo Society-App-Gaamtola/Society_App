@@ -38,7 +38,10 @@ export type SharedStackParams = {
 
 export type HomeStackParamList = { HomeMain: undefined } & SharedStackParams;
 export type EventsStackParamList = { EventsMain: undefined } & SharedStackParams;
-export type DonateStackParamList = { DonateMain: undefined } & SharedStackParams;
+/** resume: finish a UPI donation saved before paying (My Donations → Finish Payment): opens its payment step */
+export type DonateStackParamList = {
+  DonateMain: { resume?: { id: number; amount: number; purpose: string; method: 'UPI App' | 'QR Code' } } | undefined;
+} & SharedStackParams;
 export type ProfileStackParamList = { ProfileMain: undefined } & SharedStackParams;
 
 export type MainTabParamList = {

@@ -114,18 +114,25 @@ export type AppNotification = {
   event?: { date: string; time: string; venue: string };
 };
 
-export type DonationMethod = 'UPI App' | 'QR Code' | 'Card' | 'Net Banking' | 'Cash';
+/** How a member pays in the app: UPI (UPI app or QR code) or cash at the office. There is no card / net banking. */
+export type DonationMethod = 'UPI App' | 'QR Code' | 'Cash';
 
 export type MyDonation = {
   id: string;
   title: string;
+  /** One of the society's donation purposes, as saved */
+  purpose: string;
   /** ISO date-time. */
   date: string;
   amount: number;
-  /** Pending until the treasurer matches it with the bank statement or cash book. */
-  status: 'Successful' | 'Pending' | 'Failed';
+  /**
+   * Pending until the treasurer matches it with the bank statement or cash book.
+   * Awaiting payment: a UPI donation saved before paying, still without its UTR (it can be finished from My Donations).
+   */
+  status: 'Successful' | 'Pending' | 'Failed' | 'Awaiting payment';
   icon: McIconName;
-  method: DonationMethod;
+  /** The panel can also enter a member's bank transfer or cheque */
+  method: DonationMethod | 'Bank Transfer' | 'Cheque';
   /** UPI transaction ID (UTR) or receipt number. */
   reference?: string;
 };

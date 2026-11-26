@@ -127,7 +127,9 @@ backend/
     multer.js                  uploads/ disk storage (legacy profile_image file)
     cron.js                    every 24 hours (midnight) + once on start: OTP cleanup; scheduled events →
                                posted, then common.notifyNewContent() (new event / notice notifications);
-                               1 AM: read notifications older than NOTIFICATION_READ_KEEP_DAYS (30) deleted
+                               1 AM: read notifications older than NOTIFICATION_READ_KEEP_DAYS (30) deleted;
+                               1:30 AM: members' UPI donations still without a UTR after
+                               DONATION_UNPAID_KEEP_HOURS (48) soft-deleted (never paid)
   middleware/middleware.js     checkApi, decryption, tokenMiddleware, allowedRoles, validateJoi,
                                sendSuccess / sendError / sendServerError / sendApiResponse, extractHeaderLanguage
   languages/en.js hn.js guj.js message keys (en / hi / gu)
@@ -422,7 +424,7 @@ API field ↔ column:
     - A new executive (role API or approved request) gets `DEFAULT_EXECUTIVE_SECTIONS` (events, notices). Back to
       member → every permission removed (`changeRole` → `common.savePermissions`).
 
-## All APIs (82) – base `/api/v1`
+## All APIs (83) – base `/api/v1`
 
 Headers on every call:
 - `api-key` (always)
@@ -494,8 +496,9 @@ super_admin) unless the row says **executives** (super_admin + executive) or **s
 | POST `/event-plans`, PUT `/event-plans/:id` | **executives** + Events permission (edit: owner or Super Admin). `title, notes?, tentative_date?, status` | `{ plan }` |
 | DELETE `/event-plans/:id` | **executives** + Events permission (owner or Super Admin). Soft delete | – |
 | GET `/donation-settings` | – | `{ upi: { payee_name, upi_id, qr_image_url, display_note } \| null, purposes, methods, min_amount, max_amount, executive_min_donation }`. `upi` is null until the admin adds a `upi_settings` row |
-| GET `/donations` | `page, limit` | `{ donations: [{ id, amount, purpose, method, status, reference_no, note, created_at, confirmed_at }], summary: { total, this_year }, pagination }`. Own donations; summary counts `success` only |
-| POST `/donations` | `amount, purpose (one of the settings' `donation_purposes`), method (upi_app\|upi_qr\|cash), reference_no` (the 12-digit UTR, required for UPI, dropped for cash) | `{ donation }`, status `pending` until the treasurer confirms. A UTR can be used once (`uq_donations_upi_reference`, code 0 `rest_donation_reference_used`) |
+| GET `/donations` | `page, limit` | `{ donations: [{ id, amount, purpose, method, status, reference_no, proof_url, note, created_at, confirmed_at }], summary: { total, this_year }, pagination }`. Own donations; summary counts `success` only. A UPI one with `status = pending` and no `reference_no` is still unpaid (the app shows "Awaiting payment" + Finish Payment) |
+| POST `/donations` | `amount, purpose (one of the settings' `donation_purposes`), method (upi_app\|upi_qr\|cash), reference_no?` (the 12-digit UTR: only older app builds send it here; dropped for cash) | `{ donation }`, status `pending`. **UPI without a UTR** = saved before paying (`rest_donation_started`), so its receipt number goes in the UPI note; the same amount + purpose again within 48 h returns the same unpaid donation. No admin alert until the UTR comes. Cash / with a UTR → `rest_donation_recorded` + admin alert |
+| PUT `/donations/:id/payment` | `reference_no` (12-digit UTR), `method? (upi_app\|upi_qr)`, `proof_url?` (screenshot, Cloudinary `proofs/user_<id>/`) | `{ donation }`. Own unpaid UPI donation only (else `rest_donation_payment_already_sent` / `rest_donation_not_found`). Alerts the Super Admins. A UTR can be used once (`uq_donations_upi_reference`, code 0 `rest_donation_reference_used`) |
 | GET `/executive-request` | – | `{ application \| null, executive_min_donation }`: the latest request (`status, donation_amount, reference_no, reason, payment_proof_url, review_note, …`) |
 | POST `/executive-request` | **members only** (route). `donation_amount (>= the settings' `executive_min_donation`), reference_no, reason, payment_proof_url?` (Cloudinary `proofs/user_<id>/`) | `{ application }`. One pending request at a time (`rest_executive_request_pending`); linked to the member's donation with the same `reference_no` |
 
@@ -632,6 +635,15 @@ Money rules:
 - **Only verified entries count** in totals, the dashboard, the overview and reports: donations with `status =
   'success'` (on `donated_on`), expenses with `status = 'verified'`. Pending ones are counted as pending.
 - A member's donation from the app starts `pending`; the panel verifies or rejects it (the member is notified).
+- **UPI donations (manual verification)**: on the Donate screen the app first saves the donation (`POST /user/donations`,
+  pending, no UTR), then builds the UPI link and QR itself:
+  `upi://pay?pa=<upi_id>&pn=<payee_name>&am=501.00&cu=INR&tn=Donation%20DON042` (`services/upi.ts`). `pa` / `pn` come
+  from App Settings → UPI in the panel (`upi_settings`, `GET /user/donation-settings`); `tn` is the receipt number
+  (`DON` + id), which shows on the bank statement. After paying, the donor sends the UTR and an optional screenshot
+  (`PUT /user/donations/:id/payment`). The treasurer matches amount + UTR with the bank statement and verifies it in
+  the panel; the donor is notified and the receipt appears in My Donations. Until the UTR comes, the dashboard's pending
+  count and Recent Activities leave the donation out (`UNPAID_DONATION_SQL` in adminModule) and the panel shows it as
+  "Awaiting UTR" (`isAwaitingUtr`).
 - Payment modes: the panel filters by `upi | cash | bank | cheque`; a donation's UPI covers `upi_app` and `upi_qr`
   (`DONATION_METHODS_BY_MODE`).
 
@@ -673,7 +685,9 @@ Notice flow:
 
 ## Not built yet (planned)
 
-- Payment gateway (card / net banking) and push notifications (FCM; tables exist). SMS / WhatsApp API alerts.
+- Push notifications (FCM; tables exist). SMS / WhatsApp API alerts. There is **no payment gateway**: the app takes
+  UPI (UPI app / QR code) and cash only; card and net banking were removed from the app on 2026-11-26 (the `payments`
+  table and the `gateway` method value stay unused).
 - RFP items not started: Ads Campaign panel, admin theme panel, admin 2FA, family members (5A).
 - Settings the client asked about (executive minimum donation, society name) are now in App Settings; `cash_entry_mode` in `app_settings` is still an open question.
 

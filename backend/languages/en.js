@@ -80,6 +80,8 @@ const en = {
 	rest_notification_not_found: "Notification not found",
 	rest_donation_recorded: "Thank you! Your donation is recorded and will be verified by the treasurer",
 	rest_donation_reference_used: "This UPI transaction ID has already been submitted",
+	rest_donation_started: "Your donation ID is ready. Pay with any UPI app, then enter the UTR",
+	rest_donation_payment_already_sent: "The payment details of this donation were already sent",
 	rest_executive_request_sent: "Your executive membership request has been sent for admin review",
 	rest_executive_request_pending: "You already have a request waiting for review",
 	notify_event_approved: "Your event was approved",

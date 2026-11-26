@@ -79,6 +79,10 @@ const userController = {
         return userModule.createDonation(request, res);
     },
 
+    async submitDonationPayment(request, res) {
+        return userModule.submitDonationPayment(request, res);
+    },
+
     async getExecutiveRequest(request, res) {
         return userModule.getExecutiveRequest(request, res);
     },

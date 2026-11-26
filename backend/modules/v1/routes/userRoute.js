@@ -8,7 +8,8 @@ import constant from "../../../config/constant.js";
 
 const {
   eventListSchema, noticeListSchema, saveMediaSchema, mediaListSchema, editMediaSchema,
-  notificationListSchema, notificationSettingsSchema, memberListSchema, donationListSchema, donationSchema, executiveRequestSchema,
+  notificationListSchema, notificationSettingsSchema, memberListSchema, donationListSchema, donationSchema, donationPaymentSchema,
+  executiveRequestSchema,
 } = schemas;
 const {
   eventSchema, noticeSchema, reviewSchema, eventStatusSchema, eventFeaturedSchema, noticeStatusSchema, eventPlanSchema, eventPlanListSchema,
@@ -90,11 +91,13 @@ userRoutes.put("/notification-settings", allUsers, middleware.validateJoi(notifi
 // Member directory: ?page=&limit=&search=&role=
 userRoutes.get("/members", allUsers, middleware.validateJoi(memberListSchema, true), userController.getMembers);
 
-// Donations: the society's UPI details, the member's own donations, and a new UPI (UTR) / cash donation
+// Donations: the society's UPI details, the member's own donations, a new UPI / cash donation, and the UTR (+ screenshot)
+// of a UPI donation after paying
 userRoutes.get("/app-info", allUsers, userController.getAppInfo);
 userRoutes.get("/donation-settings", allUsers, userController.getDonationSettings);
 userRoutes.get("/donations", allUsers, middleware.validateJoi(donationListSchema, true), userController.getMyDonations);
 userRoutes.post("/donations", allUsers, middleware.validateJoi(donationSchema), userController.createDonation);
+userRoutes.put("/donations/:id/payment", allUsers, middleware.validateJoi(donationPaymentSchema), userController.submitDonationPayment);
 
 // Executive Request: the latest request's status, and a new request (members only)
 userRoutes.get("/executive-request", allUsers, userController.getExecutiveRequest);

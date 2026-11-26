@@ -63,8 +63,10 @@ export const getMembers = (page: number, filters: { search?: string; role?: ApiR
 
 // ---------- Donations ----------
 
-export type ApiDonationMethod = 'upi_app' | 'upi_qr' | 'cash' | 'gateway';
-export type ApiDonationStatus = 'pending' | 'success' | 'failed' | 'cancelled';
+/** upi_app / upi_qr / cash from the app; bank / cheque only when the panel enters them */
+export type ApiDonationMethod = 'upi_app' | 'upi_qr' | 'cash' | 'bank' | 'cheque';
+export type ApiDonationStatus = 'pending' | 'success' | 'failed' | 'cancelled' | 'rejected';
+type MemberMethod = 'upi_app' | 'upi_qr' | 'cash';
 
 export type ApiDonation = {
   id: number;
@@ -74,6 +76,8 @@ export type ApiDonation = {
   status: ApiDonationStatus;
   /** UPI transaction ID (UTR) or receipt number. */
   reference_no: string | null;
+  /** The payment screenshot, if one was sent */
+  proof_url: string | null;
   note: string | null;
   created_at: string;
   confirmed_at: string | null;
@@ -96,24 +100,40 @@ export const DONATION_PURPOSE_ICON: Record<DonationPurpose, McIconName> = {
   Other: 'hand-heart',
 };
 
-export const METHOD_TO_API: Partial<Record<DonationMethod, Exclude<ApiDonationMethod, 'gateway'>>> = {
+export const METHOD_TO_API: Record<DonationMethod, MemberMethod> = {
   'UPI App': 'upi_app',
   'QR Code': 'upi_qr',
   Cash: 'cash',
 };
-const METHOD_LABEL: Record<ApiDonationMethod, DonationMethod> = { upi_app: 'UPI App', upi_qr: 'QR Code', cash: 'Cash', gateway: 'Card' };
-const STATUS_LABEL: Record<ApiDonationStatus, MyDonation['status']> = { pending: 'Pending', success: 'Successful', failed: 'Failed', cancelled: 'Failed' };
+const METHOD_LABEL: Record<ApiDonationMethod, MyDonation['method']> = {
+  upi_app: 'UPI App',
+  upi_qr: 'QR Code',
+  cash: 'Cash',
+  bank: 'Bank Transfer',
+  cheque: 'Cheque',
+};
+const STATUS_LABEL: Record<ApiDonationStatus, MyDonation['status']> = {
+  pending: 'Pending',
+  success: 'Successful',
+  failed: 'Failed',
+  cancelled: 'Failed',
+  rejected: 'Failed',
+};
+
+/** A UPI donation saved before paying that has no UTR yet (the backend removes it after 48 hours if never paid) */
+export const isAwaitingPayment = (d: ApiDonation) => d.status === 'pending' && !d.reference_no && (d.method === 'upi_app' || d.method === 'upi_qr');
 
 export const toMyDonation = (d: ApiDonation): MyDonation => {
   const purpose = (d.purpose ?? 'Other') as DonationPurpose;
   return {
     id: String(d.id),
     title: `${purpose} Donation`,
+    purpose,
     date: d.confirmed_at ?? d.created_at,
     amount: d.amount,
-    status: STATUS_LABEL[d.status],
+    status: isAwaitingPayment(d) ? 'Awaiting payment' : STATUS_LABEL[d.status],
     icon: DONATION_PURPOSE_ICON[purpose] ?? 'hand-heart',
-    method: METHOD_LABEL[d.method],
+    method: METHOD_LABEL[d.method] ?? 'UPI App',
     reference: d.reference_no ?? undefined,
   };
 };
@@ -126,9 +146,17 @@ export const getMyDonations = (page = 1, limit = 50) =>
     `/user/donations${toQuery({ page, limit })}`,
   );
 
-/** UPI app / QR need the 12-digit UTR; cash is paid at the office later. Saved as "pending" for the treasurer. */
-export const createDonation = (body: { amount: number; purpose: string; method: Exclude<ApiDonationMethod, 'gateway'>; reference_no?: string }) =>
+/**
+ * Saves a donation as "pending" for the treasurer. UPI (app / QR): saved before paying, so its receipt number
+ * (DON042) goes in the UPI note; the same amount and purpose again gives back the same unpaid donation. The UTR then
+ * goes with submitDonationPayment. Cash: paid at the office later.
+ */
+export const createDonation = (body: { amount: number; purpose: string; method: MemberMethod }) =>
   request<{ donation: ApiDonation }>('POST', '/user/donations', { body });
+
+/** After paying by UPI: the 12-digit UTR, the UPI way used and an optional screenshot (Cloudinary proofs/user_<id>/) */
+export const submitDonationPayment = (id: number, body: { reference_no: string; method: 'upi_app' | 'upi_qr'; proof_url?: string }) =>
+  request<{ donation: ApiDonation }>('PUT', `/user/donations/${id}/payment`, { body });
 
 // ---------- Executive Request ----------
 

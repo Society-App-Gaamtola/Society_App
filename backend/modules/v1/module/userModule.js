@@ -801,25 +801,45 @@ const userModule = {
         }
     },
 
-    // A donation the member made outside the app (UPI app / QR with the UTR) or will pay in cash at the office.
-    // It stays "pending" until the treasurer matches it with the bank statement or the cash book
+    // POST /user/donations. UPI (app / QR): saved "pending" without a UTR before the member pays, so its receipt
+    // number (DON042) goes in the UPI note; the UTR follows with PUT /donations/:id/payment. Going back and forth on the
+    // Donate screen reuses the same unpaid donation (same amount and purpose). Cash: paid at the office later.
+    // Older app builds send the UTR here straight away. Either way it stays "pending" until the treasurer matches it
+    // with the bank statement or the cash book
     async createDonation(request, res) {
         try {
+            const user_id = request.loginUser.id;
             const { amount, purpose, method, reference_no } = request.body;
             if (!(await common.getSettings()).donation_purposes.includes(purpose)) {
                 return middleware.sendError(res, "rest_donation_purpose_invalid");
             }
+            const isUpi = UPI_METHODS.includes(method);
+            const unpaid = isUpi && !reference_no;
+            if (unpaid) {
+                const [[open]] = await db.query(
+                    `SELECT id FROM donations
+                     WHERE donor_user_id = ? AND amount = ? AND purpose = ? AND status = ? AND reference_no IS NULL
+                       AND method = ANY(?::text[]) AND entered_by IS NULL AND is_deleted = 0
+                       AND created_at > NOW() - make_interval(hours => ?::int)
+                     ORDER BY id DESC LIMIT 1`,
+                    [user_id, amount, purpose, DONATION_STATUS.PENDING, UPI_METHODS, constant.DONATION_UNPAID_KEEP_HOURS],
+                );
+                if (open) {
+                    return middleware.sendSuccess(res, "rest_donation_started", { donation: await userModule.findDonation(open.id, user_id) });
+                }
+            }
             const [result] = await query.insertQuery("donations", {
-                donor_user_id: request.loginUser.id,
+                donor_user_id: user_id,
                 amount,
                 purpose,
                 method,
                 status: DONATION_STATUS.PENDING,
-                reference_no: UPI_METHODS.includes(method) ? reference_no : null,
+                reference_no: isUpi ? reference_no || null : null,
             });
-            common.notifyAdmins("notify_donation", "notify_admin_donation", `₹${Number(amount).toLocaleString("en-IN")} · ${purpose}`, "donation", result.insertId);
-            const donation = await userModule.findDonation(result.insertId, request.loginUser.id);
-            return middleware.sendSuccess(res, "rest_donation_recorded", { donation });
+            // The treasurer is told once there is something to check: a UTR, or a cash promise
+            if (!unpaid) userModule.notifyDonationToVerify(amount, purpose, result.insertId);
+            const donation = await userModule.findDonation(result.insertId, user_id);
+            return middleware.sendSuccess(res, unpaid ? "rest_donation_started" : "rest_donation_recorded", { donation });
         } catch (error) {
             if (error.code === DB_ERROR.UNIQUE_VIOLATION && error.constraint === "uq_donations_upi_reference") {
                 return middleware.sendError(res, "rest_donation_reference_used");
@@ -828,14 +848,52 @@ const userModule = {
         }
     },
 
+    // PUT /user/donations/:id/payment: after paying by UPI, the member's own unpaid donation gets the UTR, the UPI way
+    // used (app / QR) and an optional screenshot. Only once: after that the treasurer verifies or rejects it
+    async submitDonationPayment(request, res) {
+        try {
+            const user_id = request.loginUser.id;
+            const id = routeId(request);
+            const { reference_no, method, proof_url } = request.body;
+            if (proof_url && !common.isInMediaFolder(proof_url, "proof", user_id)) {
+                return middleware.sendError(res, "rest_invalid_media_folder");
+            }
+            const [result] = id
+                ? await query.updateQuery(
+                    "donations",
+                    { reference_no, proof_url: proof_url || null, ...(method ? { method } : {}) },
+                    `id = ? AND donor_user_id = ? AND status = ? AND reference_no IS NULL AND method = ANY(?::text[])
+                     AND entered_by IS NULL AND is_deleted = 0`,
+                    [id, user_id, DONATION_STATUS.PENDING, UPI_METHODS],
+                )
+                : [{ affectedRows: 0 }];
+            const donation = id ? await userModule.findDonation(id, user_id) : null;
+            if (!result.affectedRows) {
+                return middleware.sendError(res, donation ? "rest_donation_payment_already_sent" : "rest_donation_not_found");
+            }
+            userModule.notifyDonationToVerify(donation.amount, donation.purpose, id);
+            return middleware.sendSuccess(res, "rest_donation_recorded", { donation });
+        } catch (error) {
+            if (error.code === DB_ERROR.UNIQUE_VIOLATION && error.constraint === "uq_donations_upi_reference") {
+                return middleware.sendError(res, "rest_donation_reference_used");
+            }
+            return middleware.sendServerError(res, "submitDonationPayment", error);
+        }
+    },
+
+    // The Super Admins' "new donation to verify" alert (App Settings -> notify_donation). Not awaited, never throws
+    notifyDonationToVerify(amount, purpose, donation_id) {
+        common.notifyAdmins("notify_donation", "notify_admin_donation", `₹${Number(amount).toLocaleString("en-IN")} · ${purpose}`, "donation", donation_id);
+    },
+
     async findDonation(id, donor_user_id) {
         const [rows] = await db.query(
-            `SELECT id, amount, purpose, method, status, reference_no, note, TO_CHAR(donated_on, 'YYYY-MM-DD') AS donated_on,
-                created_at, confirmed_at
+            `SELECT id, amount, purpose, method, status, reference_no, proof_url, note,
+                TO_CHAR(donated_on, 'YYYY-MM-DD') AS donated_on, created_at, confirmed_at
              FROM donations WHERE id = ? AND donor_user_id = ? AND is_deleted = 0`,
             [id, donor_user_id],
         );
-        return rows[0] ? { ...rows[0], amount: money(rows[0].amount) } : null;
+        return rows[0] ? { ...rows[0], amount: money(rows[0].amount), proof_url: common.mediaUrl(rows[0].proof_url) } : null;
     },
 
     // The member's donations, newest first. summary counts confirmed (success) donations only
@@ -845,8 +903,8 @@ const userModule = {
             const { page, limit } = request.body;
             const [[rows], [[summary]]] = await Promise.all([
                 db.query(
-                    `SELECT id, amount, purpose, method, status, reference_no, note, TO_CHAR(donated_on, 'YYYY-MM-DD') AS donated_on,
-                        created_at, confirmed_at
+                    `SELECT id, amount, purpose, method, status, reference_no, proof_url, note,
+                        TO_CHAR(donated_on, 'YYYY-MM-DD') AS donated_on, created_at, confirmed_at
                      FROM donations WHERE donor_user_id = ? AND is_deleted = 0
                      ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
                     [user_id, limit, (page - 1) * limit],
@@ -861,7 +919,7 @@ const userModule = {
                 ),
             ]);
             return middleware.sendSuccess(res, "rest_keywords_success", {
-                donations: rows.map((d) => ({ ...d, amount: money(d.amount) })),
+                donations: rows.map((d) => ({ ...d, amount: money(d.amount), proof_url: common.mediaUrl(d.proof_url) })),
                 summary: { total: money(summary.total), this_year: money(summary.this_year) },
                 pagination: pageInfo(page, limit, summary.count),
             });

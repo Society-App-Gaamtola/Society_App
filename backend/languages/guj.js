@@ -80,6 +80,8 @@ const gu = {
 	rest_notification_not_found: "સૂચના મળી નથી",
 	rest_donation_recorded: "આભાર! તમારું દાન નોંધાયું છે, ખજાનચી તેની ચકાસણી કરશે",
 	rest_donation_reference_used: "આ UPI ટ્રાન્ઝેક્શન ID પહેલેથી જ સબમિટ થયેલ છે",
+	rest_donation_started: "તમારું દાન ID તૈયાર છે. કોઈપણ UPI એપથી ચુકવણી કરો, પછી UTR દાખલ કરો",
+	rest_donation_payment_already_sent: "આ દાનની ચુકવણીની વિગતો પહેલેથી મોકલાઈ ગઈ છે",
 	rest_executive_request_sent: "તમારી એક્ઝિક્યુટિવ સભ્યપદ વિનંતી એડમિનની સમીક્ષા માટે મોકલવામાં આવી છે",
 	rest_executive_request_pending: "તમારી એક વિનંતી પહેલેથી સમીક્ષા માટે બાકી છે",
 	notify_event_approved: "તમારો કાર્યક્રમ મંજૂર થયો",

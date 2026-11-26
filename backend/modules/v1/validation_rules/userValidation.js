@@ -104,13 +104,21 @@ const donationListSchema = Joi.object({ ...pagination });
 // A UPI transaction ID (UTR / RRN) is 12 digits
 const utr = Joi.string().trim().pattern(/^\d{12}$/).messages({ "string.pattern.base": "reference_no must be the 12-digit UPI transaction ID (UTR)" });
 
-// UPI app / QR: paid outside the app, confirmed with the UTR. Cash: paid at the office, no reference yet
+// UPI app / QR: saved first without a UTR (its receipt number goes in the UPI note), then the UTR is sent with
+// PUT /donations/:id/payment. Older app builds still send the UTR here. Cash: paid at the office, no reference
 const donationSchema = Joi.object({
   amount: Joi.number().precision(2).min(constant.DONATION_MIN_AMOUNT).max(constant.DONATION_MAX_AMOUNT).required(),
   purpose: Joi.string().trim().max(128).required(), // must be one of the settings' donation purposes (module)
   method: Joi.string().valid(...constant.MEMBER_DONATION_METHODS).required(),
   // Checked only for UPI; for cash anything sent is dropped
-  reference_no: Joi.when("method", { is: Joi.valid(...constant.UPI_METHODS), then: utr.required(), otherwise: Joi.any().strip() }),
+  reference_no: Joi.when("method", { is: Joi.valid(...constant.UPI_METHODS), then: utr.optional(), otherwise: Joi.any().strip() }),
+});
+
+// After paying by UPI: the UTR, which UPI way was used, and an optional screenshot (Cloudinary proofs/user_<id>/)
+const donationPaymentSchema = Joi.object({
+  reference_no: utr.required(),
+  method: Joi.string().valid(...constant.UPI_METHODS),
+  proof_url: mediaUrl.allow("", null),
 });
 
 const executiveRequestSchema = Joi.object({
@@ -132,5 +140,6 @@ export default {
   memberListSchema,
   donationListSchema,
   donationSchema,
+  donationPaymentSchema,
   executiveRequestSchema,
 };

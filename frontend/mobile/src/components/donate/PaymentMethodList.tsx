@@ -9,8 +9,6 @@ import { useT } from '../../i18n';
 export const PAYMENT_METHODS: { method: DonationMethod; icon: McIconName; hint: string }[] = [
   { method: 'UPI App', icon: 'cellphone-check', hint: 'Google Pay, PhonePe, Paytm, BHIM' },
   { method: 'QR Code', icon: 'qrcode-scan', hint: 'Scan with any UPI app' },
-  { method: 'Card', icon: 'credit-card-outline', hint: 'Visa, Mastercard, RuPay' },
-  { method: 'Net Banking', icon: 'bank-outline', hint: 'All major Indian banks' },
   { method: 'Cash', icon: 'cash-multiple', hint: 'Pay at the Mandal office' },
 ];
 

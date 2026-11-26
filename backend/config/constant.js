@@ -173,13 +173,18 @@ export default {
     CAPTION_MAX_LENGTH: 256,
 
     // ---------- Donations ----------
-    // What a member can choose in the app (gateway = card / net banking, not connected yet)
+    // gateway = card / net banking: not offered (the app pays by UPI or cash only); kept for the column's old values
     DONATION_METHODS: { GATEWAY: "gateway", UPI_APP: "upi_app", UPI_QR: "upi_qr", CASH: "cash", BANK: "bank", CHEQUE: "cheque" },
     // What the panel can enter (UPI done outside the app = upi_app)
     ADMIN_DONATION_METHODS: ["upi_app", "upi_qr", "cash", "bank", "cheque"],
     MEMBER_DONATION_METHODS: ["upi_app", "upi_qr", "cash"],
     // Paid outside the app and confirmed with the 12-digit UPI transaction ID (UTR)
     UPI_METHODS: ["upi_app", "upi_qr"],
+    // A member's UPI donation is saved (pending, no UTR) before they pay, so its receipt number (DON042) can go in the
+    // UPI note and show on the bank statement. The UTR comes after paying. One still without a UTR after this many
+    // hours was never paid: the cron job removes it (DONATION_CLEANUP_SCHEDULE, daily at 1:30 AM)
+    DONATION_UNPAID_KEEP_HOURS: 48,
+    DONATION_CLEANUP_SCHEDULE: "30 1 * * *",
     // success = verified by the treasurer / Super Admin; rejected = not received (entered by mistake, wrong UTR…)
     DONATION_STATUS: { PENDING: "pending", SUCCESS: "success", FAILED: "failed", CANCELLED: "cancelled", REJECTED: "rejected" },
     // The statuses the panel sets
