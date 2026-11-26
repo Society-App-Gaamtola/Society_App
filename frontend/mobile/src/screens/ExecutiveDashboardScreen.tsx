@@ -45,7 +45,7 @@ export default function ExecutiveDashboardScreen() {
   // Reloaded in the new language when the user switches it (category names, dates and server messages)
   const language = useLanguage();
   const navigation = useNavigation<Nav>();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   // The user's latest events (Recent Activity), when they may manage events
   const [recent, setRecent] = useState<ApiExecEvent[]>([]);
   const [hero, setHero] = useState<SocietyEvent[]>([]);
@@ -71,15 +71,18 @@ export default function ExecutiveDashboardScreen() {
     }
   }, [language]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The permissions are reloaded too (GET /auth/profile), so a section the Super Admin turns on or off in the panel
+  // locks / unlocks its tiles as soon as this screen is opened or pulled down, without leaving the app
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load]),
+      refreshUser().catch(() => {});
+    }, [load, refreshUser]),
   );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await load();
+    await Promise.all([load(), refreshUser().catch(() => {})]);
     setRefreshing(false);
   };
 
