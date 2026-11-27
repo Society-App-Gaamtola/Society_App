@@ -25,4 +25,8 @@ export const useEditMember = () =>
 export const useMemberStatus = () =>
   useBackendAction([KEY, EXECUTIVES], ({ id, status }: { id: number; status: AdminMember['status'] }) => adminMembersApi.setStatus(id, status));
 
-export const useDeleteMember = () => useBackendAction([KEY, EXECUTIVES], (id: number) => adminMembersApi.remove(id));
+/** Member ↔ executive (PUT /executive/members/:id/role): the member is notified and logged out of every device */
+export const useMemberRole = () =>
+  useBackendAction([KEY, EXECUTIVES], ({ id, role }: { id: number; role: Exclude<MemberRole, 'super_admin'> }) => adminMembersApi.setRole(id, role));
+
+export const useDeleteMember =() => useBackendAction([KEY, EXECUTIVES], (id: number) => adminMembersApi.remove(id));

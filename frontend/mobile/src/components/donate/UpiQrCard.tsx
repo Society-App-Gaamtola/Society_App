@@ -32,7 +32,18 @@ export default function UpiQrCard({ amount, url, upi, donationNo }: Props) {
       <Text style={styles.amount}>{formatINR(amount)}</Text>
       {url && upi ? <Text style={styles.payee}>{upi.payee_name}</Text> : null}
       <View style={styles.qrBox}>
-        <QRCode value={url ?? SAMPLE_VALUE} size={SIZE} color={colors.textDark} logo={LOGO} logoSize={44} logoBackgroundColor={colors.white} />
+        {/* Black on white in both themes, and high error correction so the logo in the middle doesn't stop scans */}
+        <QRCode
+          value={url ?? SAMPLE_VALUE}
+          size={SIZE}
+          color={colors.qrDots}
+          backgroundColor={colors.qrBackground}
+          ecl="H"
+          logo={LOGO}
+          logoSize={44}
+          logoBackgroundColor={colors.qrBackground}
+          logoMargin={2}
+        />
         {!url ? (
           <View style={styles.sample}>
             <Text style={styles.sampleText}>{t('SAMPLE')}</Text>
@@ -50,7 +61,7 @@ const styles = themedStyles(() => ({
   card: { ...surface, alignItems: 'center', padding: 16, gap: 10 },
   amount: { fontFamily: fonts.bold, fontSize: 22, color: colors.primary },
   payee: { fontFamily: fonts.semiBold, fontSize: 13, color: colors.textDark, textAlign: 'center', marginTop: -6 },
-  qrBox: { padding: 10, backgroundColor: colors.white, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
+  qrBox: { padding: 12, backgroundColor: colors.qrBackground, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
   sample: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.55)' },
   sampleText: {
     fontFamily: fonts.bold,

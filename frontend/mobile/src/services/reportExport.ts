@@ -17,6 +17,7 @@ import {
 import type { DateRange, Donation, ReportFormat, ReportType } from '../types';
 import { MONTHS, formatDate, formatDateTime, formatRange, fromIsoDay, isInRange } from '../utils/date';
 import { formatINR } from '../utils/format';
+import { t } from '../i18n';
 
 type Group = { label: string; count: number; amount: number };
 
@@ -236,6 +237,22 @@ async function toWorkbookBase64(data: ReportData) {
 
 const fileSafe = (s: string) => s.replace(/[^\w-]+/g, '_');
 
+/**
+ * Prints the HTML to a PDF and saves it in the app's documents folder as `name`.pdf; returns its URI for sharing.
+ * The PDF comes back as base64 and is written here: the file expo-print saves itself sits outside the folders the app
+ * may read in Expo Go, so moving or sharing that file is refused ("Missing 'READ' permission", "Not allowed to read
+ * file under given URL"). size: the page in points (left out = the printer's default).
+ */
+export async function savePdf(html: string, name: string, size?: { width: number; height: number }) {
+  const { printToFileAsync } = await import('expo-print');
+  const { base64 } = await printToFileAsync({ html, base64: true, ...size });
+  if (!base64) throw new Error(t('Please try again.'));
+  const target = new File(Paths.document, `${name}.pdf`);
+  if (target.exists) target.delete();
+  await target.write(base64, { encoding: 'base64' });
+  return target.uri;
+}
+
 /** Saves a report as PDF (from its HTML) or Excel (from its workbook) in the app's documents folder; returns the URI */
 async function saveReportFile(
   type: ReportType,
@@ -246,13 +263,7 @@ async function saveReportFile(
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
   const baseName = `${fileSafe(type)}_${stamp}`;
 
-  if (format === 'PDF') {
-    const { printToFileAsync } = await import('expo-print');
-    const { uri } = await printToFileAsync({ html: html(await logoDataUri()) });
-    const target = new File(Paths.document, `${baseName}.pdf`);
-    await new File(uri).move(target);
-    return target.uri;
-  }
+  if (format === 'PDF') return savePdf(html(await logoDataUri()), baseName);
 
   const target = new File(Paths.document, `${baseName}.xlsx`);
   await target.write(await workbook(), { encoding: 'base64' });

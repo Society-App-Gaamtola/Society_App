@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Trash2, UserCheck, UserPlus, UserX } from 'lucide-react';
+import { ShieldCheck, ShieldOff, Trash2, UserCheck, UserPlus, UserX } from 'lucide-react';
 import { Avatar, ConfirmDialog, ExportButton, PageHeader, RowActions, StatusBadge } from '@/components/common';
 import { DataTable, type Column } from '@/components/DataTable';
 import { FilterBar, type FilterSelect } from '@/components/FilterBar';
@@ -10,7 +10,7 @@ import { AddMemberForm } from '@/components/forms/AddMemberForm';
 import { MemberForm } from '@/components/forms/MemberForm';
 import { Button } from '@/components/ui/primitives';
 import { DEFAULT_PAGE_SIZE } from '@/config';
-import { useDeleteMember, useMemberStatus, useMembersPage } from '@/hooks/useAdminMembers';
+import { useDeleteMember, useMemberRole, useMemberStatus, useMembersPage } from '@/hooks/useAdminMembers';
 import { useUrlState } from '@/hooks/useUrlState';
 import { exportTable, type ExportFormat } from '@/lib/exporters';
 import { useNavigate } from '@/lib/navigation';
@@ -57,6 +57,7 @@ export default function MembersPage() {
   const list = useMembersPage(query);
   const setStatus = useMemberStatus();
   const remove = useDeleteMember();
+  const setRole = useMemberRole();
 
   // Picked rows are remembered with their data, so exporting them needs no extra API call
   const [picked, setPicked] = useState<Map<Id, AdminMember>>(new Map());
@@ -64,6 +65,9 @@ export default function MembersPage() {
   const [adding, setAdding] = useState(false);
   const [deactivating, setDeactivating] = useState<AdminMember | null>(null);
   const [deleting, setDeleting] = useState<AdminMember | null>(null);
+  /** The member whose role is being switched (member ↔ executive), waiting for the confirm dialog */
+  const [changingRole, setChangingRole] = useState<AdminMember | null>(null);
+  const newRole = changingRole?.role === 'executive' ? 'member' : 'executive';
 
   const onSelectionChange = (ids: Id[]) => {
     const onPage = new Map((list.data?.members ?? []).map((m) => [m.id as Id, m]));
@@ -112,6 +116,12 @@ export default function MembersPage() {
               onEdit={() => setEditing(m)}
               onView={() => navigate(`/members/${m.id}`)}
               more={[
+                // A deactivated member can't be made an executive (the backend refuses it), but an executive's role can always be taken away
+                ...(m.role === 'executive'
+                  ? [{ label: 'Make Member', icon: ShieldOff, onSelect: () => setChangingRole(m) }]
+                  : m.status === 'active'
+                    ? [{ label: 'Make Executive', icon: ShieldCheck, onSelect: () => setChangingRole(m) }]
+                    : []),
                 m.status === 'active'
                   ? { label: 'Deactivate', icon: UserX, onSelect: () => setDeactivating(m) }
                   : { label: 'Activate', icon: UserCheck, onSelect: () => setStatus.mutate({ id: m.id, status: 'active' }) },
@@ -195,6 +205,18 @@ export default function MembersPage() {
         confirmLabel="Deactivate"
         destructive
         onConfirm={() => deactivating && setStatus.mutate({ id: deactivating.id, status: 'suspended' })}
+      />
+      <ConfirmDialog
+        open={!!changingRole}
+        onOpenChange={(open) => !open && setChangingRole(null)}
+        title={`Make ${changingRole ? memberName(changingRole) : ''} ${newRole === 'executive' ? 'an Executive' : 'a Member'}?`}
+        description={
+          newRole === 'executive'
+            ? 'They get the default Events and Notices permissions (change them in Executives). They are logged out and see the executive screens after logging in again.'
+            : 'Every executive permission is removed. They are logged out and see the member screens after logging in again.'
+        }
+        confirmLabel={newRole === 'executive' ? 'Make Executive' : 'Make Member'}
+        onConfirm={() => changingRole && setRole.mutate({ id: changingRole.id, role: newRole })}
       />
       <ConfirmDialog
         open={!!deleting}

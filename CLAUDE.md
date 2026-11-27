@@ -107,6 +107,10 @@ cd frontend\admin; npm run dev     # http://localhost:3000 (needs the backend ru
     R8 removed `WorkDatabase_Impl`'s constructor ("Failed to create an instance of class androidx.work.impl.WorkDatabase").
     The `extraProguardRules` keep rule there fixes that if R8 is turned on again (e.g. for the Play Store); test the APK
     on a phone before sending it.
+  - **APK size** (`expo-build-properties` in `app.json`, 2026-11-27: 105 MB → ~45 MB): `buildArchs` is only
+    `armeabi-v7a` + `arm64-v8a` (real phones; `x86` / `x86_64` are emulators only and were ~42 MB), and
+    `useLegacyPackaging: true` compresses the native libraries inside the APK. The Play Store needs an `.aab` instead
+    (it sends each phone only its own part).
   - A JavaScript error in a built app shows `AppErrorBoundary` (error text + Try Again) instead of closing the app.
     A native crash still closes it: read it with `adb logcat` (Android platform-tools, phone with USB debugging).
 
@@ -732,7 +736,8 @@ Notice flow:
   - PDFs (payment proof) are sent as they are.
 - **Admin** (`frontend/admin/src`): Next.js app router `app/(admin)/<screen>`, TanStack Query and Tailwind.
   - **Connected to the backend**: login (`POST /admin/login`, token in `lib/session.ts`, logout calls `DELETE /auth/logout`)
-    , Members (list, detail, **Add Member** `components/forms/AddMemberForm.tsx`, edit, deactivate, delete), **Events & Notices** (`components/EventsNotices.tsx`: list with
+    , Members (list, detail, **Add Member** `components/forms/AddMemberForm.tsx`, edit, deactivate, delete, Make Executive / Make Member in the row's ⋮ menu
+    via `PUT /executive/members/:id/role`), **Events & Notices** (`components/EventsNotices.tsx`: list with
     `manage=true`, create / edit / delete, post / draft / cancel, featured, a "Share by email" switch (Publish & Share),
     notice categories from App Settings (`noticeTagLabel`); posters upload straight
     to Cloudinary `events/<yyyy>/<mm>` via `services/cloudinary.ts`, env `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`,

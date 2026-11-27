@@ -6,7 +6,7 @@ import { t } from '../i18n';
 import type { MyDonation, ReportFormat } from '../types';
 import { formatDateTime } from '../utils/date';
 import { amountInWords, formatINR, formatRs } from '../utils/format';
-import { logoDataUri } from './reportExport';
+import { logoDataUri, savePdf } from './reportExport';
 
 /** Who the receipt is for (the signed-in member) */
 export type Donor = { name: string; memberId?: string };
@@ -35,16 +35,8 @@ const page = (logo: string | null, title: string, body: string) => `<!doctype ht
   <div class="foot">${escape(t('Generated on {date}', { date: formatDateTime(new Date()) }))}</div>
 </body></html>`;
 
-/** Saves the HTML as a PDF in the app's documents folder (named `name`.pdf) and returns its URI */
-async function savePdf(html: string, name: string) {
-  const { printToFileAsync } = await import('expo-print');
-  // A4 in points (iOS prints Letter by default)
-  const { uri } = await printToFileAsync({ html, width: 595, height: 842 });
-  const target = new File(Paths.document, `${name}.pdf`);
-  if (target.exists) target.delete();
-  await new File(uri).move(target);
-  return target.uri;
-}
+/** A4 in points (iOS prints Letter by default) */
+const A4 = { width: 595, height: 842 };
 
 /** The phone's share sheet for a file: WhatsApp, email, Drive, Save … */
 export async function shareFile(uri: string, format: ReportFormat, title: string) {
@@ -167,7 +159,7 @@ export async function donationReceiptPdf(donation: MyDonation, donor: Donor) {
     ${phones.length ? `<div style="text-align: right; white-space: nowrap">Tel: ${phones.join(' / ')}</div>` : ''}
   </div>
 </body></html>`;
-  return savePdf(html, `Receipt_${no}`);
+  return savePdf(html, `Receipt_${no}`, A4);
 }
 
 /** Every donation of the member as a summary sheet (PDF or Excel); returns the file URI */
@@ -210,5 +202,5 @@ export async function donationSummaryFile(donations: MyDonation[], donor: Donor,
         .join('')}
     </table>
     <p class="foot">${escape(t('Totals count verified donations only.'))}</p>`;
-  return savePdf(page(await logoDataUri(), t('Donation Summary'), body), name);
+  return savePdf(page(await logoDataUri(), t('Donation Summary'), body), name, A4);
 }

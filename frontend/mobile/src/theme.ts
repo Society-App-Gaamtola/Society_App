@@ -44,6 +44,9 @@ const light = {
   dangerBorder: '#F1D9D9',
   orangeBorder: '#F6D3AE',
   successBorder: '#BFE5CC',
+  /** QR codes are always black on white (in both themes): scanners need dark dots on a light background */
+  qrDots: '#000000',
+  qrBackground: '#FFFFFF',
 };
 
 export type Palette = typeof light;
@@ -81,6 +84,8 @@ const dark: Palette = {
   dangerBorder: '#5A2A2A',
   orangeBorder: '#5A3D22',
   successBorder: '#22523A',
+  qrDots: '#000000',
+  qrBackground: '#FFFFFF',
 };
 
 type ToneName = 'success' | 'danger' | 'info' | 'warning' | 'neutral' | 'sky';
