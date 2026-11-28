@@ -1,18 +1,39 @@
-import { amountInWords, formatDate, monthName, nowLocal, recordNo } from './utils';
+import type { jsPDF as JsPdf } from 'jspdf';
+import { amountInWords, formatDate, formatDateTime, monthName, nowLocal, recordNo } from './utils';
 
 /** One table to export: the same shape for Excel and PDF, on every screen */
 export type ExportTable = { title: string; subtitle?: string; columns: string[]; rows: (string | number)[][] };
 export type ExportFormat = 'excel' | 'pdf';
 
 const DEFAULT_SOCIETY = 'Shri Gamtola Yuvak Mitra Mandal';
-/** The society name on every PDF: App Settings' name, set by AdminShell once the settings load */
-let societyName = DEFAULT_SOCIETY;
-export function setSocietyName(name?: string | null) {
-  societyName = name?.trim() || DEFAULT_SOCIETY;
+
+/** The society on a PDF: App Settings' name, phone(s), address and logo */
+export type ReceiptSociety = { name?: string | null; phone?: string | null; address?: string | null; logoUrl?: string | null };
+
+/** The society on every PDF (header, contact, footer): App Settings, set by AdminShell once the settings load */
+let currentSociety: ReceiptSociety = {};
+export function setSociety(society: ReceiptSociety) {
+  currentSociety = society;
 }
-const MAROON: [number, number, number] = [122, 16, 32];
+/** A receipt's own society details, else App Settings' (AdminShell) */
+const societyOf = (society: ReceiptSociety = {}): ReceiptSociety => ({
+  name: society.name?.trim() || currentSociety.name?.trim() || DEFAULT_SOCIETY,
+  phone: society.phone ?? currentSociety.phone,
+  address: society.address ?? currentSociety.address,
+  logoUrl: society.logoUrl ?? currentSociety.logoUrl,
+});
+
+type Rgb = [number, number, number];
+const MAROON: Rgb = [122, 16, 32];
+const DARK: Rgb = [51, 51, 51];
+const GREY: Rgb = [120, 120, 120];
+const LINE: Rgb = [205, 205, 205];
+const PANEL: Rgb = [240, 240, 239];
+const STATUS_COLOR: Record<'ok' | 'wait' | 'no', Rgb> = { ok: [22, 163, 74], wait: [217, 119, 6], no: [198, 40, 40] };
 /** More columns than this → the PDF page is turned sideways */
 const PDF_PORTRAIT_MAX_COLUMNS = 6;
+/** Room kept at the bottom of every page for the footer (society, address, telephone, page number) */
+const FOOTER_SPACE = 26;
 
 /** Excel file. The library is heavy, so it loads on the first export only. */
 export async function exportExcel({ title, subtitle, columns, rows }: ExportTable, fileName: string) {
@@ -23,90 +44,7 @@ export async function exportExcel({ title, subtitle, columns, rows }: ExportTabl
   XLSX.writeFile(book, `${fileName}.xlsx`);
 }
 
-/**
- * PDF file: maroon header with the society name, the title and subtitle, then the table. Long tables continue on
- * new pages with the column header repeated, and every page gets "Page x of y". Built in the browser (no server work).
- * jsPDF's built-in font has no ₹ sign, so pass amounts as plain numbers (formatNumber).
- */
-export async function exportPdf({ title, subtitle, columns, rows }: ExportTable, fileName: string) {
-  const [{ jsPDF }, { autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
-  const doc = new jsPDF({ orientation: columns.length > PDF_PORTRAIT_MAX_COLUMNS ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
-  const width = doc.internal.pageSize.getWidth();
-  const height = doc.internal.pageSize.getHeight();
-
-  doc.setFillColor(...MAROON);
-  doc.rect(0, 0, width, 18, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(13);
-  doc.text(societyName, width / 2, 11.5, { align: 'center' });
-  doc.setTextColor(40, 26, 18);
-  doc.setFontSize(14);
-  doc.text(title, 14, 28);
-  doc.setFontSize(9);
-  doc.setTextColor(122, 106, 94);
-  doc.text([subtitle, `Exported ${nowLocal().replace('T', ' ')}`].filter(Boolean).join('  ·  '), 14, 34);
-
-  autoTable(doc, {
-    head: [columns],
-    body: rows.map((row) => row.map((cell) => String(cell ?? ''))),
-    startY: 39,
-    margin: { left: 14, right: 14, bottom: 16 },
-    styles: { fontSize: 8.5, cellPadding: 2, textColor: [40, 26, 18], lineColor: [234, 223, 207], lineWidth: 0.1 },
-    headStyles: { fillColor: MAROON, textColor: 255, fontStyle: 'bold' },
-    alternateRowStyles: { fillColor: [251, 245, 236] },
-  });
-
-  const pages = doc.getNumberOfPages();
-  for (let page = 1; page <= pages; page += 1) {
-    doc.setPage(page);
-    doc.setFontSize(8);
-    doc.setTextColor(122, 106, 94);
-    doc.text(`Page ${page} of ${pages}`, width - 14, height - 8, { align: 'right' });
-  }
-  doc.save(`${fileName}.pdf`);
-}
-
-/** The one export function every screen calls: the same table, as Excel or PDF */
-export const exportTable = (table: ExportTable, fileName: string, format: ExportFormat) =>
-  format === 'pdf' ? exportPdf(table, fileName) : exportExcel(table, fileName);
-
-// ---------- Donation receipt and expense voucher (the client's receipt design, 2026-11-23) ----------
-
-/** The society on a receipt: App Settings' name, phone(s), address and logo */
-export type ReceiptSociety = { name?: string | null; phone?: string | null; address?: string | null; logoUrl?: string | null };
-
-/** What a donation receipt needs (services/finance Donation fits) */
-export type ReceiptDonation = {
-  id: number;
-  donor_name: string;
-  member_code: string | null;
-  amount: number;
-  donated_on: string;
-  method: string;
-  reference_no: string | null;
-  purpose: string | null;
-  status: string;
-};
-
-/** What an expense voucher needs (services/finance Expense fits) */
-export type ReceiptExpense = {
-  id: number;
-  description: string;
-  paid_to: string | null;
-  category: string | null;
-  amount: number;
-  mode: string;
-  reference_no: string | null;
-  txn_date: string;
-  status: string;
-};
-
-type Rgb = [number, number, number];
-const DARK: Rgb = [51, 51, 51];
-const GREY: Rgb = [120, 120, 120];
-const LINE: Rgb = [205, 205, 205];
-const PANEL: Rgb = [240, 240, 239];
-const STATUS_COLOR: Record<'ok' | 'wait' | 'no', Rgb> = { ok: [22, 163, 74], wait: [217, 119, 6], no: [198, 40, 40] };
+// ---------- The client's receipt design (2026-11-23), shared by every PDF ----------
 
 /** jsPDF's built-in font has no ₹ sign: "Rs. 1,001.00" */
 const rs = (amount: number) => `Rs. ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -122,7 +60,7 @@ const phonesOf = (phone?: string | null) =>
     .map((p) => p.trim())
     .filter(Boolean);
 
-/** An image redrawn at most LOGO_PX wide (a full-size logo would make every receipt megabytes); as it is without a canvas */
+/** An image redrawn at most LOGO_PX wide (a full-size logo would make every PDF megabytes); as it is without a canvas */
 const LOGO_PX = 300;
 async function shrinkImage(data: string) {
   if (typeof document === 'undefined') return data;
@@ -165,6 +103,225 @@ const twoLines = (text: string) => {
   return [text.slice(0, at), text.slice(at + 1)];
 };
 
+type TextStyle = { size?: number; color?: Rgb; style?: string; align?: 'left' | 'right' | 'center' };
+
+/** Drawing helpers on one jsPDF page set (portrait or landscape: W / H are the page size) */
+function pdfKit(doc: JsPdf, society: ReceiptSociety) {
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const name = society.name || DEFAULT_SOCIETY;
+  const phones = phonesOf(society.phone);
+  const address = society.address?.trim() ?? '';
+
+  const write = (value: string | string[], x: number, y: number, { size = 10, color = DARK, style = 'normal', align = 'left' }: TextStyle = {}) => {
+    doc.setFont('helvetica', style);
+    doc.setFontSize(size);
+    doc.setTextColor(...color);
+    doc.text(value, x, y, { align });
+  };
+  const width = (value: string, size: number, style = 'normal') => {
+    doc.setFont('helvetica', style);
+    doc.setFontSize(size);
+    return doc.getTextWidth(value);
+  };
+  const wrap = (value: string, size: number, maxWidth: number, style = 'normal'): string[] => {
+    doc.setFont('helvetica', style);
+    doc.setFontSize(size);
+    return doc.splitTextToSize(value, maxWidth);
+  };
+  const dashed = (y: number, from = 20, to = W - 20) => {
+    doc.setDrawColor(...LINE);
+    doc.setLineDashPattern([0.8, 0.8], 0);
+    doc.line(from, y, to, y);
+    doc.setLineDashPattern([], 0);
+  };
+  /** The grey band at the top of every page */
+  const band = () => {
+    doc.setFillColor(158, 158, 158);
+    doc.rect(10, 8, W - 20, 5, 'F');
+  };
+  /** A small grey label on a panel ("Payment Details", "Note") */
+  const pill = (label: string, at: number) => {
+    doc.setFillColor(214, 214, 214);
+    doc.roundedRect(14, at, width(label, 8, 'bold') + 10, 7, 1.5, 1.5, 'F');
+    write(label, 19, at + 4.8, { size: 8, style: 'bold', color: [255, 255, 255] });
+  };
+
+  /** Band, logo, society name (maroon, two lines when long) + the title, contact on the right, a line. Returns its bottom */
+  const header = (title: string, logo: string | null) => {
+    band();
+    if (logo) {
+      try {
+        doc.addImage(logo, 'PNG', 14, 18, 28, 28, undefined, 'FAST');
+      } catch {
+        // a logo jsPDF can't read: the PDF is still made
+      }
+    }
+    const nameLines = width(name, 17, 'bold') > 74 ? twoLines(name) : [name];
+    nameLines.forEach((line, i) => write(line, 46, 27 + i * 7, { size: 17, style: 'bold', color: MAROON }));
+    const titleY = 27 + (nameLines.length - 1) * 7 + 6;
+    write(title, 46, titleY, { size: 9.5, color: GREY });
+
+    let right = 22;
+    if (phones.length || address) {
+      write('Contact', W - 14, right, { size: 9, style: 'bold', align: 'right' });
+      for (const phone of phones) write(phone, W - 14, (right += 4.5), { size: 9, color: GREY, align: 'right' });
+      right += 2;
+      for (const line of address ? wrap(address, 8.5, 72) : []) write(line, W - 14, (right += 4.2), { size: 8.5, color: GREY, align: 'right' });
+    }
+    const y = Math.max(titleY + 6, 50, right + 5);
+    doc.setDrawColor(220, 220, 220);
+    doc.line(10, y, W - 10, y);
+    return y;
+  };
+
+  /** The grey Note panel and the dotted line under it. Returns its bottom */
+  const notePanel = (top: number, noteText: string, thanks: string, details: [string, string][] = []) => {
+    const note = wrap(noteText, 8.5, W - 38);
+    const noteTop = details.length ? top + 12 + Math.ceil(details.length / 2) * 7.5 + 2 : top + 3;
+    const bandEnd = noteTop + 10 + note.length * 4.2;
+    doc.setFillColor(...PANEL);
+    doc.rect(10, top, W - 20, bandEnd - top, 'F');
+    if (details.length) {
+      pill('Payment Details', top + 3);
+      details.forEach(([label, value], i) => {
+        const x = i % 2 ? W / 2 + 5 : 20;
+        const at = top + 16 + Math.floor(i / 2) * 7.5;
+        write(`${label}:`, x, at, { size: 9.5, style: 'bold' });
+        write(value || '-', x + 27, at, { size: 9.5 });
+      });
+    }
+    pill('Note', noteTop);
+    write(note, 20, noteTop + 11, { size: 8.5, color: GREY });
+
+    const y = bandEnd + 5;
+    doc.setDrawColor(190, 190, 190);
+    doc.setLineDashPattern([0.6, 0.8], 0);
+    doc.rect(16, y, W - 32, 10);
+    doc.setLineDashPattern([], 0);
+    write(thanks, W / 2, y + 6.5, { size: 10, align: 'center' });
+    return y + 10;
+  };
+
+  /** Society and address on the left, telephone (and the page number) on the right, at the bottom of the page */
+  const footer = (at = H - 20, pageText?: string) => {
+    write(name, 10, at, { size: 10, style: 'bold' });
+    if (pageText) write(pageText, W - 10, at, { size: 8.5, color: GREY, align: 'right' });
+    if (address) write(wrap(address, 8.5, W / 2), 10, at + 4.5, { size: 8.5, color: GREY });
+    if (phones.length) write(`Tel: ${phones.join(' / ')}`, W - 10, at + 4.5, { size: 8.5, color: GREY, align: 'right' });
+  };
+
+  return { doc, W, H, name, phones, write, width, wrap, dashed, band, header, notePanel, footer };
+}
+
+/**
+ * Every table export as a PDF in the receipt design: grey band, logo + society name + the report's title, contact,
+ * a box with the society / report / filters / record count / export date, then the table. Long tables continue on new
+ * pages (grey band, column header repeated); the Note panel ends the report, and every page has the society footer
+ * and "Page x of y". Built in the browser (no server work).
+ * jsPDF's built-in font has no ₹ sign, so pass amounts as plain numbers (formatNumber).
+ */
+export async function exportPdf({ title, subtitle, columns, rows }: ExportTable, fileName: string) {
+  const society = societyOf();
+  const [{ jsPDF }, { autoTable }, logo] = await Promise.all([import('jspdf'), import('jspdf-autotable'), logoData(society.logoUrl)]);
+  const doc = new jsPDF({ orientation: columns.length > PDF_PORTRAIT_MAX_COLUMNS ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+  const k = pdfKit(doc, society);
+  const { W, H, write, width, wrap, dashed } = k;
+  const exported = formatDateTime(nowLocal());
+
+  let y = k.header(title, logo) + 8;
+
+  // Box: society / report, filters / records, date / pages (filled in at the end)
+  const filtersLabel = 'Filters -';
+  const filters = wrap(subtitle || 'All records', 10, W - 100 - width(filtersLabel, 10, 'bold'));
+  const boxTop = y;
+  const boxHeight = 30 + filters.length * 4.6;
+  doc.setFillColor(...PANEL);
+  doc.setDrawColor(222, 222, 222);
+  doc.roundedRect(14, boxTop, W - 28, boxHeight, 3, 3, 'FD');
+  write(k.name, 20, boxTop + 8.5, { size: 10, style: 'bold' });
+  write(`Report - ${title}`, W - 20, boxTop + 8.5, { size: 10, color: GREY, align: 'right' });
+  dashed(boxTop + 12.5);
+  write(filtersLabel, 20, boxTop + 20.5, { size: 10, style: 'bold' });
+  write(filters, 21.5 + width(filtersLabel, 10, 'bold'), boxTop + 20.5, { size: 10 });
+  write(`Records - ${rows.length}`, W - 20, boxTop + 20.5, { size: 10, color: GREY, align: 'right' });
+  const dateRow = boxTop + 20.5 + filters.length * 4.6 + 6.5;
+  dashed(dateRow - 6.5);
+  write('Date - ', 20, dateRow, { size: 10, color: GREY });
+  write(exported, 20 + width('Date - ', 10), dateRow, { size: 10, style: 'bold' });
+  y = boxTop + boxHeight + 8;
+
+  autoTable(doc, {
+    head: [columns],
+    body: rows.map((row) => row.map((cell) => String(cell ?? ''))),
+    startY: y,
+    theme: 'plain',
+    margin: { top: 20, left: 14, right: 14, bottom: FOOTER_SPACE },
+    styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 2.2, textColor: DARK, lineColor: LINE, lineWidth: { bottom: 0.15 } },
+    headStyles: { fillColor: PANEL, textColor: DARK, fontStyle: 'bold', lineWidth: { bottom: 0.3 } },
+    // Every page after the first starts with the grey band
+    didDrawPage: (data) => {
+      if (data.pageNumber > 1) k.band();
+    },
+  });
+
+  // Note panel after the table (on a new page when it doesn't fit)
+  const tableEnd = (doc as JsPdf & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? y;
+  let noteTop = tableEnd + 8;
+  if (noteTop + 40 > H - FOOTER_SPACE) {
+    doc.addPage();
+    k.band();
+    noteTop = 22;
+  }
+  k.notePanel(
+    noteTop,
+    `This is a computer-generated report issued by ${k.name} on ${exported}. It lists the ${rows.length} record${rows.length === 1 ? '' : 's'} ` +
+      `that matched the filters above when it was exported.${k.phones.length ? ` For queries, contact ${k.phones.join(' or ')}.` : ''}`,
+    'End of report',
+  );
+
+  const pages = doc.getNumberOfPages();
+  for (let page = 1; page <= pages; page += 1) {
+    doc.setPage(page);
+    k.footer(H - 20, `Page ${page} of ${pages}`);
+  }
+  doc.setPage(1);
+  write(`Pages - ${pages}`, W - 20, dateRow, { size: 10, color: GREY, align: 'right' });
+  doc.save(`${fileName}.pdf`);
+}
+
+/** The one export function every screen calls: the same table, as Excel or PDF */
+export const exportTable = (table: ExportTable, fileName: string, format: ExportFormat) =>
+  format === 'pdf' ? exportPdf(table, fileName) : exportExcel(table, fileName);
+
+// ---------- Donation receipt and expense voucher ----------
+
+/** What a donation receipt needs (services/finance Donation fits) */
+export type ReceiptDonation = {
+  id: number;
+  donor_name: string;
+  member_code: string | null;
+  amount: number;
+  donated_on: string;
+  method: string;
+  reference_no: string | null;
+  purpose: string | null;
+  status: string;
+};
+
+/** What an expense voucher needs (services/finance Expense fits) */
+export type ReceiptExpense = {
+  id: number;
+  description: string;
+  paid_to: string | null;
+  category: string | null;
+  amount: number;
+  mode: string;
+  reference_no: string | null;
+  txn_date: string;
+  status: string;
+};
+
 type Tone = 'ok' | 'wait' | 'no';
 type ReceiptLayout = {
   society: ReceiptSociety;
@@ -188,7 +345,6 @@ type ReceiptLayout = {
   note: string;
   thanks: string;
 };
-type TextStyle = { size?: number; color?: Rgb; style?: string; align?: 'left' | 'right' | 'center' };
 
 /**
  * One A4 page in the client's receipt design: grey band, logo + society name + contact, greeting, a box with the
@@ -196,34 +352,12 @@ type TextStyle = { size?: number; color?: Rgb; style?: string; align?: 'left' | 
  * Note panels, a thank-you line and the society's address at the bottom. Built in the browser and downloaded
  */
 async function receiptPdf(r: ReceiptLayout) {
-  const [{ jsPDF }, logo] = await Promise.all([import('jspdf'), logoData(r.society.logoUrl)]);
+  const society = societyOf(r.society);
+  const [{ jsPDF }, logo] = await Promise.all([import('jspdf'), logoData(society.logoUrl)]);
   const doc = new jsPDF({ format: 'a4', unit: 'mm' });
-  const name = r.society.name?.trim() || societyName;
-  const phones = phonesOf(r.society.phone);
-  const address = r.society.address?.trim() ?? '';
+  const k = pdfKit(doc, society);
+  const { write, width, wrap, dashed } = k;
 
-  const write = (value: string | string[], x: number, y: number, { size = 10, color = DARK, style = 'normal', align = 'left' }: TextStyle = {}) => {
-    doc.setFont('helvetica', style);
-    doc.setFontSize(size);
-    doc.setTextColor(...color);
-    doc.text(value, x, y, { align });
-  };
-  const width = (value: string, size: number, style = 'normal') => {
-    doc.setFont('helvetica', style);
-    doc.setFontSize(size);
-    return doc.getTextWidth(value);
-  };
-  const wrap = (value: string, size: number, maxWidth: number): string[] => {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(size);
-    return doc.splitTextToSize(value, maxWidth);
-  };
-  const dashed = (y: number) => {
-    doc.setDrawColor(...LINE);
-    doc.setLineDashPattern([0.8, 0.8], 0);
-    doc.line(20, y, 190, y);
-    doc.setLineDashPattern([], 0);
-  };
   /** A label on the left and an amount on the right */
   const row = (
     label: string,
@@ -236,33 +370,7 @@ async function receiptPdf(r: ReceiptLayout) {
     write(value, 190, y, { size, style: opts.valueStyle ?? style, color: opts.valueColor ?? color, align: 'right' });
   };
 
-  // Header: grey band, logo, name + title, contact on the right
-  doc.setFillColor(158, 158, 158);
-  doc.rect(10, 8, 190, 5, 'F');
-  if (logo) {
-    try {
-      doc.addImage(logo, 'PNG', 14, 18, 28, 28, undefined, 'FAST');
-    } catch {
-      // a logo jsPDF can't read: the receipt is still made
-    }
-  }
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(17);
-  const nameLines = doc.getTextWidth(name) > 74 ? twoLines(name) : [name];
-  nameLines.forEach((line, i) => write(line, 46, 27 + i * 7, { size: 17, style: 'bold', color: MAROON }));
-  const titleY = 27 + (nameLines.length - 1) * 7 + 6;
-  write(r.title, 46, titleY, { size: 9.5, color: GREY });
-
-  let right = 22;
-  if (phones.length || address) {
-    write('Contact', 196, right, { size: 9, style: 'bold', align: 'right' });
-    for (const phone of phones) write(phone, 196, (right += 4.5), { size: 9, color: GREY, align: 'right' });
-    right += 2;
-    for (const line of address ? wrap(address, 8.5, 72) : []) write(line, 196, (right += 4.2), { size: 8.5, color: GREY, align: 'right' });
-  }
-  let y = Math.max(titleY + 6, 50, right + 5);
-  doc.setDrawColor(220, 220, 220);
-  doc.line(10, y, 200, y);
+  let y = k.header(r.title, logo);
 
   // Greeting
   y += 10;
@@ -279,7 +387,7 @@ async function receiptPdf(r: ReceiptLayout) {
   doc.setFillColor(...PANEL);
   doc.setDrawColor(222, 222, 222);
   doc.roundedRect(14, top, 182, 36, 3, 3, 'FD');
-  write(name, 20, top + 8.5, { size: 10, style: 'bold' });
+  write(k.name, 20, top + 8.5, { size: 10, style: 'bold' });
   write(`${r.noLabel} - ${r.no}`, 190, top + 8.5, { size: 10, color: GREY, align: 'right' });
   dashed(top + 12.5);
   const partyLabel = `${r.partyLabel} -`;
@@ -309,42 +417,11 @@ async function receiptPdf(r: ReceiptLayout) {
   row('Remaining Balance', rs(r.item.amount - r.paid), (y += 7), { size: 13, valueStyle: 'bold' });
   write(`Amount in words: ${amountInWords(r.item.amount)}`, 20, (y += 5.5), { size: 9, style: 'italic', color: GREY });
 
-  // Payment Details and Note panels (one grey band)
-  const note = wrap(r.note, 8.5, 172);
-  const band = (y += 7);
-  const noteTop = band + 12 + Math.ceil(r.details.length / 2) * 7.5 + 2;
-  const bandEnd = noteTop + 10 + note.length * 4.2;
-  doc.setFillColor(...PANEL);
-  doc.rect(10, band, 190, bandEnd - band, 'F');
-  const pill = (label: string, at: number) => {
-    doc.setFillColor(214, 214, 214);
-    doc.roundedRect(14, at, width(label, 8, 'bold') + 10, 7, 1.5, 1.5, 'F');
-    write(label, 19, at + 4.8, { size: 8, style: 'bold', color: [255, 255, 255] });
-  };
-  pill('Payment Details', band + 3);
-  r.details.forEach(([label, value], i) => {
-    const x = i % 2 ? 110 : 20;
-    const at = band + 16 + Math.floor(i / 2) * 7.5;
-    write(`${label}:`, x, at, { size: 9.5, style: 'bold' });
-    write(value || '-', x + 27, at, { size: 9.5 });
-  });
-  pill('Note', noteTop);
-  write(note, 20, noteTop + 11, { size: 8.5, color: GREY });
+  // Payment Details and Note panels (one grey band), the thank-you line
+  y = k.notePanel((y += 7), r.note, r.thanks, r.details);
 
-  // Thank-you line in a dotted box
-  y = bandEnd + 5;
-  doc.setDrawColor(190, 190, 190);
-  doc.setLineDashPattern([0.6, 0.8], 0);
-  doc.rect(16, y, 178, 10);
-  doc.setLineDashPattern([], 0);
-  write(r.thanks, 105, y + 6.5, { size: 10, align: 'center' });
-
-  // Footer: society and address on the left, telephone on the right
-  // At the bottom of the page (a long note pushes it down, never off the page)
-  const footer = Math.min(Math.max(y + 18, 272), 284);
-  write(name, 10, footer, { size: 10, style: 'bold' });
-  if (address) write(wrap(address, 8.5, 120), 10, footer + 4.5, { size: 8.5, color: GREY });
-  if (phones.length) write(`Tel: ${phones.join(' / ')}`, 200, footer + 4.5, { size: 8.5, color: GREY, align: 'right' });
+  // Footer at the bottom of the page (a long note pushes it down, never off the page)
+  k.footer(Math.min(Math.max(y + 8, 272), 284));
 
   doc.save(`${r.fileName}.pdf`);
 }
@@ -358,8 +435,9 @@ export async function exportDonationReceipt(donation: ReceiptDonation, { society
   const no = recordNo('DON', donation.id);
   const mode = modeLabel(donation.method);
   const isUpi = donation.method.startsWith('upi');
+  const s = societyOf(society);
   await receiptPdf({
-    society,
+    society: s,
     title: 'Donation Receipt',
     fileName: no,
     noLabel: 'Receipt No',
@@ -389,8 +467,8 @@ export async function exportDonationReceipt(donation: ReceiptDonation, { society
       ['Status', statusLabel(donation.status)],
     ],
     note:
-      `This is a computer-generated donation receipt issued by ${society.name?.trim() || societyName} against the amount received via ${mode}. ` +
-      `Please quote the Receipt No.${isUpi ? ' and UTR reference' : ''} for any correspondence.${queries(phonesOf(society.phone))}`,
+      `This is a computer-generated donation receipt issued by ${s.name} against the amount received via ${mode}. ` +
+      `Please quote the Receipt No.${isUpi ? ' and UTR reference' : ''} for any correspondence.${queries(phonesOf(s.phone))}`,
     thanks: 'Thank you for supporting the society.',
   });
 }
@@ -399,8 +477,9 @@ export async function exportDonationReceipt(donation: ReceiptDonation, { society
 export async function exportExpenseVoucher(expense: ReceiptExpense, { society = {}, modeLabel = (m) => m, statusLabel = (s) => s }: ReceiptOptions = {}) {
   const no = recordNo('EXP', expense.id);
   const mode = modeLabel(expense.mode);
+  const s = societyOf(society);
   await receiptPdf({
-    society,
+    society: s,
     title: 'Expense Voucher',
     fileName: no,
     noLabel: 'Voucher No',
@@ -430,8 +509,8 @@ export async function exportExpenseVoucher(expense: ReceiptExpense, { society = 
       ['Status', statusLabel(expense.status)],
     ],
     note:
-      `This is a computer-generated payment voucher issued by ${society.name?.trim() || societyName} for the amount paid via ${mode}. ` +
-      `Please quote the Voucher No. for any correspondence.${queries(phonesOf(society.phone))}`,
+      `This is a computer-generated payment voucher issued by ${s.name} for the amount paid via ${mode}. ` +
+      `Please quote the Voucher No. for any correspondence.${queries(phonesOf(s.phone))}`,
     thanks: 'Paid from the society fund.',
   });
 }

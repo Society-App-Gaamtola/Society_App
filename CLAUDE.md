@@ -495,7 +495,7 @@ super_admin) unless the row says **executives** (super_admin + executive) or **s
 | GET `/notification-settings` | – | `{ settings: { events, notices, payments } }` (the app's Settings → Notifications; all on by default) |
 | PUT `/notification-settings` | only the switches that change: `events, notices, payments` (booleans) | same as GET. A type switched off is no longer delivered to this user (`user_profiles.notify_*`, applied in `common.sendNotification`); `general` always is |
 | GET `/members` | `page, limit, search (name / member code), role (super_admin\|executive\|member)` | `{ members: [{ id, name, member_code, role, photo_url, mobile, email }], pagination }`. Only completed, active members with `directory_visible`. `mobile` / `email` are null unless the member allows it (`mobile_visible` / `email_visible`), it's the viewer, or the viewer is in `CONTACT_VISIBLE_ROLES` |
-| GET `/app-info` | – | `{ society_name, society_name_gu, show_gujarati_name, notice_tags, contact_email, phone, address, logo_url, social_links: [{ network (facebook\|instagram\|x\|youtube), url }] }`. Only filled links, in `SOCIAL_NETWORKS` order (App Settings → Social Networking); the app's side menu shows them |
+| GET `/app-info` | – | `{ society_name, society_name_gu, show_gujarati_name, notice_tags, contact_email, phone, address, map_link, logo_url, social_links: [{ network (facebook\|instagram\|x\|youtube), url }] }`. Only filled links, in `SOCIAL_NETWORKS` order (App Settings → Social Networking); the app's side menu shows them |
 | GET `/event-plans` | **executives** + Events permission. `page, limit, status (idea\|planning\|approved\|dropped\|converted), search` | `{ plans: [{ id, title, notes, tentative_date, status, created_by, created_by_name, created_at, can_edit (own or Super Admin) }], pagination }`. One shared board (`future_event_plans`), soonest date first |
 | POST `/event-plans`, PUT `/event-plans/:id` | **executives** + Events permission (edit: owner or Super Admin). `title, notes?, tentative_date?, status` | `{ plan }` |
 | DELETE `/event-plans/:id` | **executives** + Events permission (owner or Super Admin). Soft delete | – |
@@ -632,7 +632,7 @@ Routes: the Super Admin, or an executive with that permission section (`requireP
 | GET `/finance` | `from_date?, to_date?` | `{ totals: { donations, expenses, balance, transactions, donation_trend, expense_trend }, monthly, recent (5 transactions) }` (the Financial Overview) |
 | GET `/reports/data/:type` | `summary\|donation\|expense\|category\|monthly\|custom` + `from_date, to_date, category, mode, page, limit` | `{ rows, pagination }`. Lists are paged; summary / category / monthly are totals added up by the database |
 | GET `/reports`, POST `/reports`, DELETE `/reports/:id` | POST: `report_type, from_date?, to_date?, category?, mode?` | the "Generated Reports" history (`generated_reports`). The panel builds the file in the browser |
-| GET `/settings` | – | `{ settings: { society_name, society_name_gu, contact_email, phone, address, logo_url, show_gujarati_name, executive_min_donation, allow_registration, allow_uploads, require_media_approval, event_notifications, notify_new_member, notify_donation, notify_executive_request, notify_media_upload, notify_expense, donation_purposes, expense_categories, notice_tags (lowercase), social_links: { facebook, instagram, x, youtube }, last_backup_at }, event_categories, upi }` |
+| GET `/settings` | – | `{ settings: { society_name, society_name_gu, contact_email, phone, address, map_link, logo_url, show_gujarati_name, executive_min_donation, allow_registration, allow_uploads, require_media_approval, event_notifications, notify_new_member, notify_donation, notify_executive_request, notify_media_upload, notify_expense, donation_purposes, expense_categories, notice_tags (lowercase), social_links: { facebook, instagram, x, youtube }, last_backup_at }, event_categories, upi }` |
 | PUT `/settings` | only what changes (not `last_backup_at`); `social_links` (https links, "" = hidden); `event_categories: [{ id?, name }]` (the full list: no id = add, left out = hidden), `upi: { payee_name, upi_id, qr_image_url?, display_note? } \| null` | same as GET |
 
 Money rules:
@@ -664,7 +664,7 @@ rows (JSON values); cached in memory, `common.saveSettings()` clears it). They a
 - `notice_tags` → the notice categories (`notices.tag`, lowercase; the CHECK was dropped on 2026-11-23). important /
   general / event are translated in the app; the society's own show as typed (Title Case). Removing one leaves old
   notices as they are;
-- `society_name` / `society_name_gu` → the panel header and PDFs (`lib/exporters.ts` `setSocietyName`), the app's
+- `society_name` / `society_name_gu` → the panel header and PDFs (`lib/exporters.ts` `setSociety`: name, logo, phone, address), the app's
   header, splash, menu, receipts, reports and share text (`GET /user/app-info`).
 - With several backend servers, the cache would only clear on the one that saved (one server today).
 
@@ -726,9 +726,14 @@ Notice flow:
     when opened.
   - **Publish and Share (email)**: Event Preview and Post Notice have an "Also share by email" checkbox
     (`email_members`); the primary button then reads Post & Share / Publish & Share.
-- **Sharing**: events and notices go to WhatsApp with the venue and a Google Maps link (`services/share.ts`, `wa.me`);
+- **Sharing**: events and notices go to WhatsApp with the venue and a Google Maps link (`services/share.ts`, `wa.me`):
+  the event's own pin or map link, else the society's `map_link` + `address` (App Settings → General → Society Map
+  Link), else a Maps search for the venue;
   a verified donation's receipt PDF and the My Donations summary (PDF / Excel) open the share sheet
   (`services/receipt.ts`, expo-print + expo-sharing).
+- **Every app PDF** (receipt, My Donations summary, the executive reports) is built with `pdfPage()` in
+  `services/pdfLayout.ts`: the same DON receipt design as the panel (band, logo + name, contact, grey box, body,
+  Note panel, thank-you line, footer), in English with `Rs.` amounts. New PDFs must use it too.
 - **Uploads** go straight to Cloudinary (`services/media.ts`):
   - photos are shrunk to `MEDIA.maxImageSide` (1600px) and re-saved as JPEG at `MEDIA.imageQuality` (0.7);
   - iOS videos are re-encoded to 720p (`videoExportPreset`); Android has no built-in video compression, so videos
@@ -755,8 +760,10 @@ Notice flow:
       already seen makes **no API call**;
     - `useBackendAction(keys, run)`: after a change, marks the screen's cache old (only the page on screen reloads)
       and shows the backend's message as a toast.
-  - **Exports**: `exportTable(table, fileName, 'excel' | 'pdf')` in `lib/exporters.ts` (PDF via `jspdf-autotable`:
-    maroon header, filters line, repeated column header, page numbers). `ExportButton` is the "Export ▾ Excel / PDF"
+  - **Exports**: `exportTable(table, fileName, 'excel' | 'pdf')` in `lib/exporters.ts` (PDF via `jspdf-autotable`
+    in the **DON receipt design**, `pdfKit` in exporters: grey band, logo + society name + title, contact, the grey box
+    with report / filters / records / date / pages, the table (column header repeated), the Note panel, the society
+    footer + "Page x of y" on every page). Every PDF (tables, reports, receipt, voucher) uses this one design. `ExportButton` is the "Export ▾ Excel / PDF"
     menu on every screen. Rows: the picked rows, or `fetchAllPages()` over the screen's list API.
   - Backend timestamps are UTC: pass them through `fromUtc()` before `formatDate` / `formatDateTime`.
   - **Loaders** (nothing to add per screen): `components/LoadingBar.tsx` (gold bar under the top bar whenever any

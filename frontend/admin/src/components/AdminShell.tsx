@@ -31,7 +31,7 @@ import { getSession } from '@/lib/session';
 import { ChangePasswordDialog } from './forms/ChangePasswordDialog';
 import { useMyProfile } from '@/hooks/useAccount';
 import { useLogout } from '@/hooks/useLogout';
-import { setSocietyName } from '@/lib/exporters';
+import { setSociety } from '@/lib/exporters';
 import { cn } from '@/lib/utils';
 import { PageSkeleton } from './common';
 import { LoadingBar } from './LoadingBar';
@@ -103,8 +103,11 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
   const { data: profile } = useMyProfile();
   const { data } = useAppSettings();
   const settings = data?.settings;
-  // PDFs (tables, reports, receipts) carry the name saved in App Settings
-  useEffect(() => setSocietyName(settings?.society_name), [settings?.society_name]);
+  // PDFs (tables, reports, receipts) carry the society's name, logo, phone and address from App Settings
+  useEffect(
+    () => setSociety({ name: settings?.society_name, phone: settings?.phone, address: settings?.address, logoUrl: settings?.logo_url }),
+    [settings?.society_name, settings?.phone, settings?.address, settings?.logo_url],
+  );
 
   // Searches the list on screen: keeps the open tab and filters (?tab=…), goes back to page 1
   const onSearch = (e: FormEvent) => {

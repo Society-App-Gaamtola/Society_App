@@ -16,8 +16,9 @@ import {
 } from '../api/executive';
 import type { DateRange, Donation, ReportFormat, ReportType } from '../types';
 import { MONTHS, formatDate, formatDateTime, formatRange, fromIsoDay, isInRange } from '../utils/date';
-import { formatINR } from '../utils/format';
+import { formatRs } from '../utils/format';
 import { t } from '../i18n';
+import { amountLine, escapeHtml, pdfPage, queriesLine, societyRow } from './pdfLayout';
 
 type Group = { label: string; count: number; amount: number };
 
@@ -84,14 +85,11 @@ export function buildReportData(donations: Donation[], type: ReportType, range: 
   };
 }
 
-const escapeHtml = (s: string) =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
 const groupTable = (title: string, rows: Group[]) =>
   rows.length
     ? `<h3>${title}</h3>
 <table><tr><th>Name</th><th class="num">Entries</th><th class="num">Amount</th></tr>
-${rows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${r.count}</td><td class="num">${formatINR(r.amount)}</td></tr>`).join('')}
+${rows.map((r) => `<tr><td>${escapeHtml(r.label)}</td><td class="num">${r.count}</td><td class="num">${formatRs(r.amount)}</td></tr>`).join('')}
 </table>`
     : '';
 
@@ -118,47 +116,38 @@ export async function logoDataUri() {
   }
 }
 
-/** The page every report shares: society header, period, total cards, then the report's own tables */
-function pageHtml({ type, period, generatedOn, totals, body, logo }: {
+/**
+ * The page every report shares, in the receipt design (pdfLayout): society header, a box with the report / period /
+ * entries / date, the total lines, then the report's own tables and a Note
+ */
+function pageHtml({ type, period, generatedOn, entries, totals, body, note, logo }: {
   type: ReportType;
   period: string;
   generatedOn: string;
+  entries: number;
   totals: [string, string][];
   body: string;
+  note?: string;
   logo: string | null;
 }) {
   const society = escapeHtml(getSocietyInfo().society_name);
-  return `<!doctype html><html><head><meta charset="utf-8" />
-<style>
-  body { font-family: -apple-system, Roboto, Arial, sans-serif; color: #2B1A12; padding: 24px; }
-  header { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #C9A24A; padding-bottom: 12px; }
-  header img { width: 64px; height: 64px; }
-  h1 { margin: 0; font-size: 20px; color: #7A1020; }
-  h2 { margin: 2px 0 0; font-size: 14px; font-weight: normal; color: #7A6A5E; }
-  h3 { color: #7A1020; font-size: 14px; margin: 22px 0 8px; }
-  .meta { font-size: 12px; color: #7A6A5E; margin-top: 10px; }
-  .totals { display: flex; gap: 12px; margin-top: 16px; }
-  .total { flex: 1; border: 1px solid #EADFCF; border-radius: 8px; padding: 10px 12px; background: #FFF8EE; }
-  .total b { display: block; font-size: 18px; color: #7A1020; }
-  .total span { font-size: 11px; color: #7A6A5E; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  th { background: #7A1020; color: #fff; text-align: left; padding: 6px 8px; }
-  td { padding: 6px 8px; border-bottom: 1px solid #EADFCF; }
-  .num { text-align: right; }
-  .bars { display: flex; align-items: flex-end; gap: 12px; height: 150px; }
-  .bar { display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #7A6A5E; }
-  .fill { width: 28px; background: #8E1426; border-radius: 4px 4px 0 0; margin-bottom: 4px; }
-  footer { margin-top: 28px; font-size: 10px; color: #7A6A5E; text-align: center; }
-</style></head><body>
-<header>
-  ${logo ? `<img src="${logo}" />` : ''}
-  <div><h1>${society}</h1><h2>${type}</h2></div>
-</header>
-<div class="meta">Period: ${period} &nbsp;·&nbsp; Generated on ${generatedOn}</div>
-<div class="totals">${totals.map(([value, label]) => `<div class="total"><b>${value}</b><span>${label}</span></div>`).join('')}</div>
-${body}
-<footer>${society} · Society Cultural Activity App</footer>
-</body></html>`;
+  return pdfPage({
+    logo,
+    title: type,
+    box: [
+      societyRow('Report', type),
+      [`<b>Period -</b> ${escapeHtml(period)}`, `<span class="grey">Entries - ${entries}</span>`],
+      [`<span class="grey">Date -</span> <b>${escapeHtml(generatedOn)}</b>`, `<span class="grey">Format - PDF</span>`],
+    ],
+    body: `<div class="item">
+  ${totals.map(([value, label], i) => amountLine(escapeHtml(label), escapeHtml(value), { big: true, tone: i === 0 ? 'ok' : '' })).join('')}
+  ${body}
+</div>`,
+    note:
+      `This is a computer-generated ${escapeHtml(type.toLowerCase())} issued by ${society} for ${escapeHtml(period)}. ` +
+      `${note ?? 'Only verified entries are counted in the totals.'}${queriesLine()}`,
+    thanks: 'Thank you for supporting the society.',
+  });
 }
 
 function toHtml(data: ReportData, logo: string | null) {
@@ -168,20 +157,22 @@ function toHtml(data: ReportData, logo: string | null) {
   } else if (data.type === 'Member-wise Report') {
     body = `<h3>Member-wise Donations</h3>
 <table><tr><th>Member ID</th><th>Name</th><th class="num">Entries</th><th class="num">Amount</th></tr>
-${data.byMember.map((m) => `<tr><td>${escapeHtml(m.memberId)}</td><td>${escapeHtml(m.label)}</td><td class="num">${m.count}</td><td class="num">${formatINR(m.amount)}</td></tr>`).join('')}
+${data.byMember.map((m) => `<tr><td>${escapeHtml(m.memberId)}</td><td>${escapeHtml(m.label)}</td><td class="num">${m.count}</td><td class="num">${formatRs(m.amount)}</td></tr>`).join('')}
 </table>`;
   } else {
     body = `<h3>Transactions</h3>
 <table><tr><th>Date</th><th>Donor</th><th>Member ID</th><th>Mode</th><th>Status</th><th class="num">Amount</th></tr>
-${data.transactions.map((d) => `<tr><td>${formatDate(fromIsoDay(d.date))}</td><td>${escapeHtml(d.donorName)}</td><td>${escapeHtml(d.memberId)}</td><td>${d.mode}</td><td>${d.status}</td><td class="num">${formatINR(d.amount)}</td></tr>`).join('')}
+${data.transactions.map((d) => `<tr><td>${formatDate(fromIsoDay(d.date))}</td><td>${escapeHtml(d.donorName)}</td><td>${escapeHtml(d.memberId)}</td><td>${d.mode}</td><td>${d.status}</td><td class="num">${formatRs(d.amount)}</td></tr>`).join('')}
 </table>`;
   }
   return pageHtml({
     type: data.type,
     period: data.period,
     generatedOn: data.generatedOn,
-    totals: [[formatINR(data.totalAmount), 'Total Donations'], [String(data.totalCount), 'Total Entries']],
-    body: data.totalCount ? body : '<p class="meta">No donations in this period.</p>',
+    entries: data.totalCount,
+    totals: [[formatRs(data.totalAmount), 'Total Donations'], [String(data.totalCount), 'Total Entries']],
+    note: 'Verified and pending donations are listed and counted; rejected ones are left out.',
+    body: data.totalCount ? body : '<p class="empty">No donations in this period.</p>',
     logo,
   });
 }
@@ -302,8 +293,10 @@ async function makeExpenseReport(range: DateRange, format: ReportFormat) {
       type,
       period,
       generatedOn,
+      entries: items.length,
+      note: 'Only verified expenses are counted in the totals; pending ones are listed for reference.',
       totals: [
-        [formatINR(total), 'Verified Expenses'],
+        [formatRs(total), 'Verified Expenses'],
         [String(verified.length), 'Verified Entries'],
         [String(pending.length), 'Pending Verification'],
       ],
@@ -312,9 +305,9 @@ async function makeExpenseReport(range: DateRange, format: ReportFormat) {
           groupTable('Payment Mode Summary', byMode) +
           `<h3>Expenses</h3>
 <table><tr><th>Date</th><th>Description</th><th>Paid To</th><th>Category</th><th>Mode</th><th>Status</th><th class="num">Amount</th></tr>
-${items.map((e) => `<tr><td>${formatDate(fromIsoDay(e.txn_date))}</td><td>${escapeHtml(e.description)}</td><td>${escapeHtml(e.paid_to ?? '')}</td><td>${escapeHtml(e.category ?? '')}</td><td>${MODE_LABEL[e.mode] ?? e.mode}</td><td>${STATUS_LABEL[e.status]}</td><td class="num">${formatINR(e.amount)}</td></tr>`).join('')}
+${items.map((e) => `<tr><td>${formatDate(fromIsoDay(e.txn_date))}</td><td>${escapeHtml(e.description)}</td><td>${escapeHtml(e.paid_to ?? '')}</td><td>${escapeHtml(e.category ?? '')}</td><td>${MODE_LABEL[e.mode] ?? e.mode}</td><td>${STATUS_LABEL[e.status]}</td><td class="num">${formatRs(e.amount)}</td></tr>`).join('')}
 </table>`
-        : '<p class="meta">No expenses in this period.</p>',
+        : '<p class="empty">No expenses in this period.</p>',
       logo,
     });
 
@@ -377,10 +370,11 @@ async function makeIncomeExpenseSummary(range: DateRange, format: ReportFormat) 
       type,
       period,
       generatedOn,
+      entries: income.reduce((n, g) => n + g.count, 0) + spending.reduce((n, g) => n + g.count, 0),
       totals: [
-        [formatINR(total('total_donations')), 'Income (Donations)'],
-        [formatINR(total('total_expenses')), 'Expenses'],
-        [formatINR(total('balance')), 'Balance'],
+        [formatRs(total('total_donations')), 'Income (Donations)'],
+        [formatRs(total('total_expenses')), 'Expenses'],
+        [formatRs(total('balance')), 'Balance'],
       ],
       body:
         groupTable('Income by Category', income) +
@@ -388,10 +382,10 @@ async function makeIncomeExpenseSummary(range: DateRange, format: ReportFormat) 
         (months.length
           ? `<h3>Month by Month</h3>
 <table><tr><th>Month</th><th class="num">Income</th><th class="num">Expenses</th><th class="num">Balance</th></tr>
-${months.map((m) => `<tr><td>${monthLabel(m.month)}</td><td class="num">${formatINR(m.donations)}</td><td class="num">${formatINR(m.expenses)}</td><td class="num">${formatINR(m.balance)}</td></tr>`).join('')}
+${months.map((m) => `<tr><td>${monthLabel(m.month)}</td><td class="num">${formatRs(m.donations)}</td><td class="num">${formatRs(m.expenses)}</td><td class="num">${formatRs(m.balance)}</td></tr>`).join('')}
 </table>`
-          : '') +
-        `<p class="meta">Only verified entries are counted. Waiting for verification: ${total('pending_donations')} donations, ${total('pending_expenses')} expenses.</p>`,
+          : ''),
+      note: `Only verified entries are counted. Waiting for verification: ${total('pending_donations')} donations, ${total('pending_expenses')} expenses.`,
       logo,
     });
 
