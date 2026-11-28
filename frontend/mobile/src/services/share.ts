@@ -18,16 +18,30 @@ export const shareOnWhatsApp = (message: string) =>
 /** The phone's share sheet (any app), with the same text */
 export const shareAnywhere = (message: string) => Share.share({ message }).catch(() => {});
 
-/** Event details + a Google Maps link to the venue (the pin, the pasted map link, or a search for the venue) */
+/**
+ * Where a shared event points. Its own map pin or map link comes first; otherwise the society's location from App
+ * Settings (Society Map Link, with the society address when the event has none); without that, a Maps search for
+ * the venue.
+ */
+function eventLocation(event: SocietyEvent) {
+  const society = getSocietyInfo();
+  const venueName = event.venueName ?? event.venue;
+  const societyLink = !event.coords && !event.mapLink ? society.map_link : '';
+  const venue = [venueName, event.address || (societyLink ? society.address : '')].filter(Boolean).join(', ');
+  const link = societyLink || googleMapsUrl({ coords: event.coords, venueName, address: event.address, mapLink: event.mapLink });
+  return { venue, link };
+}
+
+/** Event details + a Google Maps link (the pin, the pasted map link, the society's location, or a venue search) */
 export function eventShareText(event: SocietyEvent) {
-  const venue = [event.venueName ?? event.venue, event.address].filter(Boolean).join(', ');
+  const { venue, link } = eventLocation(event);
   const lines = [
     `*${event.title}*`,
     '',
     `📅 ${t('Date')}: ${event.days ? `${event.date} (${event.days})` : event.date}`,
     event.time ? `⏰ ${t('Time')}: ${event.time}` : null,
     venue ? `📍 ${t('Venue')}: ${venue}` : null,
-    `🗺️ ${t('Location')}: ${googleMapsUrl({ coords: event.coords, venueName: event.venueName ?? event.venue, address: event.address, mapLink: event.mapLink })}`,
+    `🗺️ ${t('Location')}: ${link}`,
     event.contact ? `📞 ${t('Contact')}: ${event.contact}` : null,
     event.description ? `\n${clip(event.description)}` : null,
     '',
@@ -40,13 +54,13 @@ export function eventShareText(event: SocietyEvent) {
 export function noticeShareText(notice: Notice, event?: SocietyEvent | null) {
   const lines = [`📢 *${notice.title}*`, `${notice.date}`, '', clip(notice.description)];
   if (event) {
-    const venue = [event.venueName ?? event.venue, event.address].filter(Boolean).join(', ');
+    const { venue, link } = eventLocation(event);
     lines.push(
       '',
       `🎉 ${event.title}`,
       `📅 ${event.date}${event.time ? `, ${event.time}` : ''}`,
       venue ? `📍 ${venue}` : '',
-      `🗺️ ${googleMapsUrl({ coords: event.coords, venueName: event.venueName ?? event.venue, address: event.address, mapLink: event.mapLink })}`,
+      `🗺️ ${link}`,
     );
   }
   lines.push('', `— ${getSocietyInfo().society_name}`);

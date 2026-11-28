@@ -270,6 +270,8 @@ export type AppSettings = {
   contact_email: string;
   phone: string;
   address: string;
+  /** The society's Google Maps link: the default location in shared events without a pin / map link */
+  map_link: string;
   logo_url: string | null;
   show_gujarati_name: boolean;
   executive_min_donation: number;

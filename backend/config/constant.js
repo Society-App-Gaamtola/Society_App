@@ -267,6 +267,8 @@ export default {
         contact_email: "",
         phone: "",
         address: "",
+        // The society's Google Maps link: the default location in shared events that have no pin / map link of their own
+        map_link: "",
         logo_url: null,
         show_gujarati_name: true,
         executive_min_donation: 10000,

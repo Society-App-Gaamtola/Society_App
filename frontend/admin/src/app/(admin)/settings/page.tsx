@@ -162,7 +162,8 @@ export default function SettingsPage() {
   const socialErrors = Object.fromEntries(
     SOCIAL_NETWORKS.map(({ key }) => [key, socialLinks[key] && !/^https?:\/\/\S+\.\S+/.test(socialLinks[key].trim()) ? 'Enter the full link, starting with https://' : '']),
   ) as Record<keyof SocialLinks, string>;
-  const blocked = !!(emailError || nameError || upiError || Object.values(socialErrors).some(Boolean));
+  const mapLinkError = s.map_link && !/^https?:\/\/\S+\.\S+/.test(s.map_link.trim()) ? 'Enter the full link, starting with https://' : '';
+  const blocked = !!(emailError || nameError || upiError || mapLinkError ||Object.values(socialErrors).some(Boolean));
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -218,6 +219,12 @@ export default function SettingsPage() {
                     </Field>
                     <Field label="Society Address" className="md:col-span-3">
                       <Textarea rows={3} value={s.address} onChange={(e) => set('address', e.target.value)} />
+                    </Field>
+                    <Field label="Society Map Link (Google Maps)" error={mapLinkError} className="md:col-span-3">
+                      <Input value={s.map_link} onChange={(e) => set('map_link', e.target.value)} placeholder="https://maps.app.goo.gl/…" />
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        Shared with every event that has no map pin or map link of its own
+                      </span>
                     </Field>
                   </div>
                   <div>

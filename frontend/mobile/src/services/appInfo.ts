@@ -22,6 +22,7 @@ const DEFAULT_INFO: AppInfo = {
   contact_email: '',
   phone: '',
   address: '',
+  map_link: '',
   logo_url: null,
   social_links: [],
 };

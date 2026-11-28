@@ -163,6 +163,7 @@ const settingsSchema = Joi.object({
   contact_email: Joi.string().trim().lowercase().email().allow(""),
   phone: Joi.string().trim().pattern(/^\+?[\d\s-]{7,20}$/).allow("").messages({ "string.pattern.base": "phone must be a phone number" }),
   address: Joi.string().trim().max(512).allow(""),
+  map_link: Joi.string().trim().max(constant.SOCIAL_LINK_MAX_LENGTH).uri({ scheme: ["https", "http"] }).allow(""),
   logo_url: mediaUrl.allow(null),
   show_gujarati_name: Joi.boolean(),
   executive_min_donation: Joi.number().integer().min(0).max(constant.AMOUNT_MAX),

@@ -93,6 +93,8 @@ export type ApiAppInfo = {
   contact_email: string;
   phone: string;
   address: string;
+  /** The society's Google Maps link: the default location in shared events (App Settings; "" = none) */
+  map_link?: string;
   logo_url: string | null;
   /** Only the networks the admin filled in (App Settings → Social Networking), in display order */
   social_links: { network: SocialNetwork; url: string }[];

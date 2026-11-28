@@ -737,6 +737,7 @@ const userModule = {
                 contact_email: settings.contact_email,
                 phone: settings.phone,
                 address: settings.address,
+                map_link: settings.map_link, // the default location in shared events
                 logo_url: common.mediaUrl(settings.logo_url),
                 social_links,
             });
