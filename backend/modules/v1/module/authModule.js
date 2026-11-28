@@ -152,7 +152,7 @@ const authModule = {
             mail = await common.sendOtpMail({
                 toEmail: email,
                 subject: "Your verification OTP",
-                htmlMessage: createOtpWmailTemplate({ otp, otpType: otp_purpose }),
+                htmlMessage: createOtpWmailTemplate({ society: await common.mailSociety(), otp, otpType: otp_purpose }),
             });
         } catch (error) {
             mail = { skipped: true, reason: error.message };

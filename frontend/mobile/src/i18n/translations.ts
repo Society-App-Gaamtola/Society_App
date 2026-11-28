@@ -951,6 +951,8 @@ export const translations: Record<string, Entry> = {
   'No reports yet.': { gu: 'હજી કોઈ રિપોર્ટ નથી.', hi: 'अभी कोई रिपोर्ट नहीं।' },
   'View Detailed Report': { gu: 'વિગતવાર રિપોર્ટ જુઓ', hi: 'विस्तृत रिपोर्ट देखें' },
   'Open PDF': { gu: 'PDF ખોલો', hi: 'PDF खोलें' },
+  'Download PDF': { gu: 'PDF ડાઉનલોડ કરો', hi: 'PDF डाउनलोड करें' },
+  'Could not create the PDF': { gu: 'PDF બનાવી શકાઈ નહીં', hi: 'PDF नहीं बन सका' },
   'Open Excel': { gu: 'Excel ખોલો', hi: 'Excel खोलें' },
   'Could not load the report.': { gu: 'રિપોર્ટ લોડ થઈ શક્યો નહીં.', hi: 'रिपोर्ट लोड नहीं हो सकी।' },
   'Could not open report': { gu: 'રિપોર્ટ ખોલી શકાયો નહીં', hi: 'रिपोर्ट खोली नहीं जा सकी' },

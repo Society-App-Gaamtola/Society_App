@@ -99,6 +99,7 @@ export function pdfPage({
   box,
   body,
   details = [],
+  detailsLabel = 'Payment Details',
   note,
   thanks,
 }: {
@@ -108,6 +109,8 @@ export function pdfPage({
   box: BoxRow[];
   body: string;
   details?: [string, string][];
+  /** The details panel's label ("Event Details" …) */
+  detailsLabel?: string;
   note: string;
   thanks: string;
 }) {
@@ -130,7 +133,7 @@ export function pdfPage({
   <div class="panel">
     ${
       details.length
-        ? `<div class="pill">Payment Details</div>
+        ? `<div class="pill">${detailsLabel}</div>
     <div class="grid">${details.map(([label, value]) => `<div><b>${label}:</b> ${value || '-'}</div>`).join('')}</div>
     <div class="pill" style="margin-top: 12px">Note</div>`
         : '<div class="pill">Note</div>'

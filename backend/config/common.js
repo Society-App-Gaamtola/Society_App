@@ -137,6 +137,12 @@ const common = {
         return settingsCache;
     },
 
+    // The society on every email (config/mail.js, the receipt design): App Settings' name, phone, address and logo link
+    async mailSociety() {
+        const { society_name, phone, address, logo_url } = await common.getSettings();
+        return { name: society_name, phone, address, logo_url: common.mediaUrl(logo_url) };
+    },
+
     // Saves the settings sent (only keys of DEFAULT_SETTINGS) and clears the cache
     async saveSettings(changes, conn = db) {
         for (const [setting_key, value] of Object.entries(changes)) {
@@ -485,8 +491,7 @@ const common = {
                  ${toEveryone ? "" : "AND id = ANY(?::bigint[])"}`,
                 toEveryone ? [] : [receiver_ids],
             );
-            const { society_name } = await common.getSettings();
-            const htmlMessage = createContentMailTemplate({ societyName: society_name, ...mail });
+            const htmlMessage = createContentMailTemplate({ society: await common.mailSociety(), ...mail });
             const subject = `${mail.heading}: ${mail.title}`.slice(0, constant.TITLE_MAX_LENGTH);
             const emails = rows.map((r) => r.email);
             for (let i = 0; i < emails.length; i += constant.MAIL_BATCH_SIZE) {

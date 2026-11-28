@@ -127,7 +127,8 @@ backend/
                                isInMediaFolder, hashToken, likeText (ILIKE search text), sendOtpMail,
                                sendNotification (the one way to notify), notifyNewContent, deleteUpload
     status_codes.js            Codes (HTTP + response codes)
-    mail.js                    OTP email HTML template
+    mail.js                    every email (OTP, Publish and Share) in the DON receipt design: mailLayout()
+                               (tables + inline styles; logo = App Settings' https logo, common.mailSociety())
     multer.js                  uploads/ disk storage (legacy profile_image file)
     cron.js                    every 24 hours (midnight) + once on start: OTP cleanup; scheduled events →
                                posted, then common.notifyNewContent() (new event / notice notifications);
@@ -734,6 +735,10 @@ Notice flow:
 - **Every app PDF** (receipt, My Donations summary, the executive reports) is built with `pdfPage()` in
   `services/pdfLayout.ts`: the same DON receipt design as the panel (band, logo + name, contact, grey box, body,
   Note panel, thank-you line, footer), in English with `Rs.` amounts. New PDFs must use it too.
+- **Event / Notice PDF** (EVT012 / NOT005, same design): the app's Event Details and Notice Details screens have a PDF
+  button (`services/contentPdf.ts`, share sheet); the panel's Events & Notices rows and view dialogs have Download PDF
+  (`exportEventPdf` / `exportNoticePdf` in `lib/exporters.ts`). jsPDF's font has no Gujarati: a Gujarati title would not
+  print in the panel's PDFs (the app's HTML PDFs are fine).
 - **Uploads** go straight to Cloudinary (`services/media.ts`):
   - photos are shrunk to `MEDIA.maxImageSide` (1600px) and re-saved as JPEG at `MEDIA.imageQuality` (0.7);
   - iOS videos are re-encoded to 720p (`videoExportPreset`); Android has no built-in video compression, so videos

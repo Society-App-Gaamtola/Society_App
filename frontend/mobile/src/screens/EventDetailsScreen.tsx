@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Linking,
   Modal,
@@ -27,6 +28,8 @@ import { AppHeader, StatusBadge } from '../components';
 // Not in components/index.ts: it loads the native map library, so only screens with a map import it
 import EventMapCard from '../components/events/EventMapCard';
 import { eventShareText, shareAnywhere, shareOnWhatsApp } from '../services/share';
+import { eventNo, eventPdf } from '../services/contentPdf';
+import { shareFile } from '../services/receipt';
 import { useLanguage, useT } from '../i18n';
 
 const IMAGE_HEIGHT = 220;
@@ -50,6 +53,18 @@ export default function EventDetailsScreen() {
   const [photos, setPhotos] = useState<ApiMedia[]>([]);
   // Full-screen view of an event image or a gallery photo
   const [viewing, setViewing] = useState<{ url: string; caption?: string | null } | null>(null);
+  // The event as a PDF in the receipt design, shared through the phone's share sheet
+  const [makingPdf, setMakingPdf] = useState(false);
+  const sharePdf = async (item: SocietyEvent) => {
+    setMakingPdf(true);
+    try {
+      await shareFile(await eventPdf(item), 'PDF', eventNo(item.id));
+    } catch (e) {
+      Alert.alert(t('Could not create the PDF'), e instanceof Error ? e.message : t('Please try again.'));
+    } finally {
+      setMakingPdf(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -143,6 +158,15 @@ export default function EventDetailsScreen() {
               accessibilityLabel={t('Share')}
             >
               <Ionicons name="share-social-outline" size={20} color={colors.primary} />
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.shareMore, (pressed || makingPdf) && styles.pressed]}
+              onPress={() => sharePdf(event)}
+              disabled={makingPdf}
+              accessibilityRole="button"
+              accessibilityLabel={t('Download PDF')}
+            >
+              {makingPdf ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="document-text-outline" size={20} color={colors.primary} />}
             </Pressable>
           </View>
 

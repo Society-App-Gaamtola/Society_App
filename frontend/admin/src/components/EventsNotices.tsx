@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Ban, CalendarDays, EyeOff, Megaphone, Plus, Send, Star, StarOff } from 'lucide-react';
+import { Ban, CalendarDays, EyeOff, FileText, Megaphone, Plus, Send, Star, StarOff } from 'lucide-react';
 import { ConfirmDialog, DetailList, Field, FileUpload, FormDialog, PageHeader, RowActions, StatusBadge, Tabs, ViewDialog } from '@/components/common';
 import { DataTable, type Column } from '@/components/DataTable';
 import { FilterBar } from '@/components/FilterBar';
@@ -21,6 +21,7 @@ import {
 } from '@/hooks/useAdminContent';
 import { useAppSettings } from '@/hooks/useFinance';
 import { useUrlState } from '@/hooks/useUrlState';
+import { exportEventPdf, exportNoticePdf } from '@/lib/exporters';
 import { useNavigate } from '@/lib/navigation';
 import { formatDate, formatDateTime, isImageUrl, todayISO } from '@/lib/utils';
 import {
@@ -62,6 +63,37 @@ function EmailShareSwitch({ checked, onChange, what }: { checked: boolean; onCha
 /** "2026-11-20" + optional end → "20 Nov 2026" or "20 Nov 2026 – 22 Nov 2026" */
 const eventDates = (e: BackendEvent) => (e.end_date && e.end_date !== e.event_date ? `${formatDate(e.event_date)} – ${formatDate(e.end_date)}` : formatDate(e.event_date));
 const eventTimes = (e: BackendEvent) => [timeLabel(e.start_time), timeLabel(e.end_time)].filter(Boolean).join(' – ');
+const noticeAudience = (n: BackendNotice) => (n.audience === 'selected' ? `${n.recipient_count} selected members` : 'All members');
+
+/** The event / notice as a PDF in the receipt design (lib/exporters) */
+const eventPdf = (e: BackendEvent) =>
+  exportEventPdf({
+    id: e.id,
+    title: e.title,
+    category: e.category.name,
+    dates: eventDates(e),
+    times: eventTimes(e),
+    venue: e.venue_name,
+    address: e.venue_address,
+    organizer: e.organizer_name,
+    contact: e.contact_number,
+    mapLink: e.map_link || (e.latitude != null && e.longitude != null ? `https://www.google.com/maps?q=${e.latitude},${e.longitude}` : null),
+    description: e.description,
+    status: e.status,
+    statusLabel: EVENT_STATUS_LABEL[e.status],
+  });
+const noticePdf = (n: BackendNotice) =>
+  exportNoticePdf({
+    id: n.id,
+    title: n.title,
+    body: n.body,
+    category: noticeTagLabel(n.tag),
+    date: formatDate(n.published_at ?? n.created_at),
+    audience: noticeAudience(n),
+    issuedBy: n.created_by_name,
+    status: n.status,
+    statusLabel: NOTICE_STATUS_LABEL[n.status],
+  });
 
 // ---------- Event form (POST / PUT /user/events) ----------
 
@@ -292,6 +324,7 @@ function EventsTable({ onCreate }: { onCreate: boolean }) {
             onView={() => setViewing(e)}
             onDelete={() => setDeleting(e)}
             more={[
+              { label: 'Download PDF', icon: FileText, onSelect: () => eventPdf(e) },
               { label: 'Post now', icon: Send, hidden: e.status === 'posted', onSelect: () => setStatus.mutate({ id: e.id, status: 'posted' }) },
               { label: 'Move to draft', icon: EyeOff, hidden: e.status === 'draft', onSelect: () => setStatus.mutate({ id: e.id, status: 'draft' }) },
               { label: 'Cancel event', icon: Ban, hidden: ['cancelled', 'draft'].includes(e.status), destructive: true, onSelect: () => setStatus.mutate({ id: e.id, status: 'cancelled' }) },
@@ -339,15 +372,20 @@ function EventsTable({ onCreate }: { onCreate: boolean }) {
         className="max-w-2xl"
         footer={
           viewing ? (
-            <Button
-              variant="outline"
-              onClick={() => {
-                setForm({ open: true, event: viewing });
-                setViewing(null);
-              }}
-            >
-              Edit
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => eventPdf(viewing)}>
+                <FileText className="h-4 w-4" /> Download PDF
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setForm({ open: true, event: viewing });
+                  setViewing(null);
+                }}
+              >
+                Edit
+              </Button>
+            </>
           ) : null
         }
       >
@@ -503,7 +541,7 @@ function NoticesTable({ onCreate }: { onCreate: boolean }) {
           <button type="button" className="text-left hover:underline" onClick={() => setViewing(n)}>
             <span className="font-medium text-[#1E3A8A]">{n.title}</span>
             <span className="block text-xs text-muted-foreground">
-              {n.audience === 'selected' ? `${n.recipient_count} selected members` : 'All members'}
+              {noticeAudience(n)}
               {n.created_by_name ? ` · by ${n.created_by_name}` : ''}
             </span>
           </button>
@@ -522,6 +560,7 @@ function NoticesTable({ onCreate }: { onCreate: boolean }) {
             onView={() => setViewing(n)}
             onDelete={() => setDeleting(n)}
             more={[
+              { label: 'Download PDF', icon: FileText, onSelect: () => noticePdf(n) },
               n.status === 'published'
                 ? { label: 'Move to draft', icon: EyeOff, onSelect: () => setStatus.mutate({ id: n.id, status: 'draft' }) }
                 : { label: 'Publish now', icon: Send, onSelect: () => setStatus.mutate({ id: n.id, status: 'published' }) },
@@ -565,15 +604,20 @@ function NoticesTable({ onCreate }: { onCreate: boolean }) {
         title={viewing?.title ?? ''}
         footer={
           viewing ? (
-            <Button
-              variant="outline"
-              onClick={() => {
-                setForm({ open: true, notice: viewing });
-                setViewing(null);
-              }}
-            >
-              Edit
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => noticePdf(viewing)}>
+                <FileText className="h-4 w-4" /> Download PDF
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setForm({ open: true, notice: viewing });
+                  setViewing(null);
+                }}
+              >
+                Edit
+              </Button>
+            </>
           ) : null
         }
       >

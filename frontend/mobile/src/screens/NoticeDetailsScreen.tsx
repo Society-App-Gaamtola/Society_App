@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import type { HomeStackParamList } from '../navigation/types';
 import { common, surface } from '../styles/common';
 import { colors, fonts, themedStyles } from '../theme';
 import { getEvent, getNotice, toNotice, toSocietyEvent } from '../api/user';
 import { noticeShareText, shareAnywhere, shareOnWhatsApp } from '../services/share';
+import { noticeNo, noticePdf } from '../services/contentPdf';
+import { shareFile } from '../services/receipt';
 import { Ionicons } from '../icons';
 import type { Notice, SocietyEvent } from '../types';
 import { AppHeader, IconCircle, LotusFooter, StatusBadge } from '../components';
@@ -19,6 +21,18 @@ export default function NoticeDetailsScreen() {
   const [error, setError] = useState<string | null>(null);
   // Reloaded in the new language when the user switches it (category names, dates and server messages)
   const language = useLanguage();
+  // The notice as a PDF in the receipt design, shared through the phone's share sheet
+  const [makingPdf, setMakingPdf] = useState(false);
+  const sharePdf = async (item: Notice) => {
+    setMakingPdf(true);
+    try {
+      await shareFile(await noticePdf(item, item.tag), 'PDF', noticeNo(item.id));
+    } catch (e) {
+      Alert.alert(t('Could not create the PDF'), e instanceof Error ? e.message : t('Please try again.'));
+    } finally {
+      setMakingPdf(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -86,6 +100,15 @@ export default function NoticeDetailsScreen() {
               accessibilityLabel={t('Share')}
             >
               <Ionicons name="share-social-outline" size={20} color={colors.primary} />
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.shareMore, (pressed || makingPdf) && styles.pressed]}
+              onPress={() => sharePdf(notice)}
+              disabled={makingPdf}
+              accessibilityRole="button"
+              accessibilityLabel={t('Download PDF')}
+            >
+              {makingPdf ? <ActivityIndicator size="small" color={colors.primary} /> : <Ionicons name="document-text-outline" size={20} color={colors.primary} />}
             </Pressable>
           </View>
           <LotusFooter style={styles.footer} />

@@ -105,6 +105,10 @@ const twoLines = (text: string) => {
 
 type TextStyle = { size?: number; color?: Rgb; style?: string; align?: 'left' | 'right' | 'center' };
 
+type Tone = 'ok' | 'wait' | 'no';
+/** The receipt's grey box: number, party, id, date and status (each "label - value") */
+type InfoBox = { noLabel: string; no: string; partyLabel: string; party: string; idLabel: string; idValue: string; date: string; status: string; tone: Tone };
+
 /** Drawing helpers on one jsPDF page set (portrait or landscape: W / H are the page size) */
 function pdfKit(doc: JsPdf, society: ReceiptSociety) {
   const W = doc.internal.pageSize.getWidth();
@@ -175,20 +179,53 @@ function pdfKit(doc: JsPdf, society: ReceiptSociety) {
     return y;
   };
 
+  /** The grey box (society / number, party / id, date / status). Returns its bottom */
+  const infoBox = (top: number, b: InfoBox) => {
+    doc.setFillColor(...PANEL);
+    doc.setDrawColor(222, 222, 222);
+    doc.roundedRect(14, top, W - 28, 36, 3, 3, 'FD');
+    write(name, 20, top + 8.5, { size: 10, style: 'bold' });
+    write(`${b.noLabel} - ${b.no}`, W - 20, top + 8.5, { size: 10, color: GREY, align: 'right' });
+    dashed(top + 12.5);
+    const partyLabel = `${b.partyLabel} -`;
+    const idText = `${b.idLabel} - ${b.idValue}`;
+    // A long party (an event title) is cut to the room left of the id
+    const room = W - 46 - width(partyLabel, 10, 'bold') - width(idText, 10);
+    const party = wrap(b.party, 10, Math.max(room, 30));
+    write(partyLabel, 20, top + 20.5, { size: 10, style: 'bold' });
+    write(party.length > 1 ? `${party[0]}…` : party[0] ?? '', 21.5 + width(partyLabel, 10, 'bold'), top + 20.5, { size: 10 });
+    write(idText, W - 20, top + 20.5, { size: 10, color: GREY, align: 'right' });
+    dashed(top + 24.5);
+    write('Date - ', 20, top + 31.5, { size: 10, color: GREY });
+    write(b.date, 20 + width('Date - ', 10), top + 31.5, { size: 10, style: 'bold' });
+    write(b.status, W - 20, top + 31.5, { size: 10, style: 'bold', color: STATUS_COLOR[b.tone], align: 'right' });
+    write('Status - ', W - 22 - width(b.status, 10, 'bold'), top + 31.5, { size: 10, color: GREY, align: 'right' });
+    return top + 36;
+  };
+
+  /** y, or the top of a new page (with the grey band) when `need` mm don't fit above the footer */
+  const ensure = (y: number, need: number) => {
+    if (y + need <= H - FOOTER_SPACE) return y;
+    doc.addPage();
+    band();
+    return 22;
+  };
+
   /** The grey Note panel and the dotted line under it. Returns its bottom */
-  const notePanel = (top: number, noteText: string, thanks: string, details: [string, string][] = []) => {
+  const notePanel = (top: number, noteText: string, thanks: string, details: [string, string][] = [], detailsLabel = 'Payment Details') => {
     const note = wrap(noteText, 8.5, W - 38);
     const noteTop = details.length ? top + 12 + Math.ceil(details.length / 2) * 7.5 + 2 : top + 3;
     const bandEnd = noteTop + 10 + note.length * 4.2;
     doc.setFillColor(...PANEL);
     doc.rect(10, top, W - 20, bandEnd - top, 'F');
     if (details.length) {
-      pill('Payment Details', top + 3);
+      pill(detailsLabel, top + 3);
       details.forEach(([label, value], i) => {
         const x = i % 2 ? W / 2 + 5 : 20;
         const at = top + 16 + Math.floor(i / 2) * 7.5;
+        const fit = wrap(value || '-', 9.5, W / 2 - 40);
         write(`${label}:`, x, at, { size: 9.5, style: 'bold' });
-        write(value || '-', x + 27, at, { size: 9.5 });
+        write(fit.length > 1 ? `${fit[0]}…` : fit[0], x + 27, at, { size: 9.5 });
       });
     }
     pill('Note', noteTop);
@@ -211,7 +248,7 @@ function pdfKit(doc: JsPdf, society: ReceiptSociety) {
     if (phones.length) write(`Tel: ${phones.join(' / ')}`, W - 10, at + 4.5, { size: 8.5, color: GREY, align: 'right' });
   };
 
-  return { doc, W, H, name, phones, write, width, wrap, dashed, band, header, notePanel, footer };
+  return { doc, W, H, name, phones, write, width, wrap, dashed, band, header, infoBox, ensure, notePanel, footer };
 }
 
 /**
@@ -322,22 +359,12 @@ export type ReceiptExpense = {
   status: string;
 };
 
-type Tone = 'ok' | 'wait' | 'no';
-type ReceiptLayout = {
+type ReceiptLayout = InfoBox & {
   society: ReceiptSociety;
   title: string;
   fileName: string;
-  noLabel: string;
-  no: string;
   greeting: string | null;
   intro: string;
-  partyLabel: string;
-  party: string;
-  idLabel: string;
-  idValue: string;
-  date: string;
-  status: string;
-  tone: Tone;
   item: { heading: string; what: string; lines: string[]; day: string; amount: number };
   paidLabel: string;
   paid: number;
@@ -383,23 +410,7 @@ async function receiptPdf(r: ReceiptLayout) {
   y += intro.length * 5 + 5;
 
   // Box: society / receipt no, party / id, date / status
-  const top = y;
-  doc.setFillColor(...PANEL);
-  doc.setDrawColor(222, 222, 222);
-  doc.roundedRect(14, top, 182, 36, 3, 3, 'FD');
-  write(k.name, 20, top + 8.5, { size: 10, style: 'bold' });
-  write(`${r.noLabel} - ${r.no}`, 190, top + 8.5, { size: 10, color: GREY, align: 'right' });
-  dashed(top + 12.5);
-  const partyLabel = `${r.partyLabel} -`;
-  write(partyLabel, 20, top + 20.5, { size: 10, style: 'bold' });
-  write(r.party, 21.5 + width(partyLabel, 10, 'bold'), top + 20.5, { size: 10 });
-  write(`${r.idLabel} - ${r.idValue}`, 190, top + 20.5, { size: 10, color: GREY, align: 'right' });
-  dashed(top + 24.5);
-  write('Date - ', 20, top + 31.5, { size: 10, color: GREY });
-  write(r.date, 20 + width('Date - ', 10), top + 31.5, { size: 10, style: 'bold' });
-  write(r.status, 190, top + 31.5, { size: 10, style: 'bold', color: STATUS_COLOR[r.tone], align: 'right' });
-  write('Status - ', 188 - width(r.status, 10, 'bold'), top + 31.5, { size: 10, color: GREY, align: 'right' });
-  y = top + 36 + 10;
+  y = k.infoBox(y, r) + 10;
 
   // The item, the totals and the amount in words
   write(r.item.heading, 20, y, { size: 10.5, style: 'bold' });
@@ -512,5 +523,192 @@ export async function exportExpenseVoucher(expense: ReceiptExpense, { society = 
       `This is a computer-generated payment voucher issued by ${s.name} for the amount paid via ${mode}. ` +
       `Please quote the Voucher No. for any correspondence.${queries(phonesOf(s.phone))}`,
     thanks: 'Paid from the society fund.',
+  });
+}
+
+// ---------- Event and notice PDFs (Events & Notices → PDF), in the same design ----------
+
+type DocumentLayout = InfoBox & {
+  title: string;
+  fileName: string;
+  greeting: string;
+  intro: string;
+  /** "Navratri Garba Night" - "Festival": the item line, like "Donation 1 - Festival" */
+  heading: string;
+  what: string;
+  /** Grey lines under the heading (time, venue …) */
+  lines: string[];
+  /** The text typed by the creator (description / notice body); several pages when long */
+  text: string;
+  details: [string, string][];
+  /** The details panel's label: "Event Details" / "Notice Details" */
+  detailsLabel: string;
+  note: string;
+  thanks: string;
+};
+
+/** An event or notice on A4: the receipt's header, greeting and box, the item with its text, Details + Note, footer */
+async function documentPdf(d: DocumentLayout) {
+  const society = societyOf();
+  const [{ jsPDF }, logo] = await Promise.all([import('jspdf'), logoData(society.logoUrl)]);
+  const doc = new jsPDF({ format: 'a4', unit: 'mm' });
+  const k = pdfKit(doc, society);
+  const { W, H, write, width, wrap, dashed } = k;
+
+  let y = k.header(d.title, logo) + 10;
+  write(d.greeting, 20, y, { size: 10.5 });
+  const intro = wrap(d.intro, 10, W - 40);
+  write(intro, 20, (y += 8), { size: 10 });
+  y = k.infoBox(y + intro.length * 5 + 5, d) + 10;
+
+  // The item: heading - what, the grey lines, then the text
+  const heading = wrap(d.heading, 11, W - 60 - width(d.what, 10.5), 'bold');
+  heading.forEach((line, i) => write(line, 20, y + i * 5.5, { size: 11, style: 'bold' }));
+  write(` - ${d.what}`, 20 + width(heading[heading.length - 1], 11, 'bold'), y + (heading.length - 1) * 5.5, { size: 10.5 });
+  y += (heading.length - 1) * 5.5;
+  for (const line of d.lines) {
+    for (const part of wrap(line, 9, W - 40)) {
+      y = k.ensure(y + 4.8, 0);
+      write(part, 20, y, { size: 9, color: GREY });
+    }
+  }
+  if (d.text.trim()) {
+    dashed((y += 5));
+    y += 2;
+    for (const paragraph of d.text.trim().split(/\n/)) {
+      for (const line of paragraph.trim() ? wrap(paragraph, 10, W - 40) : ['']) {
+        y = k.ensure(y + 5.2, 0);
+        write(line, 20, y, { size: 10 });
+      }
+    }
+  }
+
+  // Details + Note panel and the dotted line (on a new page when they don't fit)
+  const panelHeight = 12 + Math.ceil(d.details.length / 2) * 7.5 + 12 + wrap(d.note, 8.5, W - 38).length * 4.2 + 15;
+  y = k.ensure(y + 8, panelHeight);
+  k.notePanel(y, d.note, d.thanks, d.details, d.detailsLabel);
+
+  const pages = doc.getNumberOfPages();
+  for (let page = 1; page <= pages; page += 1) {
+    doc.setPage(page);
+    k.footer(H - 20, pages > 1 ? `Page ${page} of ${pages}` : undefined);
+  }
+  doc.save(`${d.fileName}.pdf`);
+}
+
+const toneOfContent = (status: string): Tone => (status === 'posted' || status === 'published' ? 'ok' : status === 'cancelled' ? 'no' : 'wait');
+
+/** What an event PDF needs, as the panel shows it (dates and times already formatted) */
+export type PdfEvent = {
+  id: number;
+  title: string;
+  category: string;
+  dates: string;
+  times: string;
+  venue: string;
+  address: string | null;
+  organizer: string | null;
+  contact: string | null;
+  mapLink: string | null;
+  description: string | null;
+  status: string;
+  statusLabel: string;
+};
+
+/** One event as a PDF (EVT012.pdf) */
+export async function exportEventPdf(e: PdfEvent) {
+  const no = recordNo('EVT', e.id);
+  const name = societyOf().name;
+  const phones = phonesOf(societyOf().phone);
+  const where = [e.venue, e.address].filter(Boolean).join(', ');
+  await documentPdf({
+    title: 'Event Details',
+    fileName: no,
+    greeting: 'Dear Members ,',
+    intro:
+      e.status === 'cancelled'
+        ? 'Please note that the event below has been cancelled.'
+        : `${name} invites you and your family to the event below. The details are below.`,
+    noLabel: 'Event No',
+    no,
+    partyLabel: 'Event',
+    party: e.title,
+    idLabel: 'Category',
+    idValue: e.category,
+    date: e.dates,
+    status: e.statusLabel,
+    tone: toneOfContent(e.status),
+    heading: e.title,
+    what: e.category,
+    lines: [
+      e.times ? `Time - ${e.times}` : '',
+      where ? `Venue - ${where}` : '',
+      e.organizer ? `Organizer - ${e.organizer}` : '',
+      e.contact ? `Contact - ${e.contact}` : '',
+      e.mapLink ? `Map - ${e.mapLink}` : '',
+    ].filter(Boolean),
+    text: e.description ?? '',
+    details: [
+      ['Date', e.dates],
+      ['Time', e.times || '-'],
+      ['Venue', e.venue || '-'],
+      ['Category', e.category],
+      ['Organizer', e.organizer || '-'],
+      ['Contact', e.contact || '-'],
+    ],
+    detailsLabel: 'Event Details',
+    note:
+      `This is a computer-generated copy of the event issued by ${name}. Timings and venue may change; please check the ` +
+      `society app for the latest details and quote the Event No. for any correspondence.${queries(phones)}`,
+    thanks: e.status === 'cancelled' ? 'Thank you for your understanding.' : 'We look forward to seeing you.',
+  });
+}
+
+/** What a notice PDF needs, as the panel shows it */
+export type PdfNotice = {
+  id: number;
+  title: string;
+  body: string;
+  category: string;
+  date: string;
+  audience: string;
+  issuedBy: string | null;
+  status: string;
+  statusLabel: string;
+};
+
+/** One notice as a PDF (NOT005.pdf) */
+export async function exportNoticePdf(n: PdfNotice) {
+  const no = recordNo('NOT', n.id);
+  const name = societyOf().name;
+  await documentPdf({
+    title: 'Notice',
+    fileName: no,
+    greeting: 'Dear Members ,',
+    intro: 'Please read the notice below from the society.',
+    noLabel: 'Notice No',
+    no,
+    partyLabel: 'Notice',
+    party: n.title,
+    idLabel: 'Category',
+    idValue: n.category,
+    date: n.date,
+    status: n.statusLabel,
+    tone: toneOfContent(n.status),
+    heading: n.title,
+    what: n.category,
+    lines: [`Sent to - ${n.audience}`, ...(n.issuedBy ? [`Issued by - ${n.issuedBy}`] : [])],
+    text: n.body,
+    details: [
+      ['Category', n.category],
+      ['Date', n.date],
+      ['Sent to', n.audience],
+      ['Status', n.statusLabel],
+    ],
+    detailsLabel: 'Notice Details',
+    note:
+      `This is a computer-generated copy of the notice issued by ${name}. Please quote the Notice No. for any ` +
+      `correspondence.${queries(phonesOf(societyOf().phone))}`,
+    thanks: 'Thank you for reading.',
   });
 }
