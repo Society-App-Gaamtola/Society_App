@@ -30,12 +30,13 @@ const statusRow = (date: string, status: string, tone: 'ok' | 'wait'): BoxRow =>
 
 /** One event as a PDF */
 export async function eventPdf(event: SocietyEvent) {
+  const logo = await logoDataUri(); // first: it reloads App Settings' society details
   const no = eventNo(event.id);
   const name = escapeHtml(getSocietyInfo().society_name);
   const venue = event.venueName ?? event.venue;
   const where = [venue, event.address].filter(Boolean).join(', ');
   const html = pdfPage({
-    logo: await logoDataUri(),
+    logo,
     title: 'Event Details',
     greeting: ['Dear Members ,', `${name} invites you and your family to the event below. The details are below.`],
     box: [
@@ -74,10 +75,11 @@ export async function eventPdf(event: SocietyEvent) {
 
 /** One notice as a PDF; category = the notice's tag as the app shows it */
 export async function noticePdf(notice: Notice, category: string) {
+  const logo = await logoDataUri(); // first: it reloads App Settings' society details
   const no = noticeNo(notice.id);
   const name = escapeHtml(getSocietyInfo().society_name);
   const html = pdfPage({
-    logo: await logoDataUri(),
+    logo,
     title: 'Notice',
     greeting: ['Dear Members ,', 'Please read the notice below from the society.'],
     box: [

@@ -30,6 +30,7 @@ const modeOf = (method: string) => (method === 'UPI App' || method === 'QR Code'
  * Returns the file URI
  */
 export async function donationReceiptPdf(donation: MyDonation, donor: Donor) {
+  const logo = await logoDataUri(); // first: it reloads App Settings' society details
   const no = receiptNo(donation.id);
   const name = escapeHtml(getSocietyInfo().society_name);
   const day = new Date(donation.date);
@@ -41,7 +42,7 @@ export async function donationReceiptPdf(donation: MyDonation, donor: Donor) {
   const donorName = escapeHtml(donor.name);
 
   const html = pdfPage({
-    logo: await logoDataUri(),
+    logo,
     title: 'Donation Receipt',
     greeting: [`Dear ${donorName} ,`, 'Thank you for supporting the society. Your donation has been received and the details are below.'],
     box: [
@@ -104,10 +105,11 @@ export async function donationSummaryFile(donations: MyDonation[], donor: Donor,
   }
 
   // The PDF is in English, like the receipt: the receipt's design with one line per donation
+  const logo = await logoDataUri(); // first: it reloads App Settings' society details
   const name = escapeHtml(getSocietyInfo().society_name);
   const donorName = escapeHtml(donor.name);
   const html = pdfPage({
-    logo: await logoDataUri(),
+    logo,
     title: 'Donation Summary',
     greeting: [`Dear ${donorName} ,`, 'Thank you for supporting the society. Here is a summary of your donations.'],
     box: [

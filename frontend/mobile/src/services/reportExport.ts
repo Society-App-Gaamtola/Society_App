@@ -1,7 +1,7 @@
 import { Asset } from 'expo-asset';
 import { File, Paths } from 'expo-file-system';
 import { LOGO } from '../config';
-import { getSocietyInfo } from './appInfo';
+import { getSocietyInfo, refreshAppInfo } from './appInfo';
 import {
   getReportCategories,
   getReportDonations,
@@ -105,7 +105,34 @@ const trendBars = (rows: Group[]) => {
     : '';
 };
 
+/** A logo link as a data URL (a PDF can't wait for a picture to load); null when it can't be read */
+async function remoteImage(url: string) {
+  try {
+    // Cloudinary sends it as a small PNG, so the PDF stays small
+    const small = url.includes('res.cloudinary.com/') && url.includes('/upload/') ? url.replace('/upload/', '/upload/f_png,c_limit,w_300/') : url;
+    const res = await fetch(small);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Call first in every PDF: reloads the society details (name, address, phone, logo) from App Settings, so a change
+ * in the panel shows in the next PDF, then returns the logo: App Settings' logo, else the app's own (offline too)
+ */
 export async function logoDataUri() {
+  await refreshAppInfo();
+  const url = getSocietyInfo().logo_url;
+  const saved = url ? await remoteImage(url) : null;
+  if (saved) return saved;
   try {
     const asset = Asset.fromModule(LOGO);
     await asset.downloadAsync();

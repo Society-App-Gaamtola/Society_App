@@ -135,12 +135,6 @@ export default function ProfilePage() {
               <Field label="Email Address" error={errors.email}>
                 <Input type="email" value={draft.email} onChange={(e) => set('email', e.target.value)} disabled={!!pendingEmail} />
               </Field>
-              <Field label="Mobile Number">
-                <Input value={`${profile.country_code} ${profile.mobile_number}`} disabled aria-describedby="mobile-note" />
-                <span id="mobile-note" className="mt-1 block text-xs text-muted-foreground">
-                  The mobile number can&apos;t be changed.
-                </span>
-              </Field>
             </div>
             <Field label="Address" className="mt-3">
               <Textarea rows={2} value={draft.address} onChange={(e) => set('address', e.target.value)} />
